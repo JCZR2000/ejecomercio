@@ -856,30 +856,41 @@
         
         // Monitor de Estado (Login/Logout)
         // ------------------------------------------
-        // LÓGICA DE AUTENTICACIÓN MEJORADA (OFFLINE FIRST)
+        // LÓGICA DE AUTENTICACIÓN MEJORADA (v41.1 Fix)
         // ------------------------------------------
         
-        // 1. Configurar persistencia explícita
-        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-            .then(() => {
-                // Persistencia activada
-            })
-            .catch((error) => console.error("Error persistencia:", error));
+        // 1. Configurar persistencia (Promesa, no bloqueante)
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
 
-        // 2. Comprobación Inicial Rápida (Optimista)
-        // Si tenemos productos guardados, asumimos que el usuario es válido y quitamos la cortina YA.
-        if (state.products.length > 0) {
+        // 2. LÓGICA DE ARRANQUE (BOOT)
+        // Verificamos si ya hay datos para dejar pasar al usuario INMEDIATAMENTE
+        const hasLocalData = state.products && state.products.length > 0;
+
+        if (hasLocalData) {
+            // USUARIO RECURRENTE (Con datos): Entra directo
+            console.log("🚀 Arranque rápido: Datos locales detectados.");
             document.getElementById('loginOverlay').classList.add('hidden');
             updateCloudStatus('OFFLINE'); // Asumimos offline hasta que Firebase diga lo contrario
+        } else {
+            // USUARIO NUEVO (Sin datos): Se queda en el Login
+            console.log("👤 Usuario nuevo o limpieza: Esperando Login...");
+            document.getElementById('loginOverlay').classList.remove('hidden');
         }
 
-        // 3. Monitor de Estado Real (Firebase)
+        // 3. MONITOR DE FIREBASE (Llega después)
         auth.onAuthStateChanged(user => {
+            const loginOverlay = document.getElementById('loginOverlay');
+            const loginStatus = document.getElementById('loginStatus');
+
             if (user) {
-                // CONFIRMADO: Usuario conectado
-                document.getElementById('loginOverlay').classList.add('hidden');
+                // --- CONEXIÓN EXITOSA ---
+                console.log("✅ Firebase Auth: Conectado como " + user.email);
                 
-                // Actualizar UI Usuario
+                // 1. Quitar Login (si aún estaba)
+                loginOverlay.classList.add('hidden');
+                loginStatus.classList.add('hidden'); // Ocultar mensaje de "Conectando..."
+
+                // 2. Actualizar UI de Usuario (Avatar/Nombre)
                 const avatar = document.getElementById('userAvatar');
                 const icon = document.getElementById('userIcon');
                 if(user.photoURL) {
@@ -890,26 +901,39 @@
                 document.getElementById('userNameDisplay').textContent = user.displayName || 'Usuario';
                 document.getElementById('userEmailDisplay').textContent = user.email;
 
-                // Conectar sincronización
+                // 3. Iniciar Sincronización de Datos
                 initDataSync(user);
+
             } else {
-                // CONFIRMADO: No hay usuario (Logout o primera vez)
-                // Solo mostramos la cortina si NO hay datos locales (para no bloquear lectura offline)
-                // O si el usuario explícitamente cerró sesión.
+                // --- DESCONECTADO / ERROR / NUEVO ---
+                console.log("💤 Firebase Auth: No hay sesión activa.");
+                
+                // Solo bloqueamos la pantalla si NO TIENE DATOS locales.
+                // Si tiene datos, le dejamos trabajar offline/anonimo con su caché.
                 if (state.products.length === 0) {
-                    document.getElementById('loginOverlay').classList.remove('hidden');
+                    loginOverlay.classList.remove('hidden');
+                    loginStatus.classList.add('hidden'); // Resetear mensaje
                 }
+                
                 if (unsubscribe) unsubscribe();
             }
         });
 
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
+            // Mostrar feedback visual
+            document.getElementById('loginStatus').textContent = "Abriendo ventana de Google...";
             document.getElementById('loginStatus').classList.remove('hidden');
-            auth.signInWithPopup(provider).catch(error => {
-                alert("Error: " + error.message);
-                document.getElementById('loginStatus').classList.add('hidden');
-            });
+            
+            auth.signInWithPopup(provider)
+                .then(() => {
+                    // El onAuthStateChanged manejará el éxito
+                })
+                .catch(error => {
+                    console.error("Login Error:", error);
+                    alert("No se pudo iniciar sesión: " + error.message);
+                    document.getElementById('loginStatus').classList.add('hidden');
+                });
         }
 
         function logout() {
