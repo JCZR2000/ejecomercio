@@ -3,9 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario Pro v39.7.1</title>
+    <title>Inventario Pro v40</title>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -49,13 +55,31 @@
 </head>
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
 
+    <div id="loginOverlay" class="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-4 transition-all duration-500">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <div class="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <i class="fa-solid fa-cloud text-4xl text-slate-900"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800 mb-2">EjeComercio Cloud</h1>
+            <p class="text-gray-500 text-sm mb-8">Tus datos sincronizados en todos tus dispositivos a tiempo real.</p>
+            
+            <button onclick="loginWithGoogle()" class="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 hover:bg-gray-50 transition shadow-sm">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6">
+                <span>Continuar con Google</span>
+            </button>
+
+            <p id="loginStatus" class="mt-4 text-xs text-blue-500 hidden animate-pulse">Conectando...</p>
+        </div>
+        <p class="text-slate-500 text-xs mt-8">Versión 40.0 Alpha</p>
+    </div>
+
     <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex flex-row justify-between items-center">
             <div class="flex items-center gap-2 overflow-hidden">
                 <h1 class="text-lg md:text-2xl font-bold text-yellow-500 flex items-center gap-2 truncate">
                     <i class="fa-solid fa-file-invoice-dollar"></i> 
                     <span class="hidden md:inline">Inventario Pro</span> 
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v39.7</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v40</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -72,9 +96,25 @@
                         <i class="fa-solid fa-sync-alt"></i>
                     </button>
                 </div>
-                <button onclick="toggleMenu('config')" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded transition shadow">
-                    <i class="fa-solid fa-gear"></i>
-                </button>
+                <div class="relative group">
+                    <button class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
+                        <img id="userAvatar" src="" class="w-full h-full object-cover hidden rounded-full">
+                        <i id="userIcon" class="fa-solid fa-user"></i>
+                    </button>
+                    <div class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden group-hover:block z-50 border border-gray-100">
+                        <div class="px-4 py-2 border-b border-gray-100 bg-gray-50">
+                            <p class="text-xs font-bold text-gray-800 truncate" id="userNameDisplay">Usuario</p>
+                            <p class="text-[10px] text-gray-500 truncate" id="userEmailDisplay">...</p>
+                        </div>
+                        <button onclick="toggleMenu('config')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-gear text-gray-400"></i> Configuración
+                        </button>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -766,6 +806,112 @@
         </div>
 
     <script>
+
+        // ==========================================
+        // 0. CONFIGURACIÓN FIREBASE (v40)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBMjRVdh6_3-eqOlxFpjjIPOJhWgIsaJOo",
+            authDomain: "ejecomercio-27f57.firebaseapp.com",
+            projectId: "ejecomercio-27f57",
+            storageBucket: "ejecomercio-27f57.firebasestorage.app",
+            messagingSenderId: "308793787242",
+            appId: "1:308793787242:web:d30cbbba17735f24e59b13",
+            measurementId: "G-WEZ45JMDRS"
+        };
+
+        // Inicializar
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        let unsubscribe = null; // Para control de sincronización
+
+        // Habilitar Persistencia Offline
+        db.enablePersistence().catch(err => {
+            if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
+            else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
+        });
+
+        // ------------------------------------------
+        // LÓGICA DE AUTENTICACIÓN
+        // ------------------------------------------
+        
+        // Monitor de Estado (Login/Logout)
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                // Usuario conectado
+                document.getElementById('loginOverlay').classList.add('hidden');
+                
+                // Actualizar Header
+                const avatar = document.getElementById('userAvatar');
+                const icon = document.getElementById('userIcon');
+                if(user.photoURL) {
+                    avatar.src = user.photoURL;
+                    avatar.classList.remove('hidden');
+                    icon.classList.add('hidden');
+                }
+                document.getElementById('userNameDisplay').textContent = user.displayName || 'Usuario';
+                document.getElementById('userEmailDisplay').textContent = user.email;
+
+                // INICIAR SINCRONIZACIÓN
+                initDataSync(user);
+            } else {
+                // Usuario desconectado
+                document.getElementById('loginOverlay').classList.remove('hidden');
+                if (unsubscribe) unsubscribe(); // Dejar de escuchar cambios
+            }
+        });
+
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            document.getElementById('loginStatus').classList.remove('hidden');
+            auth.signInWithPopup(provider).catch(error => {
+                alert("Error: " + error.message);
+                document.getElementById('loginStatus').classList.add('hidden');
+            });
+        }
+
+        function logout() {
+            if(confirm("¿Cerrar sesión y detener sincronización?")) {
+                auth.signOut();
+                location.reload();
+            }
+        }
+
+        // ------------------------------------------
+        // LÓGICA DE SINCRONIZACIÓN (NUBE <-> LOCAL)
+        // ------------------------------------------
+        function initDataSync(user) {
+            const docRef = db.collection('users').doc(user.uid);
+
+            unsubscribe = docRef.onSnapshot(doc => {
+                if (doc.exists) {
+                    // CASO A: Hay datos en la nube -> Descargar y Sobrescribir Local
+                    const cloudData = doc.data();
+                    
+                    // Actualizamos memoria
+                    state = { ...state, ...cloudData };
+                    
+                    // Actualizamos localStorage (backup redundante)
+                    // (Llamamos al localStorage directo para evitar bucle infinito con saveData)
+                    localStorage.setItem('inv_products', JSON.stringify(state.products));
+                    localStorage.setItem('inv_sales', JSON.stringify(state.sales));
+                    localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+                    localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                    // ... (resto de variables se actualizan en memoria y render)
+
+                    renderAll();
+                    console.log("☁️ Sincronizado desde la nube");
+                } else {
+                    // CASO B: Usuario Nuevo en Nube -> Subir lo Local
+                    console.log("⬆️ Subiendo datos locales a la nube por primera vez...");
+                    saveData(); 
+                }
+            }, error => {
+                console.error("Error Sync:", error);
+            });
+        }
+
         // ==========================================
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
@@ -801,7 +947,8 @@
         const $ = (id) => document.getElementById(id);
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+            // NO cargamos datos aquí. Esperamos a Firebase Auth.
+            // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
             fetchAllRates();
             renderAll();
         });
@@ -1000,6 +1147,7 @@
         }
 
         function saveData() {
+            // 1. Guardado Local (Inmediato)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
@@ -1009,6 +1157,29 @@
             localStorage.setItem('inv_bcv_usd', state.bcvUsd);
             localStorage.setItem('inv_bcv_eur', state.bcvEur);
             localStorage.setItem('inv_security', JSON.stringify(state.security));
+            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+
+            // 2. Guardado en Nube (Si hay usuario)
+            const user = auth.currentUser;
+            if (user) {
+                const dataToSave = {
+                    products: state.products,
+                    sales: state.sales,
+                    credits: state.credits,
+                    paymentMethods: state.paymentMethods,
+                    security: state.security,
+                    customRate: state.customRate,
+                    rateMode: state.rateMode,
+                    fiadosRateMode: state.fiadosRateMode,
+                    bcvUsd: state.bcvUsd,
+                    bcvEur: state.bcvEur,
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                // Usamos merge: true para no borrar campos que no enviemos
+                db.collection('users').doc(user.uid).set(dataToSave, { merge: true })
+                    .catch(err => console.error("Error nube:", err));
+            }
         }
 
         // ==========================================
@@ -2066,19 +2237,34 @@
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
+            
             reader.onload = (e) => {
                 try {
                     const d = JSON.parse(e.target.result);
-                    if (confirm('¿Restaurar backup?')) {
-                        if (d.products) localStorage.setItem('inv_products', JSON.stringify(d.products));
-                        if (d.sales) localStorage.setItem('inv_sales', JSON.stringify(d.sales));
-                        if (d.credits) localStorage.setItem('inv_credits', JSON.stringify(d.credits));
-                        if (d.security) localStorage.setItem('inv_security', JSON.stringify(d.security));
-                        alert('Restaurado.');
-                        location.reload();
+                    
+                    if (confirm('¿Restaurar este respaldo y subirlo a la Nube?')) {
+                        // 1. Inyectar datos en la memoria (State)
+                        if (d.products) state.products = d.products;
+                        if (d.sales) state.sales = d.sales;
+                        if (d.credits) state.credits = d.credits;
+                        if (d.security) state.security = d.security;
+                        if (d.paymentMethods) state.paymentMethods = d.paymentMethods;
+                        
+                        // 2. ¡EL SECRETO! Guardamos inmediatamente.
+                        // Esto empuja los datos a Firebase y actualiza el LocalStorage al mismo tiempo.
+                        saveData();
+                        
+                        // 3. Renderizar cambios (Sin recargar la página)
+                        renderAll();
+                        
+                        // 4. Resetear el input de archivo por si quieres subir otro
+                        $('restoreInput').value = '';
+                        
+                        alert('¡Datos restaurados y sincronizados con la nube! ☁️✅');
                     }
                 } catch (err) {
-                    alert('Error archivo');
+                    console.error(err);
+                    alert('Error: El archivo de respaldo no es válido.');
                 }
             };
             reader.readAsText(file);
