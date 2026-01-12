@@ -89,6 +89,9 @@
                 </span>
             </div>
             <div class="flex items-center gap-3">
+                <div id="cloudStatus" class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 border border-slate-700 transition-all duration-300" title="Estado de conexión">
+                    <div id="cloudDot" class="w-2.5 h-2.5 rounded-full bg-gray-400"></div> <span id="cloudText" class="text-[10px] font-bold text-gray-400 uppercase hidden md:inline">Conectando</span>
+                </div>
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
                     <input type="number" id="displayRate" readonly class="bg-transparent text-white w-16 text-sm font-mono focus:outline-none text-right cursor-default" placeholder="0.00">
@@ -878,38 +881,98 @@
             }
         }
 
+        // ==========================================
+        // UI: SEMÁFORO DE SINCRONIZACIÓN
+        // ==========================================
+        function updateCloudStatus(status) {
+            const container = $('cloudStatus');
+            const dot = $('cloudDot');
+            const text = $('cloudText');
+
+            // Reseteamos clases de color
+            dot.className = "w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(0,0,0,0.5)]";
+            text.className = "text-[10px] font-bold uppercase hidden md:inline transition-colors";
+
+            if (status === 'ONLINE') {
+                // VERDE: Todo sincronizado
+                dot.classList.add('bg-green-500', 'shadow-green-500/50');
+                text.classList.add('text-green-500');
+                text.textContent = "Sincronizado";
+                container.classList.replace('border-red-900', 'border-slate-700'); // Quitar borde rojo si existía
+            } 
+            else if (status === 'SYNCING') {
+                // AMARILLO: Subiendo cambios o procesando
+                dot.classList.add('bg-yellow-400', 'animate-ping'); // Ping para efecto de actividad
+                text.classList.add('text-yellow-400');
+                text.textContent = "Guardando...";
+            } 
+            else if (status === 'OFFLINE') {
+                // ROJO: Sin internet
+                dot.classList.add('bg-red-500', 'shadow-red-500/50');
+                text.classList.add('text-red-500');
+                text.textContent = "Sin Conexión";
+                // Añadimos un borde rojo sutil al contenedor para alertar
+                container.classList.replace('border-slate-700', 'border-red-900'); 
+            }
+        }
+
+        // Listeners del Navegador (Detectar si se cae el cable de red)
+        window.addEventListener('online', () => updateCloudStatus('SYNCING'));
+        window.addEventListener('offline', () => updateCloudStatus('OFFLINE'));
+
         // ------------------------------------------
         // LÓGICA DE SINCRONIZACIÓN (NUBE <-> LOCAL)
         // ------------------------------------------
         function initDataSync(user) {
             const docRef = db.collection('users').doc(user.uid);
 
-            unsubscribe = docRef.onSnapshot(doc => {
+            // Escuchar cambios INCLUYENDO METADATA (Para saber si está pendiente de escribir)
+            unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
+
+                // 1. CONTROL DEL SEMÁFORO (UI)
+                if (doc.metadata.hasPendingWrites) {
+                    updateCloudStatus('SYNCING'); // Amarillo
+                } else {
+                    updateCloudStatus('ONLINE');  // Verde
+                }
+
                 if (doc.exists) {
                     // CASO A: Hay datos en la nube -> Descargar
                     const cloudData = doc.data();
-                    
-                    // Mezclamos datos
+
+                    // Actualizamos la memoria siempre para tener la "Verdad" de la nube
                     state = { ...state, ...cloudData };
+                    state.isCloudSynced = true; // Quitamos el seguro ✅
+
+                    // 2. OPTIMIZACIÓN DE RENDERIZADO
+                    // Solo guardamos en disco (LocalStorage) y repintamos la tabla si el dato 
+                    // ya está CONFIRMADO en el servidor (no tiene escrituras pendientes).
+                    // Esto evita parpadeos cuando tú mismo haces un cambio.
+                    if (!doc.metadata.hasPendingWrites) {
+                         localStorage.setItem('inv_products', JSON.stringify(state.products));
+                         localStorage.setItem('inv_sales', JSON.stringify(state.sales));
+                         localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+                         localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                         localStorage.setItem('inv_security', JSON.stringify(state.security));
+                         localStorage.setItem('inv_custom_rate', state.customRate);
+                         localStorage.setItem('inv_rate_mode', state.rateMode);
+                         localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
+                         localStorage.setItem('inv_bcv_usd', state.bcvUsd);
+                         localStorage.setItem('inv_bcv_eur', state.bcvEur);
+                         
+                         renderAll();
+                         console.log("☁️ Sincronizado y guardado en disco local.");
+                    }
                     
-                    // IMPORTANTE: Marcamos que ya estamos sincronizados
-                    state.isCloudSynced = true; // <--- SEGURO QUITADO ✅
-                    
-                    // Actualizamos localStorage visualmente
-                    renderAll();
-                    console.log("☁️ Sincronizado desde la nube");
-                    $('syncBadge').className = "text-xs bg-green-500 text-white px-1.5 rounded animate-pulse";
-                    $('syncBadge').textContent = "ONLINE";
                 } else {
-                    // CASO B: Usuario Nuevo -> Subir Local
+                    // CASO B: Usuario Nuevo en Nube -> Subir Local
                     console.log("⬆️ Subiendo datos locales...");
-                    state.isCloudSynced = true; // <--- SEGURO QUITADO (Para poder subir)
+                    state.isCloudSynced = true; // Quitamos el seguro para poder subir
                     saveData(); 
                 }
             }, error => {
                 console.error("Error Sync:", error);
-                $('syncBadge').className = "text-xs bg-red-500 text-white px-1.5 rounded";
-                $('syncBadge').textContent = "OFFLINE";
+                updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
         }
 
@@ -1171,6 +1234,8 @@
             }
 
             if (user) {
+                // FEEDBACK VISUAL INMEDIATO
+                updateCloudStatus('SYNCING'); // Pone amarillo al instante
                 const dataToSave = {
                     products: state.products,
                     sales: state.sales,
@@ -1186,7 +1251,10 @@
                 };
                 
                 db.collection('users').doc(user.uid).set(dataToSave, { merge: true })
-                    .catch(err => console.error("Error nube:", err));
+                    .catch(err => {
+                        console.error("Error nube:", err);
+                        updateCloudStatus('OFFLINE'); // Si falla, rojo
+                    });
             }
         }
 
