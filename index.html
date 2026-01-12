@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario Pro v40.1</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <title>Inventario Pro v41</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -68,9 +73,9 @@
                 <span>Continuar con Google</span>
             </button>
 
-            <p id="loginStatus" class="mt-4 text-xs text-blue-500 hidden animate-pulse">Conectando...</p>
+            <p id="loginStatus" class="mt-4 text-xs text-blue-500 hidden animate-pulse">Conectando al inventario...</p>
         </div>
-        <p class="text-slate-500 text-xs mt-8">Versión 40.0 Alpha</p>
+        <p class="text-slate-500 text-xs mt-8">Versión 41.0</p>
     </div>
 
     <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
@@ -79,7 +84,7 @@
                 <h1 class="text-lg md:text-2xl font-bold text-yellow-500 flex items-center gap-2 truncate">
                     <i class="fa-solid fa-file-invoice-dollar"></i> 
                     <span class="hidden md:inline">Inventario Pro</span> 
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v40.1</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v41</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -807,6 +812,16 @@
                 </div>
             </div>
         </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado: ', reg.scope))
+                    .catch(err => console.log('Service Worker falló: ', err));
+            });
+        }
+    </script>
 
     <script>
 
