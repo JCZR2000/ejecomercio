@@ -850,6 +850,31 @@
             else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
         });
 
+        // ==========================================
+        // 1. ESTADO GLOBAL & VARIABLES
+        // ==========================================
+        let state = {
+            // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
+            products: JSON.parse(localStorage.getItem('inv_products')) || [],
+            sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
+            credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
+            paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
+            security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
+            
+            // Configs
+            bcvUsd: parseFloat(localStorage.getItem('inv_bcv_usd')) || 0,
+            bcvEur: parseFloat(localStorage.getItem('inv_bcv_eur')) || 0,
+            customRate: parseFloat(localStorage.getItem('inv_custom_rate')) || 0,
+            rateMode: localStorage.getItem('inv_rate_mode') || 'USD',
+            fiadosRateMode: localStorage.getItem('inv_fiados_rate_mode') || 'DEFAULT',
+
+            // Variables de sesión
+            cart: [],
+            isCloudSynced: false, 
+            editingId: null, tempImg: null, activeCreditId: null, dateEditId: null,
+            sortCol: 'name', sortAsc: true, filterText: '', surchargeType: 'PERCENT', creditSortMode: 'URGENCY', currentShareId: null
+        };
+
         // ------------------------------------------
         // LÓGICA DE AUTENTICACIÓN
         // ------------------------------------------
@@ -1037,31 +1062,6 @@
                 updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
         }
-
-        // ==========================================
-        // 1. ESTADO GLOBAL & VARIABLES
-        // ==========================================
-        let state = {
-            // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
-            products: JSON.parse(localStorage.getItem('inv_products')) || [],
-            sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
-            credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
-            paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
-            security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
-            
-            // Configs
-            bcvUsd: parseFloat(localStorage.getItem('inv_bcv_usd')) || 0,
-            bcvEur: parseFloat(localStorage.getItem('inv_bcv_eur')) || 0,
-            customRate: parseFloat(localStorage.getItem('inv_custom_rate')) || 0,
-            rateMode: localStorage.getItem('inv_rate_mode') || 'USD',
-            fiadosRateMode: localStorage.getItem('inv_fiados_rate_mode') || 'DEFAULT',
-
-            // Variables de sesión
-            cart: [],
-            isCloudSynced: false, 
-            editingId: null, tempImg: null, activeCreditId: null, dateEditId: null,
-            sortCol: 'name', sortAsc: true, filterText: '', surchargeType: 'PERCENT', creditSortMode: 'URGENCY', currentShareId: null
-        };
 
         let pendingAction = null;
         const $ = (id) => document.getElementById(id);
