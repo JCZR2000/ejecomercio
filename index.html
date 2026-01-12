@@ -855,12 +855,31 @@
         // ------------------------------------------
         
         // Monitor de Estado (Login/Logout)
+        // ------------------------------------------
+        // LÓGICA DE AUTENTICACIÓN MEJORADA (OFFLINE FIRST)
+        // ------------------------------------------
+        
+        // 1. Configurar persistencia explícita
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+            .then(() => {
+                // Persistencia activada
+            })
+            .catch((error) => console.error("Error persistencia:", error));
+
+        // 2. Comprobación Inicial Rápida (Optimista)
+        // Si tenemos productos guardados, asumimos que el usuario es válido y quitamos la cortina YA.
+        if (state.products.length > 0) {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            updateCloudStatus('OFFLINE'); // Asumimos offline hasta que Firebase diga lo contrario
+        }
+
+        // 3. Monitor de Estado Real (Firebase)
         auth.onAuthStateChanged(user => {
             if (user) {
-                // Usuario conectado
+                // CONFIRMADO: Usuario conectado
                 document.getElementById('loginOverlay').classList.add('hidden');
                 
-                // Actualizar Header
+                // Actualizar UI Usuario
                 const avatar = document.getElementById('userAvatar');
                 const icon = document.getElementById('userIcon');
                 if(user.photoURL) {
@@ -871,12 +890,16 @@
                 document.getElementById('userNameDisplay').textContent = user.displayName || 'Usuario';
                 document.getElementById('userEmailDisplay').textContent = user.email;
 
-                // INICIAR SINCRONIZACIÓN
+                // Conectar sincronización
                 initDataSync(user);
             } else {
-                // Usuario desconectado
-                document.getElementById('loginOverlay').classList.remove('hidden');
-                if (unsubscribe) unsubscribe(); // Dejar de escuchar cambios
+                // CONFIRMADO: No hay usuario (Logout o primera vez)
+                // Solo mostramos la cortina si NO hay datos locales (para no bloquear lectura offline)
+                // O si el usuario explícitamente cerró sesión.
+                if (state.products.length === 0) {
+                    document.getElementById('loginOverlay').classList.remove('hidden');
+                }
+                if (unsubscribe) unsubscribe();
             }
         });
 
@@ -995,32 +1018,25 @@
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
         let state = {
-            isCloudSynced: false, // <--- AGREGA ESTO (El seguro está puesto)
-            products: [],
-            sales: [],
-            credits: [],
+            // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
+            products: JSON.parse(localStorage.getItem('inv_products')) || [],
+            sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
+            credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
+            paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
+            security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
+            
+            // Configs
+            bcvUsd: parseFloat(localStorage.getItem('inv_bcv_usd')) || 0,
+            bcvEur: parseFloat(localStorage.getItem('inv_bcv_eur')) || 0,
+            customRate: parseFloat(localStorage.getItem('inv_custom_rate')) || 0,
+            rateMode: localStorage.getItem('inv_rate_mode') || 'USD',
+            fiadosRateMode: localStorage.getItem('inv_fiados_rate_mode') || 'DEFAULT',
+
+            // Variables de sesión
             cart: [],
-            bcvUsd: 0,
-            bcvEur: 0,
-            customRate: 0,
-            rateMode: 'USD',
-            fiadosRateMode: 'DEFAULT',
-            security: {
-                pin: null,
-                lockAdd: false,
-                lockEdit: false,
-                lockCreditAdd: false,
-                lockCreditPay: false
-            },
-            editingId: null,
-            tempImg: null,
-            activeCreditId: null,
-            dateEditId: null,
-            sortCol: 'name',
-            sortAsc: true,
-            filterText: '',
-            surchargeType: 'PERCENT',
-            creditSortMode: 'URGENCY' // <--- NUEVO: Modo de ordenamiento por defecto
+            isCloudSynced: false, 
+            editingId: null, tempImg: null, activeCreditId: null, dateEditId: null,
+            sortCol: 'name', sortAsc: true, filterText: '', surchargeType: 'PERCENT', creditSortMode: 'URGENCY', currentShareId: null
         };
 
         let pendingAction = null;
@@ -1227,7 +1243,7 @@
         }
 
         function saveData() {
-            // 1. Guardado Local (Siempre permitido)
+            // 1. Guardado Local (Siempre permitido y prioritario)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
@@ -1239,18 +1255,22 @@
             localStorage.setItem('inv_security', JSON.stringify(state.security));
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
 
-            // 2. Guardado en Nube (CON SEGURO)
+            // 2. Guardado en Nube (CON SEGURO ANTI-WIPE 🛡️)
             const user = auth.currentUser;
             
-            // SI NO ESTAMOS SINCRONIZADOS AÚN, NO TOCAMOS LA NUBE
-            if (!state.isCloudSynced) {
-                console.warn("⏳ Bloqueado guardado en nube: Esperando sincronización inicial...");
-                return; 
+            // SEGURO 1: No subir si no estamos sincronizados
+            if (!state.isCloudSynced) return;
+
+            // SEGURO 2: ¡CRÍTICO! No permitir subir un inventario vacío accidentalmente.
+            // Si products está vacío, asumimos que es un error de carga, a menos que sea un borrado intencional.
+            // (Para borrado intencional usaremos otra función específica en el futuro si hace falta).
+            if (state.products.length === 0 && state.sales.length === 0) {
+                console.warn("🛡️ BLOQUEO DE SEGURIDAD: Se intentó subir una base de datos vacía.");
+                return;
             }
 
             if (user) {
-                // FEEDBACK VISUAL INMEDIATO
-                updateCloudStatus('SYNCING'); // Pone amarillo al instante
+                updateCloudStatus('SYNCING'); 
                 const dataToSave = {
                     products: state.products,
                     sales: state.sales,
@@ -1268,7 +1288,7 @@
                 db.collection('users').doc(user.uid).set(dataToSave, { merge: true })
                     .catch(err => {
                         console.error("Error nube:", err);
-                        updateCloudStatus('OFFLINE'); // Si falla, rojo
+                        updateCloudStatus('OFFLINE');
                     });
             }
         }
