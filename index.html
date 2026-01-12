@@ -886,29 +886,30 @@
 
             unsubscribe = docRef.onSnapshot(doc => {
                 if (doc.exists) {
-                    // CASO A: Hay datos en la nube -> Descargar y Sobrescribir Local
+                    // CASO A: Hay datos en la nube -> Descargar
                     const cloudData = doc.data();
                     
-                    // Actualizamos memoria
+                    // Mezclamos datos
                     state = { ...state, ...cloudData };
                     
-                    // Actualizamos localStorage (backup redundante)
-                    // (Llamamos al localStorage directo para evitar bucle infinito con saveData)
-                    localStorage.setItem('inv_products', JSON.stringify(state.products));
-                    localStorage.setItem('inv_sales', JSON.stringify(state.sales));
-                    localStorage.setItem('inv_credits', JSON.stringify(state.credits));
-                    localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-                    // ... (resto de variables se actualizan en memoria y render)
-
+                    // IMPORTANTE: Marcamos que ya estamos sincronizados
+                    state.isCloudSynced = true; // <--- SEGURO QUITADO ✅
+                    
+                    // Actualizamos localStorage visualmente
                     renderAll();
                     console.log("☁️ Sincronizado desde la nube");
+                    $('syncBadge').className = "text-xs bg-green-500 text-white px-1.5 rounded animate-pulse";
+                    $('syncBadge').textContent = "ONLINE";
                 } else {
-                    // CASO B: Usuario Nuevo en Nube -> Subir lo Local
-                    console.log("⬆️ Subiendo datos locales a la nube por primera vez...");
+                    // CASO B: Usuario Nuevo -> Subir Local
+                    console.log("⬆️ Subiendo datos locales...");
+                    state.isCloudSynced = true; // <--- SEGURO QUITADO (Para poder subir)
                     saveData(); 
                 }
             }, error => {
                 console.error("Error Sync:", error);
+                $('syncBadge').className = "text-xs bg-red-500 text-white px-1.5 rounded";
+                $('syncBadge').textContent = "OFFLINE";
             });
         }
 
@@ -916,6 +917,7 @@
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
         let state = {
+            isCloudSynced: false, // <--- AGREGA ESTO (El seguro está puesto)
             products: [],
             sales: [],
             credits: [],
@@ -1147,7 +1149,7 @@
         }
 
         function saveData() {
-            // 1. Guardado Local (Inmediato)
+            // 1. Guardado Local (Siempre permitido)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
@@ -1159,8 +1161,15 @@
             localStorage.setItem('inv_security', JSON.stringify(state.security));
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
 
-            // 2. Guardado en Nube (Si hay usuario)
+            // 2. Guardado en Nube (CON SEGURO)
             const user = auth.currentUser;
+            
+            // SI NO ESTAMOS SINCRONIZADOS AÚN, NO TOCAMOS LA NUBE
+            if (!state.isCloudSynced) {
+                console.warn("⏳ Bloqueado guardado en nube: Esperando sincronización inicial...");
+                return; 
+            }
+
             if (user) {
                 const dataToSave = {
                     products: state.products,
@@ -1176,7 +1185,6 @@
                     lastUpdated: new Date().toISOString()
                 };
                 
-                // Usamos merge: true para no borrar campos que no enviemos
                 db.collection('users').doc(user.uid).set(dataToSave, { merge: true })
                     .catch(err => console.error("Error nube:", err));
             }
