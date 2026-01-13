@@ -118,9 +118,9 @@
                             <i class="fa-solid fa-gear text-gray-400"></i> Configuración
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button id="btnAuthAction" onclick="handleAuthAction()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition">
-                            <i id="iconAuthAction" class="fa-solid fa-right-from-bracket"></i> 
-                            <span id="textAuthAction">Cerrar Sesión</span>
+                        <button id="btnAuthAction" onclick="handleAuthAction()" class="w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition">
+                            <i id="iconAuthAction" class="fa-solid fa-right-to-bracket"></i> 
+                            <span id="textAuthAction">Iniciar Sesión</span>
                         </button>
                     </div>
                 </div>
@@ -877,122 +877,117 @@
         };
 
         // ------------------------------------------
-        // LÓGICA DE AUTENTICACIÓN
+        // LÓGICA DE AUTENTICACIÓN BLINDADA (v41.2)
         // ------------------------------------------
         
-        // Monitor de Estado (Login/Logout)
-        // ------------------------------------------
-        // LÓGICA DE AUTENTICACIÓN MEJORADA (v41.1 Fix)
-        // ------------------------------------------
-        
-        // 1. Configurar persistencia (Promesa, no bloqueante)
+        // 1. Configurar persistencia
         auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
 
-        // 2. LÓGICA DE ARRANQUE (BOOT)
-        // Verificamos si ya hay datos para dejar pasar al usuario INMEDIATAMENTE
-        const hasLocalData = state.products && state.products.length > 0;
-
-        if (hasLocalData) {
-            // USUARIO RECURRENTE (Con datos): Entra directo
-            console.log("🚀 Arranque rápido: Datos locales detectados.");
-            document.getElementById('loginOverlay').classList.add('hidden');
-            updateCloudStatus('OFFLINE'); // Asumimos offline hasta que Firebase diga lo contrario
-        } else {
-            // USUARIO NUEVO (Sin datos): Se queda en el Login
-            console.log("👤 Usuario nuevo o limpieza: Esperando Login...");
-            document.getElementById('loginOverlay').classList.remove('hidden');
-        }
-
-        // 3. MONITOR DE FIREBASE (Llega después)
-        auth.onAuthStateChanged(user => {
-            const loginOverlay = document.getElementById('loginOverlay');
-            
-            // Elementos del Menú de Usuario
+        // 2. Función Centralizada de UI (El Cerebro Visual)
+        function renderUserUI(user) {
             const btnAuth = document.getElementById('btnAuthAction');
             const txtAuth = document.getElementById('textAuthAction');
             const iconAuth = document.getElementById('iconAuthAction');
+            
             const userName = document.getElementById('userNameDisplay');
             const userEmail = document.getElementById('userEmailDisplay');
             const avatar = document.getElementById('userAvatar');
             const icon = document.getElementById('userIcon');
 
             if (user) {
-                // --- USUARIO CONECTADO (ONLINE) ---
-                console.log("✅ Auth: Conectado");
+                // MODO: CONECTADO
+                userName.textContent = user.displayName || 'Usuario';
+                userEmail.textContent = user.email;
                 
-                // 1. UI: Ocultar Login
-                loginOverlay.classList.add('hidden');
-
-                // 2. UI: Datos del Usuario
                 if(user.photoURL) {
                     avatar.src = user.photoURL;
                     avatar.classList.remove('hidden');
                     icon.classList.add('hidden');
                 }
-                userName.textContent = user.displayName || 'Usuario';
-                userEmail.textContent = user.email;
 
-                // 3. UI: Configurar botón como "Cerrar Sesión"
+                // Botón se convierte en "Cerrar Sesión" (Rojo)
                 txtAuth.textContent = "Cerrar Sesión";
                 iconAuth.className = "fa-solid fa-right-from-bracket";
-                btnAuth.classList.replace('text-blue-600', 'text-red-600');
-                btnAuth.classList.replace('hover:bg-blue-50', 'hover:bg-red-50');
-
-                // 4. Sincronización
-                initDataSync(user);
-
+                btnAuth.className = "w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition";
+            
             } else {
-                // --- USUARIO DESCONECTADO (OFFLINE / GUEST) ---
-                console.log("💤 Auth: Sin sesión");
-
-                // 1. UI: Indicador OFFLINE (¡Esto es lo que faltaba!)
-                updateCloudStatus('OFFLINE'); 
-
-                // 2. UI: Modo Invitado
-                avatar.classList.add('hidden');
-                icon.classList.remove('hidden');
+                // MODO: DESCONECTADO / OFFLINE
                 userName.textContent = "Modo Offline";
                 userEmail.textContent = "Sin sincronización";
+                avatar.classList.add('hidden');
+                icon.classList.remove('hidden');
 
-                // 3. UI: Configurar botón como "INICIAR SESIÓN"
+                // Botón se convierte en "Iniciar Sesión" (Azul)
                 txtAuth.textContent = "Iniciar Sesión";
                 iconAuth.className = "fa-solid fa-right-to-bracket";
-                btnAuth.classList.replace('text-red-600', 'text-blue-600');
-                btnAuth.classList.replace('hover:bg-red-50', 'hover:bg-blue-50');
+                btnAuth.className = "w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition";
+            }
+        }
 
-                // 4. Decisión de Cortina: 
-                // Solo bloqueamos si NO hay datos. Si hay datos, dejamos trabajar.
+        // 3. Ejecutar renderizado inicial (Para evitar parpadeos)
+        renderUserUI(null); // Asumimos desconectado al arrancar
+
+        // 4. Lógica de Arranque Rápido (Quitar cortina si hay datos)
+        if (state.products && state.products.length > 0) {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            updateCloudStatus('OFFLINE'); 
+        } else {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+
+        // 5. Monitor de Firebase (La Verdad Absoluta)
+        auth.onAuthStateChanged(user => {
+            const loginOverlay = document.getElementById('loginOverlay');
+            const loginStatus = document.getElementById('loginStatus');
+
+            // Actualizamos la UI con la verdad de Firebase
+            renderUserUI(user);
+
+            if (user) {
+                console.log("✅ Auth: Conectado");
+                loginOverlay.classList.add('hidden');
+                loginStatus.classList.add('hidden');
+                initDataSync(user); // Arrancar sincronización
+            } else {
+                console.log("💤 Auth: Desconectado");
+                updateCloudStatus('OFFLINE');
+                
+                // Si no hay datos y no hay usuario, mostramos login.
+                // Si hay datos, dejamos al usuario trabajar offline.
                 if (state.products.length === 0) {
                     loginOverlay.classList.remove('hidden');
+                    loginStatus.classList.add('hidden');
                 }
-                
                 if (unsubscribe) unsubscribe();
             }
         });
 
-        // Nueva función inteligente para el botón
+        // 6. Botón Inteligente
         function handleAuthAction() {
             const user = auth.currentUser;
             if (user) {
-                // Si está conectado -> Cerrar Sesión
                 if(confirm("¿Cerrar sesión y detener sincronización?")) {
-                    auth.signOut();
-                    location.reload();
+                    auth.signOut().then(() => location.reload());
                 }
             } else {
-                // Si está desconectado -> Abrir Login
                 loginWithGoogle();
             }
         }
 
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            // Si la cortina está visible, mostramos status allí
             const statusText = document.getElementById('loginStatus');
-            if(statusText) {
+            
+            // Si la cortina está visible, mostramos mensaje allí
+            if(!document.getElementById('loginOverlay').classList.contains('hidden')) {
                 statusText.textContent = "Abriendo Google...";
                 statusText.classList.remove('hidden');
             }
+
+            auth.signInWithPopup(provider).catch(error => {
+                console.error("Login Error:", error);
+                alert("No se pudo iniciar sesión. Verifica tu conexión.");
+            });
             
             auth.signInWithPopup(provider)
                 .then(() => {
