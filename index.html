@@ -1706,28 +1706,79 @@
         }
 
         function clearData(action) {
+            // 1. REINICIO DE FÁBRICA (Borrar TODO)
             if (action === 'factory_reset') {
-                if (confirm('¿BORRAR TODO?')) {
+                if (confirm('⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.')) {
+                    
+                    // Borrar en Nube primero (si hay usuario)
+                    const user = auth.currentUser;
+                    if (user) {
+                        // Enviamos un objeto vacío para sobrescribir todo el documento
+                        db.collection('users').doc(user.uid).set({
+                            lastUpdated: new Date().toISOString() // Dejamos solo la fecha
+                        }).then(() => {
+                            console.log("✅ Nube formateada.");
+                        });
+                    }
+
+                    // Borrar Local y Recargar
                     localStorage.clear();
-                    location.reload();
+                    location.reload(); 
                 }
-            } else if (action === 'clean_inv') {
-                if (confirm('¿Vaciar inventario?')) {
+            } 
+            
+            // 2. VACIAR SOLO INVENTARIO
+            else if (action === 'clean_inv') {
+                if (confirm('¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)')) {
                     state.products = [];
-                    saveData();
+                    // Guardamos local
+                    localStorage.setItem('inv_products', '[]');
+                    
+                    // Forzamos borrado en nube
+                    forceClearCloud('products');
+                    
                     renderAll();
                     toggleMenu('config');
-                    alert('Vaciado');
+                    alert('Inventario vaciado.');
                 }
-            } else if (action === 'clean_hist') {
-                if (confirm('¿Borrar historial?')) {
+            } 
+            
+            // 3. BORRAR SOLO HISTORIAL
+            else if (action === 'clean_hist') {
+                if (confirm('¿Borrar todo el historial de ventas?\n(El inventario y las deudas no se tocan)')) {
                     state.sales = [];
-                    saveData();
+                    // Guardamos local
+                    localStorage.setItem('inv_sales', '[]');
+                    
+                    // Forzamos borrado en nube
+                    forceClearCloud('sales');
+                    
                     renderAll();
                     toggleMenu('config');
-                    alert('Borrado');
+                    alert('Historial borrado.');
                 }
             }
+        }
+
+        // ==========================================
+        // FUNCIÓN ESPECIAL: BORRADO INTENCIONAL EN NUBE
+        // ==========================================
+        function forceClearCloud(fieldToClear) {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // Preparamos el objeto con el campo vacío
+            let updateData = {};
+            updateData[fieldToClear] = []; // Envia un array vacío explícitamente
+            updateData['lastUpdated'] = new Date().toISOString();
+
+            console.log(`⚠️ EJECUTANDO BORRADO FORZADO DE: ${fieldToClear}`);
+
+            // Usamos .update() en lugar de .set() para borrar solo ese campo
+            // y saltarnos la validación interna de saveData()
+            db.collection('users').doc(user.uid).update(updateData)
+                .then(() => console.log("✅ Nube limpiada correctamente."))
+                .catch(err => console.error("Error limpiando nube:", err));
         }
 
         function saveCustomRate() {
