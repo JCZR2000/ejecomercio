@@ -58,6 +58,7 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
 
     <div id="loginOverlay" class="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-4 transition-all duration-500">
@@ -104,20 +105,24 @@
                         <i class="fa-solid fa-sync-alt"></i>
                     </button>
                 </div>
-                <div class="relative group">
-                    <button class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
+                <div class="relative">
+                    <button onclick="toggleUserMenu()" class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
                         <img id="userAvatar" src="" class="w-full h-full object-cover hidden rounded-full">
                         <i id="userIcon" class="fa-solid fa-user"></i>
                     </button>
-                    <div class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden group-hover:block z-50 border border-gray-100">
+                    
+                    <div id="userMenuDropdown" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden z-50 border border-gray-100">
                         <div class="px-4 py-2 border-b border-gray-100 bg-gray-50">
                             <p class="text-xs font-bold text-gray-800 truncate" id="userNameDisplay">Usuario</p>
                             <p class="text-[10px] text-gray-500 truncate" id="userEmailDisplay">...</p>
                         </div>
-                        <button onclick="toggleMenu('config')" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition">
+                        
+                        <button onclick="toggleMenu('config'); toggleUserMenu()" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition">
                             <i class="fa-solid fa-gear text-gray-400"></i> Configuración
                         </button>
+                        
                         <div class="border-t border-gray-100 my-1"></div>
+                        
                         <button id="btnAuthAction" onclick="handleAuthAction()" class="w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition">
                             <i id="iconAuthAction" class="fa-solid fa-right-to-bracket"></i> 
                             <span id="textAuthAction">Iniciar Sesión</span>
@@ -3367,6 +3372,26 @@
                 }
             });
         }
+
+        // ==========================================
+        // UI: MENÚ DE USUARIO (CLICK MODE)
+        // ==========================================
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenuDropdown');
+            menu.classList.toggle('hidden');
+        }
+
+        // CERRAR MENÚ AL HACER CLIC FUERA
+        window.addEventListener('click', (e) => {
+            const menu = document.getElementById('userMenuDropdown');
+            const btn = document.querySelector('button[onclick="toggleUserMenu()"]');
+            
+            // Si el clic NO fue en el botón Y NO fue dentro del menú...
+            if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+                // ...entonces ciérralo.
+                menu.classList.add('hidden');
+            }
+        });
 
     </script>
 </body>
