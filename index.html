@@ -118,8 +118,9 @@
                             <i class="fa-solid fa-gear text-gray-400"></i> Configuración
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
-                        <button onclick="logout()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition">
-                            <i class="fa-solid fa-right-from-bracket"></i> Cerrar Sesión
+                        <button id="btnAuthAction" onclick="handleAuthAction()" class="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition">
+                            <i id="iconAuthAction" class="fa-solid fa-right-from-bracket"></i> 
+                            <span id="textAuthAction">Cerrar Sesión</span>
                         </button>
                     </div>
                 </div>
@@ -905,59 +906,101 @@
         // 3. MONITOR DE FIREBASE (Llega después)
         auth.onAuthStateChanged(user => {
             const loginOverlay = document.getElementById('loginOverlay');
-            const loginStatus = document.getElementById('loginStatus');
+            
+            // Elementos del Menú de Usuario
+            const btnAuth = document.getElementById('btnAuthAction');
+            const txtAuth = document.getElementById('textAuthAction');
+            const iconAuth = document.getElementById('iconAuthAction');
+            const userName = document.getElementById('userNameDisplay');
+            const userEmail = document.getElementById('userEmailDisplay');
+            const avatar = document.getElementById('userAvatar');
+            const icon = document.getElementById('userIcon');
 
             if (user) {
-                // --- CONEXIÓN EXITOSA ---
-                console.log("✅ Firebase Auth: Conectado como " + user.email);
+                // --- USUARIO CONECTADO (ONLINE) ---
+                console.log("✅ Auth: Conectado");
                 
-                // 1. Quitar Login (si aún estaba)
+                // 1. UI: Ocultar Login
                 loginOverlay.classList.add('hidden');
-                loginStatus.classList.add('hidden'); // Ocultar mensaje de "Conectando..."
 
-                // 2. Actualizar UI de Usuario (Avatar/Nombre)
-                const avatar = document.getElementById('userAvatar');
-                const icon = document.getElementById('userIcon');
+                // 2. UI: Datos del Usuario
                 if(user.photoURL) {
                     avatar.src = user.photoURL;
                     avatar.classList.remove('hidden');
                     icon.classList.add('hidden');
                 }
-                document.getElementById('userNameDisplay').textContent = user.displayName || 'Usuario';
-                document.getElementById('userEmailDisplay').textContent = user.email;
+                userName.textContent = user.displayName || 'Usuario';
+                userEmail.textContent = user.email;
 
-                // 3. Iniciar Sincronización de Datos
+                // 3. UI: Configurar botón como "Cerrar Sesión"
+                txtAuth.textContent = "Cerrar Sesión";
+                iconAuth.className = "fa-solid fa-right-from-bracket";
+                btnAuth.classList.replace('text-blue-600', 'text-red-600');
+                btnAuth.classList.replace('hover:bg-blue-50', 'hover:bg-red-50');
+
+                // 4. Sincronización
                 initDataSync(user);
 
             } else {
-                // --- DESCONECTADO / ERROR / NUEVO ---
-                console.log("💤 Firebase Auth: No hay sesión activa.");
-                
-                // Solo bloqueamos la pantalla si NO TIENE DATOS locales.
-                // Si tiene datos, le dejamos trabajar offline/anonimo con su caché.
+                // --- USUARIO DESCONECTADO (OFFLINE / GUEST) ---
+                console.log("💤 Auth: Sin sesión");
+
+                // 1. UI: Indicador OFFLINE (¡Esto es lo que faltaba!)
+                updateCloudStatus('OFFLINE'); 
+
+                // 2. UI: Modo Invitado
+                avatar.classList.add('hidden');
+                icon.classList.remove('hidden');
+                userName.textContent = "Modo Offline";
+                userEmail.textContent = "Sin sincronización";
+
+                // 3. UI: Configurar botón como "INICIAR SESIÓN"
+                txtAuth.textContent = "Iniciar Sesión";
+                iconAuth.className = "fa-solid fa-right-to-bracket";
+                btnAuth.classList.replace('text-red-600', 'text-blue-600');
+                btnAuth.classList.replace('hover:bg-red-50', 'hover:bg-blue-50');
+
+                // 4. Decisión de Cortina: 
+                // Solo bloqueamos si NO hay datos. Si hay datos, dejamos trabajar.
                 if (state.products.length === 0) {
                     loginOverlay.classList.remove('hidden');
-                    loginStatus.classList.add('hidden'); // Resetear mensaje
                 }
                 
                 if (unsubscribe) unsubscribe();
             }
         });
 
+        // Nueva función inteligente para el botón
+        function handleAuthAction() {
+            const user = auth.currentUser;
+            if (user) {
+                // Si está conectado -> Cerrar Sesión
+                if(confirm("¿Cerrar sesión y detener sincronización?")) {
+                    auth.signOut();
+                    location.reload();
+                }
+            } else {
+                // Si está desconectado -> Abrir Login
+                loginWithGoogle();
+            }
+        }
+
         function loginWithGoogle() {
             const provider = new firebase.auth.GoogleAuthProvider();
-            // Mostrar feedback visual
-            document.getElementById('loginStatus').textContent = "Abriendo ventana de Google...";
-            document.getElementById('loginStatus').classList.remove('hidden');
+            // Si la cortina está visible, mostramos status allí
+            const statusText = document.getElementById('loginStatus');
+            if(statusText) {
+                statusText.textContent = "Abriendo Google...";
+                statusText.classList.remove('hidden');
+            }
             
             auth.signInWithPopup(provider)
                 .then(() => {
-                    // El onAuthStateChanged manejará el éxito
+                    // El listener onAuthStateChanged se encargará del resto
                 })
                 .catch(error => {
                     console.error("Login Error:", error);
                     alert("No se pudo iniciar sesión: " + error.message);
-                    document.getElementById('loginStatus').classList.add('hidden');
                 });
         }
 
