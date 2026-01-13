@@ -410,6 +410,13 @@
                         <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-history"></i></div>
                         <div class="text-left"><div class="font-bold text-sm">Borrar Historial</div><div class="text-[10px] text-gray-500">Elimina registros de venta.</div></div>
                     </button>
+                    <button onclick="requestAction('clean_credits')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group mt-2">
+                        <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                        <div class="text-left">
+                            <div class="font-bold text-sm">Borrar Fiados</div>
+                            <div class="text-[10px] text-gray-500">Elimina todas las deudas pendientes.</div>
+                        </div>
+                    </button>
                     <button onclick="requestAction('factory_reset')" class="w-full flex items-center p-3 bg-red-600 text-white rounded hover:bg-red-700 transition shadow mt-4">
                         <div class="p-2 mr-2"><i class="fa-solid fa-triangle-exclamation"></i></div>
                         <div class="text-left"><div class="font-bold text-sm">Reinicio de Fábrica</div><div class="text-[10px] text-red-100">Borra TODO y reinicia la app.</div></div>
@@ -1706,24 +1713,48 @@
         }
 
         function clearData(action) {
-            // 1. REINICIO DE FÁBRICA (Borrar TODO)
+            // 1. REINICIO DE FÁBRICA (NUCLEAR) ☢️
             if (action === 'factory_reset') {
                 if (confirm('⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.')) {
                     
-                    // Borrar en Nube primero (si hay usuario)
                     const user = auth.currentUser;
-                    if (user) {
-                        // Enviamos un objeto vacío para sobrescribir todo el documento
-                        db.collection('users').doc(user.uid).set({
-                            lastUpdated: new Date().toISOString() // Dejamos solo la fecha
-                        }).then(() => {
-                            console.log("✅ Nube formateada.");
-                        });
-                    }
+                    
+                    // Función interna para borrar local y recargar
+                    const wipeLocalAndReload = () => {
+                        console.log("🧹 Borrando datos locales...");
+                        localStorage.clear();
+                        window.location.reload();
+                    };
 
-                    // Borrar Local y Recargar
-                    localStorage.clear();
-                    location.reload(); 
+                    if (user) {
+                        // Feedback visual
+                        const btn = document.querySelector('button[onclick="requestAction(\'factory_reset\')"]');
+                        if(btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Borrando nube...';
+
+                        // SOBRESCRIBIMOS el documento con un objeto casi vacío.
+                        // Al NO usar { merge: true }, esto elimina todos los campos anteriores (fiados, productos, etc).
+                        db.collection('users').doc(user.uid).set({
+                            products: [],
+                            sales: [],
+                            credits: [],
+                            paymentMethods: {},
+                            security: { pin: null },
+                            lastUpdated: new Date().toISOString()
+                        })
+                        .then(() => {
+                            console.log("✅ Nube formateada exitosamente.");
+                            // SOLO AHORA, que la nube confirmó, borramos local y recargamos.
+                            wipeLocalAndReload();
+                        })
+                        .catch(error => {
+                            console.error("Error borrando nube:", error);
+                            alert("Hubo un error al borrar la nube. Sin embargo, se borrarán los datos locales.");
+                            wipeLocalAndReload();
+                        });
+                    } else {
+                        // Si es modo offline, borramos directo
+                        wipeLocalAndReload();
+                    }
                 }
             } 
             
@@ -1731,12 +1762,8 @@
             else if (action === 'clean_inv') {
                 if (confirm('¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)')) {
                     state.products = [];
-                    // Guardamos local
                     localStorage.setItem('inv_products', '[]');
-                    
-                    // Forzamos borrado en nube
                     forceClearCloud('products');
-                    
                     renderAll();
                     toggleMenu('config');
                     alert('Inventario vaciado.');
@@ -1745,17 +1772,25 @@
             
             // 3. BORRAR SOLO HISTORIAL
             else if (action === 'clean_hist') {
-                if (confirm('¿Borrar todo el historial de ventas?\n(El inventario y las deudas no se tocan)')) {
+                if (confirm('¿Borrar todo el historial de ventas?')) {
                     state.sales = [];
-                    // Guardamos local
                     localStorage.setItem('inv_sales', '[]');
-                    
-                    // Forzamos borrado en nube
                     forceClearCloud('sales');
-                    
                     renderAll();
                     toggleMenu('config');
                     alert('Historial borrado.');
+                }
+            }
+
+            // 4. BORRAR SOLO FIADOS
+            else if (action === 'clean_credits') {
+                if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nEsta acción no se puede deshacer.')) {
+                    state.credits = [];
+                    localStorage.setItem('inv_credits', '[]');
+                    forceClearCloud('credits');
+                    renderAll();
+                    toggleMenu('config');
+                    alert('Lista de fiados eliminada.');
                 }
             }
         }
