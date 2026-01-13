@@ -851,6 +851,8 @@
             else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
         });
 
+        const $ = (id) => document.getElementById(id);
+
         // ==========================================
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
@@ -875,6 +877,8 @@
             editingId: null, tempImg: null, activeCreditId: null, dateEditId: null,
             sortCol: 'name', sortAsc: true, filterText: '', surchargeType: 'PERCENT', creditSortMode: 'URGENCY', currentShareId: null
         };
+
+        let pendingAction = null; // Para acciones que requieren autenticación
 
         // ------------------------------------------
         // LÓGICA DE AUTENTICACIÓN BLINDADA (v41.2)
@@ -1100,9 +1104,6 @@
                 updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
         }
-
-        let pendingAction = null;
-        const $ = (id) => document.getElementById(id);
 
         document.addEventListener('DOMContentLoaded', () => {
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
