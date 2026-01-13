@@ -978,28 +978,45 @@
             }
         }
 
+        // Bandera para evitar doble clic
+        let isLoggingIn = false;
+
         function loginWithGoogle() {
+            if (isLoggingIn) return; // Si ya está cargando, no hacemos nada
+            isLoggingIn = true;
+
             const provider = new firebase.auth.GoogleAuthProvider();
             const statusText = document.getElementById('loginStatus');
             
-            // Si la cortina está visible, mostramos mensaje allí
+            // Feedback visual si la cortina está visible
             if(!document.getElementById('loginOverlay').classList.contains('hidden')) {
-                statusText.textContent = "Abriendo Google...";
+                statusText.textContent = "Cargando Google...";
                 statusText.classList.remove('hidden');
             }
 
-            auth.signInWithPopup(provider).catch(error => {
-                console.error("Login Error:", error);
-                alert("No se pudo iniciar sesión. Verifica tu conexión.");
-            });
-            
             auth.signInWithPopup(provider)
                 .then(() => {
-                    // El listener onAuthStateChanged se encargará del resto
+                    // Éxito: El onAuthStateChanged se encarga
                 })
                 .catch(error => {
-                    console.error("Login Error:", error);
-                    alert("No se pudo iniciar sesión: " + error.message);
+                    // Filtro de Errores: Solo mostramos alerta si es un error REAL
+                    const ignoredErrors = [
+                        'auth/cancelled-popup-request', // Doble clic
+                        'auth/popup-closed-by-user',    // Usuario cerró la ventana
+                        'auth/popup-blocked'            // Navegador bloqueó (a veces se recupera solo)
+                    ];
+
+                    if (!ignoredErrors.includes(error.code)) {
+                        console.error("Login Error:", error);
+                        alert("Aviso: " + error.message);
+                    } else {
+                        console.log("Aviso menor de login:", error.code);
+                    }
+                })
+                .finally(() => {
+                    // Liberamos el botón pase lo que pase
+                    isLoggingIn = false;
+                    if(statusText) statusText.classList.add('hidden');
                 });
         }
 
