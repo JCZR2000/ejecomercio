@@ -1494,6 +1494,8 @@
         // ==========================================
         function attemptSubmit() {
             const isEdit = state.editingId !== null;
+
+            // Usamos checkAuth para verificar permisos
             checkAuth(isEdit ? 'edit' : 'add', () => {
                 const name = $('prodName').value.trim();
                 const barcode = $('prodBarcode').value.trim();
@@ -1503,34 +1505,42 @@
                 if (!name || isNaN(qty) || isNaN(price)) return alert('Datos inválidos');
                 
                 if (state.editingId) {
+                    // --- MODO EDICIÓN ---
                     const idx = state.products.findIndex(p => p.id == state.editingId);
                     if (idx !== -1) {
                         state.products[idx] = {
-                            ...state.products[idx],
+                            ...state.products[idx], // Mantenemos ID y otros datos
                             name,
                             qty,
                             price,
-                            barcode // <--- CODIGO DE BARRAS
+                            barcode, // <--- CODIGO DE BARRAS
+                            img: state.tempImg // <--- ¡AQUÍ ESTÁ EL CAMBIO!
+                            // Antes había un 'if'. Ahora asignamos DIRECTAMENTE.
+                            // Si state.tempImg es null (porque la borraste), se guardará como null.
                         };
                         if (state.tempImg) state.products[idx].img = state.tempImg;
                     }
                     cancelEdit();
                 } else {
+                    // --- MODO CREACIÓN ---
                     state.products.push({
                         id: Date.now(),
                         name,
                         qty,
                         price,
-                        img: state.tempImg,
+                        img: state.tempImg, // Asignamos lo que haya (imagen o null)
                         barcode // <--- CODIGO DE BARRAS
                     });
                 }
-                saveData();
-                renderAll();
+                saveData(); // Guardar en Local y Nube
+                renderAll(); // Actualizar tabla visualmente
+
+                // Limpieza final
                 $('productForm').reset();
                 state.tempImg = null;
                 $('imgPreview').classList.add('hidden');
                 $('imgIcon').classList.remove('hidden');
+                $('btnRemoveImg').classList.add('hidden'); // Ocultar la X
             });
         }
 
