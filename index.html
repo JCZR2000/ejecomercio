@@ -2552,17 +2552,63 @@
             reader.readAsText(file);
         };
         
-        // Carga de imágenes (Función helper)
+        // ==========================================
+        // COMPRESOR DE IMÁGENES (SOLUCIÓN AL LÍMITE DE 1MB)
+        // ==========================================
         function previewImage(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // 1. Crear un lector de archivos
             const reader = new FileReader();
+            
             reader.onload = function(e) {
-                state.tempImg = e.target.result;
-                $('imgPreview').src = state.tempImg;
-                $('imgPreview').classList.remove('hidden');
-                $('imgIcon').classList.add('hidden');
+                const img = new Image();
+                img.src = e.target.result;
+
+                img.onload = function() {
+                    // 2. Configurar dimensiones máximas (Thumbnail)
+                    const maxWidth = 300; // Máximo 300px de ancho
+                    const maxHeight = 300; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Calcular nueva proporción (para no deformar)
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    // 3. Crear Canvas (Lienzo invisible)
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // 4. Dibujar la imagen redimensionada
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 5. EXPORTAR COMPRIMIDO (JPEG al 70% de calidad)
+                    // Esto reduce una imagen de 3MB a aprox 20KB-50KB
+                    state.tempImg = canvas.toDataURL('image/jpeg', 0.7);
+
+                    // 6. Mostrar resultado
+                    $('imgPreview').src = state.tempImg;
+                    $('imgPreview').classList.remove('hidden');
+                    $('imgIcon').classList.add('hidden');
+                    
+                    // Feedback para el usuario (opcional en consola)
+                    console.log("📸 Imagen comprimida para Firestore.");
+                };
             };
+            
             reader.readAsDataURL(file);
         }
 
