@@ -1508,13 +1508,23 @@
                     // --- MODO EDICIÓN ---
                     const idx = state.products.findIndex(p => p.id == state.editingId);
                     if (idx !== -1) {
+
+                        // LÓGICA DE DECISIÓN DE IMAGEN 🧠
+                        let finalImg = state.products[idx].img; // 1. Por defecto: Mantener la vieja
+                        
+                        if (state.tempImg) {
+                            finalImg = state.tempImg; // 2. Si subiste una nueva: Úsala
+                        } else if (state.isImageDeleted) {
+                            finalImg = null; // 3. Solo si diste click a la X: Bórrala
+                        }
+
                         state.products[idx] = {
                             ...state.products[idx], // Mantenemos ID y otros datos
                             name,
                             qty,
                             price,
                             barcode, // <--- CODIGO DE BARRAS
-                            img: state.tempImg // <--- ¡AQUÍ ESTÁ EL CAMBIO!
+                            img: finalImg // <--- ¡AQUÍ ESTÁ EL CAMBIO!
                             // Antes había un 'if'. Ahora asignamos DIRECTAMENTE.
                             // Si state.tempImg es null (porque la borraste), se guardará como null.
                         };
@@ -1538,6 +1548,7 @@
                 // Limpieza final
                 $('productForm').reset();
                 state.tempImg = null;
+                state.isImageDeleted = false; // Reset final
                 $('imgPreview').classList.add('hidden');
                 $('imgIcon').classList.remove('hidden');
                 $('btnRemoveImg').classList.add('hidden'); // Ocultar la X
@@ -1570,16 +1581,22 @@
         window.startEdit = (id) => {
             const p = state.products.find(x => x.id == id);
             if (!p) return;
+
             $('prodName').value = p.name;
             $('prodQty').value = p.qty;
             $('prodPrice').value = p.price;
             $('prodBarcode').value = p.barcode || '';
             state.editingId = id;
+
+            // --- LÓGICA DE IMAGEN MEJORADA ---
+            state.tempImg = null;       // Empezamos limpio (sin ocupar memoria)
+            state.isImageDeleted = false; // Reseteamos la bandera
+
             if (p.img) {
                 $('imgPreview').src = p.img;
                 $('imgPreview').classList.remove('hidden');
-                $('imgIcon').classList.add('hidden');
                 $('btnRemoveImg').classList.remove('hidden'); // <--- MOSTRAR LA X
+                $('imgIcon').classList.add('hidden');
             } else {
                 // Aseguramos que esté limpio si no tiene imagen
                 state.tempImg = null;
@@ -2621,6 +2638,7 @@
                     // 5. EXPORTAR COMPRIMIDO (JPEG al 70% de calidad)
                     // Esto reduce una imagen de 3MB a aprox 20KB-50KB
                     state.tempImg = canvas.toDataURL('image/jpeg', 0.7);
+                    state.isImageDeleted = false; // <--- ¡BANDERA APAGADA! 🏳️
 
                     // 6. Mostrar resultado
                     $('imgPreview').src = state.tempImg;
@@ -2646,6 +2664,7 @@
 
             // 1. Limpiamos la memoria temporal
             state.tempImg = null;
+            state.isImageDeleted = true; // <--- ¡NUEVA BANDERA ACTIVADA! 🚩
             
             // 2. Limpiamos el input file (por si quiere subir la misma foto después)
             document.getElementById('prodImg').value = "";
