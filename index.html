@@ -570,10 +570,15 @@
                     </div>
 
                     <div class="col-span-12 md:col-span-2 flex justify-center items-center">
-                        <label class="w-16 h-16 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500 flex flex-col justify-center items-center overflow-hidden bg-gray-50 relative">
-                            <img id="imgPreview" class="hidden w-full h-full object-cover">
-                            <i id="imgIcon" class="fa-solid fa-camera text-gray-400"></i>
+                        <label class="w-16 h-16 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500 flex flex-col justify-center items-center overflow-hidden bg-gray-50 relative group">
+                            
+                            <img id="imgPreview" class="hidden w-full h-full object-cover z-10">
+                            <i id="imgIcon" class="fa-solid fa-camera text-gray-400 z-0"></i>
                             <input type="file" id="prodImg" accept="image/*" class="hidden" onchange="previewImage(event)">
+
+                            <button type="button" id="btnRemoveImg" onclick="removeImage(event)" class="hidden absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center z-20 hover:bg-red-700 transition shadow-sm" title="Borrar imagen">
+                                <i class="fa-solid fa-times text-xs"></i>
+                            </button>
                         </label>
                     </div>
                     <div class="col-span-12 md:col-span-4">
@@ -1564,6 +1569,13 @@
                 $('imgPreview').src = p.img;
                 $('imgPreview').classList.remove('hidden');
                 $('imgIcon').classList.add('hidden');
+                $('btnRemoveImg').classList.remove('hidden'); // <--- MOSTRAR LA X
+            } else {
+                // Aseguramos que esté limpio si no tiene imagen
+                state.tempImg = null;
+                $('imgPreview').classList.add('hidden');
+                $('imgIcon').classList.remove('hidden');
+                $('btnRemoveImg').classList.add('hidden');
             }
             $('submitBtn').textContent = 'Actualizar';
             $('submitBtn').className = 'flex-1 bg-yellow-500 text-white py-2 rounded text-sm hover:bg-yellow-600 shadow font-semibold';
@@ -1579,6 +1591,7 @@
             $('prodBarcode').value = '';
             state.tempImg = null;
             $('imgPreview').classList.add('hidden');
+            $('btnRemoveImg').classList.add('hidden'); // <--- OCULTAR LA X
             $('imgIcon').classList.remove('hidden');
             $('submitBtn').textContent = 'Guardar';
             $('submitBtn').className = 'flex-1 bg-blue-600 text-white py-2 rounded text-sm hover:bg-blue-700 shadow font-semibold';
@@ -2603,6 +2616,7 @@
                     $('imgPreview').src = state.tempImg;
                     $('imgPreview').classList.remove('hidden');
                     $('imgIcon').classList.add('hidden');
+                    $('btnRemoveImg').classList.remove('hidden');
                     
                     // Feedback para el usuario (opcional en consola)
                     console.log("📸 Imagen comprimida para Firestore.");
@@ -2610,6 +2624,31 @@
             };
             
             reader.readAsDataURL(file);
+        }
+
+        // ==========================================
+        // BORRAR IMAGEN (LIBERAR ESPACIO)
+        // ==========================================
+        function removeImage(e) {
+            // Evitamos que el clic traspase y abra el selector de archivos
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 1. Limpiamos la memoria temporal
+            state.tempImg = null;
+            
+            // 2. Limpiamos el input file (por si quiere subir la misma foto después)
+            document.getElementById('prodImg').value = "";
+
+            // 3. Reseteamos la UI
+            const img = document.getElementById('imgPreview');
+            const icon = document.getElementById('imgIcon');
+            const btn = document.getElementById('btnRemoveImg');
+
+            img.src = "";
+            img.classList.add('hidden');
+            btn.classList.add('hidden');
+            icon.classList.remove('hidden');
         }
 
         // ==========================================
