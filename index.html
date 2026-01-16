@@ -638,7 +638,7 @@
                             <input type="text" id="prodBarcode" placeholder="Código de Barras (EAN/UPC)" class="w-full pl-9 pr-3 py-1.5 border rounded text-sm outline-none focus:border-blue-500 font-mono text-gray-700 bg-white">
                         </div>
                         <button type="button" onclick="startScanner('LINK')" class="bg-gray-700 text-white px-3 py-1.5 rounded hover:bg-gray-800 transition shadow" title="Escanear">
-                            <i class="fa-solid fa-barcode-read"></i>
+                            <i class="fa-solid fa-barcode"></i>
                         </button>
                         <button type="button" onclick="fetchProductData($('prodBarcode').value)" class="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition shadow" title="Buscar en API">
                             <i class="fa-solid fa-cloud-arrow-down"></i>
@@ -777,7 +777,7 @@
                         </div>
 
                         <button onclick="startScanner('POS')" class="bg-slate-800 hover:bg-slate-700 text-white w-10 h-full rounded shadow flex items-center justify-center transition-colors" title="Escanear">
-                            <i class="fa-solid fa-barcode-read"></i>
+                            <i class="fa-solid fa-barcode"></i>
                         </button>
         
                         <input type="number" id="saleQty" value="1" min="1" class="w-14 h-full border rounded px-1 text-center text-sm font-bold text-gray-700 outline-none focus:border-indigo-500">
