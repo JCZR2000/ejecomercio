@@ -3646,7 +3646,7 @@
             }
         }
 
-        // 4. EL CÁLCULO MATEMÁTICO PRINCIPAL
+        // 4. EL CÁLCULO MATEMÁTICO PRINCIPAL (Con Conversión a Bs Visual)
         function calculatePriceResult() {
             // Inputs
             const base = parseFloat(document.getElementById('calcBaseUSD').value) || 0;
@@ -3666,7 +3666,6 @@
             const unitCost = totalCost / qty;
 
             // 3. Precio Sugerido (Fórmula: Costo / (1 - Margen%))
-            // Ejemplo: Costo 100, Margen 30%. Precio = 100 / 0.70 = 142.85
             let sellingPrice = 0;
             const marginFactor = 1 - (margin / 100);
             
@@ -3674,12 +3673,26 @@
                 sellingPrice = unitCost / marginFactor;
             }
 
-            // Renderizar Resultados
-            const sym = getSymbol();
-            document.getElementById('displayUnitCost').textContent = `${sym}${formatCalcNumber(unitCost)}`;
-            document.getElementById('displayFinalPrice').textContent = `${sym}${formatCalcNumber(sellingPrice)}`;
+            // --- LÓGICA NUEVA: Conversión visual a Bs ---
+            const rate = getActiveRate(); // Obtenemos la tasa del sistema
+            const unitCostBs = unitCost * rate;
+            const sellingPriceBs = sellingPrice * rate;
+
+            const sym = getSymbol(); // $ o €
+
+            // 4. Renderizar Resultados (Con HTML inyectado para estilos)
             
-            // Guardamos el resultado en un atributo temporal para el botón de "Usar"
+            // A. Costo Unitario: $0.00 (Bs 0.00)
+            // El Bs va en gris y pequeño
+            document.getElementById('displayUnitCost').innerHTML = 
+                `${sym}${formatCalcNumber(unitCost)} <span class="text-xs text-gray-400 font-normal ml-1">(Bs ${formatCalcNumber(unitCostBs)})</span>`;
+
+            // B. Precio Final: $0.00 / Bs 0.00
+            // El Bs va en Azul y tamaño mediano (text-lg) vs el Grande (text-3xl) del dólar
+            document.getElementById('displayFinalPrice').innerHTML = 
+                `${sym}${formatCalcNumber(sellingPrice)} <span class="text-lg text-blue-600 font-bold ml-1">/ Bs ${formatCalcNumber(sellingPriceBs)}</span>`;
+            
+            // Guardamos el resultado limpio (solo el número en divisa fuerte) para el botón "Usar"
             document.getElementById('displayFinalPrice').dataset.value = sellingPrice.toFixed(2);
         }
 
