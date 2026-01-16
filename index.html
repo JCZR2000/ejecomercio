@@ -546,11 +546,87 @@
         </div>
     </div>
 
+    <div id="calculatorModal" class="fixed inset-0 modal-bg z-[95] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+            <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold"><i class="fa-solid fa-calculator mr-2"></i>Calculadora de Precios</h3>
+                <button onclick="closeCalculator()" class="text-white hover:text-yellow-100 bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto">
+                
+                <div class="mb-4">
+                    <label class="text-xs font-bold text-gray-600 block mb-1">Costo Base (Factura Total)</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold dynamic-symbol-span">$</span>
+                            <input type="number" id="calcBaseUSD" step="0.01" class="w-full pl-7 pr-2 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="0.00" oninput="syncCalcCurrency('USD'); calculatePriceResult()">
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Bs</span>
+                            <input type="number" id="calcBaseBs" step="0.01" class="w-full pl-8 pr-2 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-yellow-400 font-bold bg-gray-50" placeholder="0.00" oninput="syncCalcCurrency('BS'); calculatePriceResult()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4 bg-gray-50 p-3 rounded border border-gray-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkCalcTax" class="form-checkbox h-4 w-4 text-yellow-500 rounded border-gray-300 focus:ring-yellow-400" onchange="toggleCalcTax()">
+                            <span class="text-xs font-bold text-gray-700">Incluir Impuesto (IVA)</span>
+                        </label>
+                    </div>
+                    <div id="taxInputContainer" class="hidden relative animate-fade-in">
+                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
+                         <input type="number" id="calcTaxRate" value="16" class="w-full px-3 py-1.5 border rounded text-sm outline-none focus:border-yellow-400" oninput="calculatePriceResult()">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-5">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Unidades</label>
+                        <input type="number" id="calcQty" value="1" min="1" class="w-full px-3 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-400 font-bold text-center" oninput="calculatePriceResult()">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Margen %</label>
+                        <div class="relative">
+                             <input type="number" id="calcMargin" value="30" class="w-full px-3 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-green-400 font-bold text-center text-green-700" oninput="calculatePriceResult()">
+                             <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <span class="text-xs text-gray-500">Costo Unitario Real:</span>
+                        <span id="displayUnitCost" class="text-sm font-bold text-gray-700">$0.00</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-blue-600 font-bold uppercase tracking-wider block mb-1">Precio Sugerido</span>
+                        <div id="displayFinalPrice" class="text-3xl font-bold text-slate-800 font-mono tracking-tight">$0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 bg-gray-50 shrink-0">
+                <button onclick="applyCalculatedPrice()" class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95">
+                    <i class="fa-solid fa-check"></i> Usar este Precio
+                </button>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <section class="lg:col-span-7 space-y-6">
             <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-500">
-                <h2 class="text-lg font-bold text-gray-700 mb-3"><i class="fa-solid fa-box mr-2"></i>Gestión de Producto</h2>
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-bold text-gray-700"><i class="fa-solid fa-box mr-2"></i>Gestión de Producto</h2>
+                    <button onclick="openCalculator()" class="bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-yellow-200 border border-yellow-300 shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span class="hidden sm:inline">Calculadora</span>
+                    </button>
+                </div>
                 <form id="productForm" class="grid grid-cols-12 gap-3">
                     <input type="hidden" id="productId">
                     
@@ -3506,6 +3582,130 @@
                 menu.classList.add('hidden');
             }
         });
+
+        // ==========================================
+        // CALCULADORA DE PRECIOS (v42.0)
+        // ==========================================
+        
+        // 1. Abrir Modal y Cargar Preferencias
+        function openCalculator() {
+            const modal = document.getElementById('calculatorModal');
+            modal.classList.remove('hidden');
+
+            // Cargar preferencias guardadas
+            const savedTax = localStorage.getItem('calc_use_tax');
+            const savedRate = localStorage.getItem('calc_tax_rate');
+            const savedMargin = localStorage.getItem('calc_margin');
+
+            if (savedTax === 'true') {
+                document.getElementById('chkCalcTax').checked = true;
+                document.getElementById('taxInputContainer').classList.remove('hidden');
+            }
+            if (savedRate) document.getElementById('calcTaxRate').value = savedRate;
+            if (savedMargin) document.getElementById('calcMargin').value = savedMargin;
+            
+            // Enfocar en el primer input
+            document.getElementById('calcBaseUSD').focus();
+            calculatePriceResult();
+        }
+
+        function closeCalculator() {
+            document.getElementById('calculatorModal').classList.add('hidden');
+        }
+
+        // 2. Toggle IVA (Mostrar/Ocultar y Guardar)
+        function toggleCalcTax() {
+            const chk = document.getElementById('chkCalcTax');
+            const container = document.getElementById('taxInputContainer');
+            
+            if (chk.checked) {
+                container.classList.remove('hidden');
+                document.getElementById('calcTaxRate').focus();
+            } else {
+                container.classList.add('hidden');
+            }
+            
+            localStorage.setItem('calc_use_tax', chk.checked);
+            calculatePriceResult();
+        }
+
+        // 3. Sincronizar Divisas (Bs <-> USD)
+        function syncCalcCurrency(source) {
+            const rate = getActiveRate();
+            if (rate <= 0) return;
+
+            const inputUSD = document.getElementById('calcBaseUSD');
+            const inputBs = document.getElementById('calcBaseBs');
+
+            if (source === 'USD') {
+                const val = parseFloat(inputUSD.value);
+                inputBs.value = val ? (val * rate).toFixed(2) : '';
+            } else {
+                const val = parseFloat(inputBs.value);
+                inputUSD.value = val ? (val / rate).toFixed(2) : '';
+            }
+        }
+
+        // 4. EL CÁLCULO MATEMÁTICO PRINCIPAL
+        function calculatePriceResult() {
+            // Inputs
+            const base = parseFloat(document.getElementById('calcBaseUSD').value) || 0;
+            const useTax = document.getElementById('chkCalcTax').checked;
+            const taxRate = useTax ? (parseFloat(document.getElementById('calcTaxRate').value) || 0) : 0;
+            const qty = parseFloat(document.getElementById('calcQty').value) || 1;
+            const margin = parseFloat(document.getElementById('calcMargin').value) || 0;
+
+            // Guardar preferencias en vivo
+            if(useTax) localStorage.setItem('calc_tax_rate', taxRate);
+            localStorage.setItem('calc_margin', margin);
+
+            // 1. Costo Total Lote (Base + IVA)
+            const totalCost = base * (1 + (taxRate / 100));
+
+            // 2. Costo Unitario Real
+            const unitCost = totalCost / qty;
+
+            // 3. Precio Sugerido (Fórmula: Costo / (1 - Margen%))
+            // Ejemplo: Costo 100, Margen 30%. Precio = 100 / 0.70 = 142.85
+            let sellingPrice = 0;
+            const marginFactor = 1 - (margin / 100);
+            
+            if (marginFactor > 0 && marginFactor <= 1) {
+                sellingPrice = unitCost / marginFactor;
+            }
+
+            // Renderizar Resultados
+            const sym = getSymbol();
+            document.getElementById('displayUnitCost').textContent = `${sym}${formatCalcNumber(unitCost)}`;
+            document.getElementById('displayFinalPrice').textContent = `${sym}${formatCalcNumber(sellingPrice)}`;
+            
+            // Guardamos el resultado en un atributo temporal para el botón de "Usar"
+            document.getElementById('displayFinalPrice').dataset.value = sellingPrice.toFixed(2);
+        }
+
+        function formatCalcNumber(num) {
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+        }
+
+        // 5. Aplicar al formulario principal
+        function applyCalculatedPrice() {
+            const price = document.getElementById('displayFinalPrice').dataset.value;
+            if (price && parseFloat(price) > 0) {
+                $('prodPrice').value = price;
+                
+                // Feedback visual en el input de precio
+                $('prodPrice').classList.add('bg-green-100', 'transition-colors');
+                setTimeout(() => $('prodPrice').classList.remove('bg-green-100'), 1000);
+                
+                closeCalculator();
+                
+                // Scroll suave al input de precio
+                $('prodPrice').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                $('prodPrice').focus();
+            } else {
+                alert("Calcula un precio válido primero.");
+            }
+        }
 
     </script>
 </body>
