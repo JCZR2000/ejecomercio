@@ -407,19 +407,8 @@
                 </div>
                 <hr class="border-gray-200">
                 <div class="mt-4 border-t pt-4">
-                    <div class="bg-purple-50 p-3 rounded border border-purple-200">
-                        <div class="flex items-center gap-2 mb-2">
-                            <i class="fa-solid fa-lock text-purple-600"></i>
-                            <h4 class="font-bold text-xs text-purple-800 uppercase">Encriptación E2EE</h4>
+                    <div id="encryptionUI" class="transition-all duration-300">
                         </div>
-                        <p class="text-[10px] text-purple-600 mb-3 leading-tight">
-                            Protege tus datos en la nube con una contraseña que solo tú conoces.
-                            <br><b>Advertencia:</b> Si olvidas la clave, pierdes los datos.
-                        </p>
-                        <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-purple-700 transition">
-                            <i class="fa-solid fa-shield-halved mr-1"></i> Activar Protección Extrema
-                        </button>
-                    </div>
                 </div>
                 <hr class="border-gray-200">
                 <div class="space-y-2">
@@ -1929,6 +1918,56 @@
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
         }
 
+        function renderEncryptionUI() {
+            const container = document.getElementById('encryptionUI');
+            if (!container) return;
+
+            if (encryptionKey) {
+                // --- ESTADO: ACTIVADA (Modo Seguro) 🟢 ---
+                container.innerHTML = `
+                    <div class="bg-green-50 p-3 rounded border border-green-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-shield-halved text-green-600"></i>
+                                <h4 class="font-bold text-xs text-green-800 uppercase">Encriptación E2EE</h4>
+                            </div>
+                            <span class="bg-green-200 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Activada</span>
+                        </div>
+                        <p class="text-[10px] text-green-700 mb-3">
+                            Tus datos están blindados. Solo tú tienes la llave.
+                        </p>
+                
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="changeEncryptionPassword()" class="bg-white border border-green-300 text-green-700 py-2 rounded text-xs font-bold hover:bg-green-50 transition">
+                                <i class="fa-solid fa-key mr-1"></i> Cambiar Clave
+                            </button>
+                            <button onclick="disableEncryption()" class="bg-white border border-red-200 text-red-600 py-2 rounded text-xs font-bold hover:bg-red-50 transition">
+                                <i class="fa-solid fa-lock-open mr-1"></i> Desactivar
+                            </button>
+                        </div>
+                    </div>`;
+            } else {
+                // --- ESTADO: DESACTIVADA (Modo Estándar) ⚪ ---
+                container.innerHTML = `
+                    <div class="bg-purple-50 p-3 rounded border border-purple-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-lock text-purple-600"></i>
+                                <h4 class="font-bold text-xs text-purple-800 uppercase">Encriptación E2EE</h4>
+                            </div>
+                            <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Desactivada</span>
+                        </div>
+                        <p class="text-[10px] text-purple-600 mb-3 leading-tight">
+                            Protege tus datos en la nube para que sean ilegibles sin tu contraseña.
+                            <br><span class="font-bold text-red-500">Advertencia: Si olvidas la clave, pierdes los datos.</span>
+                        </p>
+                        <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-purple-700 transition">
+                            <i class="fa-solid fa-shield-halved mr-1"></i> Activar Protección Extrema
+                        </button>
+                    </div>`;
+            }
+        }
+
         // ==========================================
         // 8. CONVERSIONES Y UTILIDADES
         // ==========================================
@@ -1960,6 +1999,7 @@
             if (menu === 'config') {
                 $('configModal').classList.toggle('hidden');
                 updateRateUI();
+                renderEncryptionUI(); // <--- AGREGAR ESTA LÍNEA
             }
             if (menu === 'fiados') {
                 $('fiadosRateModal').classList.toggle('hidden');
@@ -3915,19 +3955,66 @@
             }
         }
 
+        // 1. ACTIVAR (Igual que antes, pero llama al render al final)
         function enableEncryption() {
-            if (encryptionKey) return alert("Ya tienes la encriptación activada.");
-    
             const k1 = prompt("CREAR CLAVE MAESTRA\n\nEscribe una contraseña segura. Solo tú la sabrás.");
             if(!k1) return;
             const k2 = prompt("CONFIRMA LA CLAVE\n\nEscríbela de nuevo:");
-    
             if (k1 !== k2) return alert("Las claves no coinciden.");
     
             encryptionKey = k1;
             localStorage.setItem('inv_enc_key', k1);
-            saveData(); // Esto forzará la subida inmediata en modo encriptado
+            saveData(); 
+            renderEncryptionUI(); // Actualizar visualmente
             alert("✅ ¡Protección Activada!\nTus datos se están encriptando y subiendo a la nube.");
+        }
+
+        // 2. CAMBIAR CLAVE (Flujo estricto de 4 pasos)
+        function changeEncryptionPassword() {
+            // Paso 1: Autenticación
+            const oldKey = prompt("🔒 SEGURIDAD\n\nPara hacer cambios, ingresa tu Clave Maestra ACTUAL:");
+            if (oldKey !== encryptionKey) return alert("❌ Clave incorrecta. Acceso denegado.");
+
+            // Paso 2: Nueva Clave
+            const newKey1 = prompt("NUEVA CLAVE\n\nIngresa la nueva contraseña:");
+            if (!newKey1) return;
+
+            // Paso 3: Confirmación Nueva Clave
+            const newKey2 = prompt("CONFIRMAR\n\nRepite la nueva contraseña:");
+            if (newKey1 !== newKey2) return alert("❌ Las nuevas claves no coinciden.");
+
+            // Paso 4: Confirmación Final
+            if (!confirm("¿Estás seguro de cambiar la contraseña?\n\nAsegúrate de anotarla. Si la olvidas, perderás el acceso.")) return;
+
+            // Ejecución
+            encryptionKey = newKey1;
+            localStorage.setItem('inv_enc_key', encryptionKey);
+            saveData(); // Re-encripta todo con la nueva clave inmediatamente
+            alert("✅ Clave cambiada exitosamente.");
+        }
+
+        // 3. DESACTIVAR (Flujo de "Arrepentimiento")
+        function disableEncryption() {
+            // Nivel 1: Advertencia simple
+            if (!confirm("¿Estás seguro de desactivar la Encriptación E2EE?\n\nTus datos en la nube volverán a ser legibles para el administrador del sistema (Soporte).")) return;
+
+            // Nivel 2: Advertencia grave
+            if (!confirm("⚠️ CONFIRMACIÓN FINAL ⚠️\n\nAl desactivar esto, se eliminará la capa de seguridad extra.\n¿Realmente deseas continuar?")) return;
+
+            // Nivel 3: Autenticación final (La barrera real)
+            const keyCheck = prompt("AUTORIZACIÓN REQUERIDA\n\nEscribe tu Clave Maestra para confirmar la desactivación:");
+    
+            if (keyCheck !== encryptionKey) return alert("❌ Clave incorrecta. No se ha desactivado nada.");
+
+            // Ejecución: Volver al modo estándar
+            encryptionKey = null;
+            localStorage.removeItem('inv_enc_key');
+    
+            // Al no haber encryptionKey, saveData() entrará en el 'else' y subirá 'rawData' plano.
+            saveData(); 
+    
+            renderEncryptionUI(); // Actualizar visualmente a morado
+            alert("🔓 Encriptación desactivada.\nTus datos se han convertido a formato estándar en la nube.");
         }
 
     </script>
