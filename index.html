@@ -366,6 +366,17 @@
                         </div>
                     </div>
                 </div>
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase">Uso de Almacenamiento (Nube)</span>
+                        <span id="storageText" class="text-[10px] font-bold text-gray-700">Calculando...</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                        <div id="storageBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" style="width: 0%">
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-400 mt-1 text-right">Límite recomendado: ~1 MB</p>
+                </div>
                 <hr class="border-gray-200">
                 <div class="grid grid-cols-2 gap-3">
                     <button onclick="downloadBackup()" class="flex flex-col items-center justify-center p-3 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition text-green-700">
@@ -2023,8 +2034,13 @@
         function toggleMenu(menu) {
             if (menu === 'config') {
                 $('configModal').classList.toggle('hidden');
-                updateRateUI();
-                renderEncryptionUI(); // <--- AGREGAR ESTA LÍNEA
+
+                // Si el menú se está abriendo (no tiene hidden), calculamos
+                if (!$('configModal').classList.contains('hidden')) {
+                    updateRateUI(); // Actualizar UI de tasa
+                    renderEncryptionUI(); // Menú de encriptación
+                    updateStorageUsage(); // Uso de almacenamiento
+                }
             }
             if (menu === 'fiados') {
                 $('fiadosRateModal').classList.toggle('hidden');
@@ -4172,6 +4188,48 @@
                 });
                 
                 saveData(); // Guardar cambios en disco
+            }
+        }
+
+        // ==========================================
+        // 20. MONITOR DE ALMACENAMIENTO (v42)
+        // ==========================================
+        function updateStorageUsage() {
+            // 1. Simulamos el payload que se envía a Firebase
+            // (Si usas encriptación, el peso podría variar ligeramente por el overhead de CryptoJS, pero esto es una buena estimación)
+            const payload = JSON.stringify({
+                products: state.products,
+                sales: state.sales,
+                credits: state.credits,
+                paymentMethods: state.paymentMethods,
+                security: state.security
+            });
+
+            // 2. Calculamos bytes (Aprox. caracteres * 1 byte, aunque UTF-8 varía, es suficiente para referencia)
+            const bytes = new Blob([payload]).size;
+            const limit = 1048576; // 1 MB en bytes (Límite Firestore por documento)
+            
+            // 3. Convertimos a KB para mostrar
+            const kb = (bytes / 1024).toFixed(2);
+            const percentage = Math.min(((bytes / limit) * 100), 100).toFixed(1);
+
+            // 4. Actualizamos UI
+            const bar = $('storageBar');
+            const text = $('storageText');
+            
+            bar.style.width = `${percentage}%`;
+            text.textContent = `${kb} KB / 1024 KB (${percentage}%)`;
+
+            // 5. Colores del Semáforo
+            bar.className = "h-2.5 rounded-full transition-all duration-1000 ";
+            
+            if (percentage < 50) {
+                bar.classList.add('bg-green-500'); // Zona Segura
+            } else if (percentage < 80) {
+                bar.classList.add('bg-yellow-500'); // Zona de Precaución
+            } else {
+                bar.classList.add('bg-red-600', 'animate-pulse'); // ¡PELIGRO!
+                alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
             }
         }
 
