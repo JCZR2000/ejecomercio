@@ -622,6 +622,30 @@
         </div>
     </div>
 
+    <div id="creditHistoryModal" class="fixed inset-0 modal-bg z-[85] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="bg-gray-100 p-4 border-b flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="font-bold text-gray-800"><i
+                            class="fa-solid fa-clock-rotate-left mr-2 text-gray-500"></i>Historial de Pagos</h3>
+                    <p class="text-[10px] text-gray-500">Últimos 5 clientes solventes</p>
+                </div>
+                <button onclick="closeCreditHistory()"
+                    class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                    <i class="fa-solid fa-times text-lg"></i>
+                </button>
+            </div>
+    
+            <div class="p-4 overflow-y-auto bg-gray-50" id="creditHistoryList">
+            </div>
+    
+            <div class="p-3 bg-white border-t text-center shrink-0">
+                <p class="text-[10px] text-gray-400 italic">Los registros antiguos se eliminan automáticamente para ahorrar
+                    espacio.</p>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <section class="lg:col-span-7 space-y-6">
@@ -813,8 +837,10 @@
                     <button onclick="switchTab('credits')" id="tab-credits" class="flex-1 py-3 text-center tab-inactive hover:bg-gray-50 text-red-600 relative">
                         Fiados <span id="creditBadge" class="hidden bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full absolute top-2 right-2">0</span>
                     </button>
-                    <button onclick="fetchAllRates()" class="ml-2 bg-blue-100 text-blue-600 w-8 h-8 rounded-full hover:bg-blue-200 shadow flex items-center justify-center text-xs">
-                        <i class="fa-solid fa-rotate"></i>
+                    <button onclick="openCreditHistory()"
+                        class="ml-2 bg-purple-100 text-purple-600 w-8 h-8 rounded-full hover:bg-purple-200 shadow flex items-center justify-center text-xs transition transform active:scale-90"
+                        title="Ver clientes anteriores">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
                     </button>
                     <button onclick="toggleMenu('fiados')" id="fiadosRateBtn" class="ml-2 bg-gray-200 text-gray-600 w-8 h-8 rounded-full hover:bg-gray-300 shadow flex items-center justify-center text-xs transition-colors" title="Cambiar Tasa de Fiados">
                         <i class="fa-solid fa-calculator"></i>
@@ -2485,9 +2511,22 @@
             if (idx === -1) return;
             const c = state.credits[idx];
 
-            if (amount > (c.totalDebt - c.paid + 0.1)) return alert('El monto excede la deuda');
+            // Tolerancia de 0.01 para errores de punto flotante
+            if (amount > (c.totalDebt - c.paid + 0.01)) return alert('El monto excede la deuda');
 
             state.credits[idx].paid += amount;
+            
+            // --- NUEVO: Detectar si se completó el pago ---
+            const remaining = state.credits[idx].totalDebt - state.credits[idx].paid;
+            if (remaining <= 0.01) {
+                // Se pagó completo: Marcamos la fecha de finalización
+                state.credits[idx].paidDate = new Date().toISOString();
+                
+                // Ejecutamos limpieza automática para borrar los viejos
+                setTimeout(autoPruneCredits, 500); 
+            }
+            // ----------------------------------------------
+
             state.sales.unshift({
                 id: Date.now(),
                 date: new Date().toISOString(),
@@ -2499,8 +2538,11 @@
 
             saveData();
             renderAll();
+            
+            // Pequeño delay para que la UI se actualice antes de la alerta
             setTimeout(() => {
-                alert('Abono registrado.');
+                if (remaining <= 0.01) alert(`¡Deuda de ${c.customer} saldada! Se ha movido al historial.`);
+                else alert('Abono registrado.');
             }, 100);
         }
 
@@ -4015,6 +4057,123 @@
     
             renderEncryptionUI(); // Actualizar visualmente a morado
             alert("🔓 Encriptación desactivada.\nTus datos se han convertido a formato estándar en la nube.");
+        }
+
+        // ==========================================
+        // 19. HISTORIAL Y LIMPIEZA DE FIADOS (v42)
+        // ==========================================
+        
+        function openCreditHistory() {
+            renderCreditHistory();
+            $('creditHistoryModal').classList.remove('hidden');
+        }
+
+        function closeCreditHistory() {
+            $('creditHistoryModal').classList.add('hidden');
+        }
+
+        function renderCreditHistory() {
+            const container = $('creditHistoryList');
+            container.innerHTML = '';
+
+            // 1. Filtramos SOLO los que están pagados (Deuda <= Pagado)
+            // Y que tengan fecha de pago (paidDate) o sean viejos (0 deuda)
+            const paidCredits = state.credits.filter(c => (c.totalDebt - c.paid) <= 0.01);
+
+            // 2. Ordenamos: El más reciente primero
+            paidCredits.sort((a, b) => {
+                const dateA = a.paidDate ? new Date(a.paidDate).getTime() : 0;
+                const dateB = b.paidDate ? new Date(b.paidDate).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            // 3. Tomamos solo los últimos 5 para mostrar
+            const historyToShow = paidCredits.slice(0, 5);
+
+            if (historyToShow.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 opacity-50">
+                        <i class="fa-solid fa-ghost text-4xl mb-2 text-gray-300"></i>
+                        <p class="text-xs text-gray-500">No hay historial reciente.</p>
+                    </div>`;
+                return;
+            }
+
+            historyToShow.forEach(c => {
+                // Resumen de items
+                let itemsSummary = "Varios productos";
+                if(c.items && c.items.length > 0) {
+                    itemsSummary = c.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+                }
+
+                // Fecha de pago
+                const datePay = c.paidDate ? new Date(c.paidDate).toLocaleDateString() : 'Fecha desc.';
+
+                container.innerHTML += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm relative group">
+                        <button onclick="permanentDeleteCredit('${c.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+
+                        <div class="flex justify-between items-start mb-1">
+                            <div>
+                                <h4 class="font-bold text-gray-700 text-sm">${c.customer}</h4>
+                                <span class="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Pagado</span>
+                            </div>
+                            <div class="text-right pr-6">
+                                <div class="font-bold text-gray-800 text-sm">${formatMoney(c.paid)}</div>
+                                <div class="text-[9px] text-gray-400">${datePay}</div>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-2 border-t pt-1 leading-tight">
+                            ${itemsSummary}
+                        </p>
+                    </div>
+                `;
+            });
+        }
+
+        function permanentDeleteCredit(id) {
+            if(confirm('¿Eliminar este registro del historial permanentemente?')) {
+                state.credits = state.credits.filter(c => c.id != id);
+                saveData();
+                renderCreditHistory();
+            }
+        }
+
+        // Función de Limpieza Automática (El recolector de basura)
+        function autoPruneCredits() {
+            // Buscamos los pagados
+            const paidCredits = state.credits.filter(c => (c.totalDebt - c.paid) <= 0.01);
+            
+            // Si hay 5 o menos, no hacemos nada
+            if (paidCredits.length <= 5) return;
+
+            // Si hay más de 5, necesitamos borrar los excedentes
+            // Ordenamos por fecha de pago (los más recientes primero)
+            paidCredits.sort((a, b) => {
+                const dateA = a.paidDate ? new Date(a.paidDate).getTime() : 0;
+                const dateB = b.paidDate ? new Date(b.paidDate).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            // Los "salvados" son los primeros 5. Los "condenados" son el resto.
+            const creditsToKeepIds = paidCredits.slice(0, 5).map(c => c.id);
+            const creditsToDelete = paidCredits.slice(5); // Del 6 en adelante
+
+            if (creditsToDelete.length > 0) {
+                console.log(`🧹 Limpieza: Borrando ${creditsToDelete.length} fiados antiguos para ahorrar espacio.`);
+                
+                // Filtramos el estado principal: 
+                // Mantenemos si NO está pagado O si está en la lista de los 5 a salvar
+                state.credits = state.credits.filter(c => {
+                    const isPaid = (c.totalDebt - c.paid) <= 0.01;
+                    if (!isPaid) return true; // Mantener deudas activas
+                    return creditsToKeepIds.includes(c.id); // Mantener solo el Top 5 pagado
+                });
+                
+                saveData(); // Guardar cambios en disco
+            }
         }
 
     </script>
