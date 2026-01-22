@@ -17,6 +17,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -656,6 +657,53 @@
         </div>
     </div>
 
+    <div id="dashboardModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold"><i class="fa-solid fa-chart-line mr-2"></i>Estadísticas</h3>
+                <button onclick="closeDashboard()" class="text-white hover:text-indigo-200"><i
+                        class="fa-solid fa-times text-xl"></i></button>
+            </div>
+    
+            <div class="p-4 overflow-y-auto space-y-4">
+    
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="updateChart('7d')" id="btnChart7d"
+                        class="flex-1 py-1 text-xs font-bold rounded shadow bg-white text-indigo-600 transition">7
+                        Días</button>
+                    <button onclick="updateChart('30d')" id="btnChart30d"
+                        class="flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition">30
+                        Días</button>
+                    <button onclick="updateChart('12m')" id="btnChart12m"
+                        class="flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition">Año</button>
+                </div>
+    
+                <div class="bg-white border rounded-lg p-2 h-64 relative">
+                    <canvas id="salesChartCanvas"></canvas>
+                </div>
+    
+                <div
+                    class="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3">
+                    <div id="starProductImg"
+                        class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-yellow-500 text-xl border border-yellow-100 overflow-hidden">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-[10px] text-yellow-800 font-bold uppercase tracking-wider">Producto Estrella
+                            (Periodo)</p>
+                        <h4 id="starProductName" class="font-bold text-gray-800 text-sm leading-tight">Calculando...</h4>
+                        <p id="starProductQty" class="text-xs text-gray-600">0 unidades vendidas</p>
+                    </div>
+                </div>
+    
+                <button onclick="downloadChartImage()"
+                    class="w-full py-3 bg-gray-800 text-white rounded-lg font-bold text-sm hover:bg-gray-900 flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-download"></i> Descargar Gráfico
+                </button>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <section class="lg:col-span-7 space-y-6">
@@ -858,9 +906,18 @@
                 </div>
                 
                 <div id="view-history" class="p-4">
-                    <div class="flex justify-between mb-2">
-                        <div class="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-bold">Hoy: <span id="todayTotal">0.00</span></div>
-                        <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded text-xs font-bold">Mes: <span id="monthTotal">0.00</span></div>
+                    <div class="flex justify-between items-center mb-2 gap-2">
+                        <div class="flex gap-2">
+                            <div class="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-bold whitespace-nowrap">Hoy: <span
+                                    id="todayTotal">0.00</span></div>
+                            <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded text-xs font-bold whitespace-nowrap">Mes: <span
+                                    id="monthTotal">0.00</span></div>
+                        </div>
+                        <button onclick="openDashboard()"
+                            class="bg-indigo-600 text-white w-8 h-8 rounded-lg shadow-lg hover:bg-indigo-700 flex items-center justify-center transition transform active:scale-95"
+                            title="Ver Estadísticas">
+                            <i class="fa-solid fa-chart-pie"></i>
+                        </button>
                     </div>
                     <div class="overflow-y-auto max-h-[300px]">
                         <table class="w-full text-xs text-left">
@@ -4231,6 +4288,184 @@
                 bar.classList.add('bg-red-600', 'animate-pulse'); // ¡PELIGRO!
                 alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
             }
+        }
+
+        // ==========================================
+        // 21. DASHBOARD ESTADÍSTICO (v42)
+        // ==========================================
+        let salesChartInstance = null; // Variable para guardar el gráfico
+
+        function openDashboard() {
+            $('dashboardModal').classList.remove('hidden');
+            // Por defecto cargamos 7 días al abrir
+            updateChart('7d');
+        }
+
+        function closeDashboard() {
+            $('dashboardModal').classList.add('hidden');
+        }
+
+        function updateChart(range) {
+            // 1. Actualizar estilos de botones
+            ['7d', '30d', '12m'].forEach(r => {
+                const btn = $(`btnChart${r}`);
+                if(r === range) btn.className = "flex-1 py-1 text-xs font-bold rounded shadow bg-white text-indigo-600 transition";
+                else btn.className = "flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition";
+            });
+
+            // 2. Filtrar Datos
+            const now = new Date();
+            let labels = [];
+            let dataPoints = [];
+            let filteredSales = [];
+            
+            // Configuración según rango
+            if (range === '7d' || range === '30d') {
+                const days = range === '7d' ? 7 : 30;
+                for (let i = days - 1; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(now.getDate() - i);
+                    const dateStr = d.toLocaleDateString(); // Clave para agrupar
+                    labels.push(dateStr.split('/')[0] + '/' + dateStr.split('/')[1]); // DD/MM visual
+                    
+                    // Sumar ventas de ese día
+                    const dayTotal = state.sales.filter(s => {
+                        const sDate = new Date(s.date);
+                        return sDate.toDateString() === d.toDateString() && s.type !== 'payment'; // Solo ventas reales
+                    }).reduce((sum, s) => sum + Number(s.total), 0);
+                    
+                    dataPoints.push(dayTotal);
+                }
+                
+                // Filtramos ventas globales para el producto estrella dentro del rango
+                const limitDate = new Date();
+                limitDate.setDate(now.getDate() - days);
+                filteredSales = state.sales.filter(s => new Date(s.date) >= limitDate && s.type !== 'payment');
+
+            } else if (range === '12m') {
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const monthName = d.toLocaleDateString('es-ES', { month: 'short' });
+                    labels.push(monthName);
+
+                    const monthTotal = state.sales.filter(s => {
+                        const sDate = new Date(s.date);
+                        return sDate.getMonth() === d.getMonth() && sDate.getFullYear() === d.getFullYear() && s.type !== 'payment';
+                    }).reduce((sum, s) => sum + Number(s.total), 0);
+
+                    dataPoints.push(monthTotal);
+                }
+                // Filtro anual para producto estrella
+                const limitDate = new Date();
+                limitDate.setFullYear(now.getFullYear() - 1);
+                filteredSales = state.sales.filter(s => new Date(s.date) >= limitDate && s.type !== 'payment');
+            }
+
+            // 3. Renderizar Gráfico
+            renderChartCanvas(labels, dataPoints);
+
+            // 4. Calcular Producto Estrella
+            calculateStarProduct(filteredSales);
+        }
+
+        function renderChartCanvas(labels, data) {
+            const ctx = document.getElementById('salesChartCanvas').getContext('2d');
+            const sym = getSymbol();
+
+            // Destruir gráfico anterior si existe para evitar bugs visuales
+            if (salesChartInstance) salesChartInstance.destroy();
+
+            salesChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Ventas (${sym})`,
+                        data: data,
+                        borderColor: '#4f46e5', // Indigo-600
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3, // Curvatura suave
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#4f46e5'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${sym} ` + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function calculateStarProduct(salesList) {
+            const productMap = {};
+
+            // Conteo masivo de items
+            salesList.forEach(sale => {
+                if (sale.items) {
+                    sale.items.forEach(item => {
+                        // Ignorar Stubs (deudas viejas)
+                        if (item.isStub) return;
+
+                        if (!productMap[item.name]) {
+                            productMap[item.name] = { qty: 0, id: item.id };
+                        }
+                        productMap[item.name].qty += item.qty;
+                    });
+                }
+            });
+
+            // Encontrar el ganador
+            let winner = { name: 'Sin datos', qty: 0, img: null };
+            let maxQty = -1;
+
+            Object.entries(productMap).forEach(([name, data]) => {
+                if (data.qty > maxQty) {
+                    maxQty = data.qty;
+                    // Buscamos la imagen en el inventario actual
+                    const prodInStock = state.products.find(p => p.id == data.id);
+                    winner = { 
+                        name: name, 
+                        qty: data.qty, 
+                        img: prodInStock ? prodInStock.img : null 
+                    };
+                }
+            });
+
+            // Actualizar UI
+            $('starProductName').textContent = winner.qty > 0 ? winner.name : 'No hay ventas en este periodo';
+            $('starProductQty').textContent = winner.qty > 0 ? `${winner.qty} unidades vendidas` : '-';
+            
+            const imgDiv = $('starProductImg');
+            if (winner.img) {
+                imgDiv.innerHTML = `<img src="${winner.img}" class="w-full h-full object-cover">`;
+            } else {
+                imgDiv.innerHTML = `<i class="fa-solid fa-trophy"></i>`;
+            }
+        }
+
+        function downloadChartImage() {
+            const link = document.createElement('a');
+            link.download = `reporte_ventas_${new Date().toISOString().split('T')[0]}.png`;
+            // Chart.js canvas to Base64
+            link.href = document.getElementById('salesChartCanvas').toDataURL('image/png');
+            link.click();
         }
 
     </script>
