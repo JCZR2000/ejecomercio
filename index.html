@@ -2904,15 +2904,16 @@
                         </div>
                         
                         <div class="text-right w-1/3">
-                            <div class="font-bold text-red-600 text-lg flex flex-col items-end">
-                                <span>${formatMoney(debt)}</span>
-                                ${hasPriceIncrease && state.creditMode === 'DYNAMIC' ? '<span class="text-[8px] bg-blue-100 text-blue-700 px-1 rounded font-bold uppercase border border-blue-200"><i class="fa-solid fa-arrow-trend-up"></i> Ajustado</span>' : ''}
-                            </div>
-                            <div class="text-xs text-blue-600 font-bold">Bs ${debtBs.toFixed(2)}</div>
+                            <div class="font-bold text-red-600 text-lg">${formatMoney(debt)}</div>
                             
-                            <div class="mt-4">
-                                <div class="text-xs text-gray-400">Orig: ${formatMoney(originalDebt)}</div>
-                                ${surchargeDisplay}
+                            <div class="text-xs text-blue-600 font-bold mb-1">Bs ${debtBs.toFixed(2)}</div>
+                            
+                            ${hasPriceIncrease && state.creditMode === 'DYNAMIC' ?
+                                '<div class="mb-2"><span class="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold uppercase border border-blue-200 inline-flex items-center gap-1"><i class="fa-solid fa-arrow-trend-up"></i> Ajustado</span></div>'
+                                : ''}
+                            
+                            <div>
+                                <div class="text-xs text-gray-400">Orig: ${formatMoney(c.totalDebt - (c.surcharge || 0))}</div> ${surchargeDisplay}
                             </div>
                         </div>
                     </div>
