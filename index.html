@@ -5041,21 +5041,20 @@
                     }
                 }
 
-                // 2. PC / ESCRITORIO: Fallback Manual (WhatsApp Web)
-                // Si llegamos aquí es porque estamos en PC o el móvil no soporta share de archivos.
-                
-                // Paso A: Descargar la imagen automáticamente (porque WA Web no deja recibir imágenes por URL)
+                // Paso A: Descargar la imagen primero
                 const link = document.createElement('a');
                 link.download = `recibo_para_enviar.png`;
                 link.href = imgData;
                 link.click();
 
-                // Paso B: Abrir WhatsApp Web con el texto pre-escrito
+                // Paso B: Instruir al usuario (Bloqueante)
+                // El alert detiene la ejecución del código hasta que el usuario da "Aceptar".
+                // Esto garantiza que lea las instrucciones ANTES de que se abra la nueva pestaña.
+                alert('✅ La imagen del recibo se ha descargado en tu PC.\n\n👉 INSTRUCCIONES:\n1. Acepta este mensaje.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.');
+
+                // Paso C: Abrir WhatsApp Web (Solo ocurre después de cerrar la alerta)
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-                
-                // Aviso al usuario
-                alert('La imagen se ha descargado a tu PC.\n\nSe abrirá WhatsApp Web: Por favor arrastra o adjunta la imagen descargada en el chat.');
 
             } catch (e) {
                 console.error(e);
