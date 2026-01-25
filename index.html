@@ -19,6 +19,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -730,6 +733,152 @@
         </div>
     </div>
 
+    <div id="successModal" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs p-6 text-center animate-bounce-in">
+            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-check text-3xl text-green-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">¡Operación Exitosa!</h3>
+            <p class="text-sm text-gray-500 mb-6">Los datos se han guardado correctamente.</p>
+    
+            <div class="space-y-3">
+                <button onclick="openReceiptFromSuccess()"
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow hover:bg-indigo-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-receipt"></i> Generar Recibo
+                </button>
+                <button onclick="closeSuccessModal()"
+                    class="w-full bg-gray-100 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-200">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="receiptModal"
+        class="fixed inset-0 modal-bg z-[95] hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-gray-100 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[95vh] relative">
+    
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0 rounded-t-xl">
+                <h3 class="font-bold"><i class="fa-solid fa-print mr-2"></i>Recibo</h3>
+                <div class="flex gap-2">
+                    <button onclick="toggleReceiptConfig()"
+                        class="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center"
+                        title="Configurar Recibo">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button onclick="closeReceiptModal()"
+                        class="w-8 h-8 rounded-full bg-slate-700 hover:bg-red-500 flex items-center justify-center transition">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+    
+            <div id="receiptConfigPanel" class="hidden bg-white p-4 border-b border-gray-200 animate-fade-in">
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Configurar Apariencia</h4>
+    
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-12 h-12 border border-gray-300 rounded flex items-center justify-center bg-gray-50 overflow-hidden relative">
+                            <img id="receiptLogoPreview" class="hidden w-full h-full object-contain">
+                            <i id="receiptLogoIcon" class="fa-solid fa-image text-gray-300"></i>
+                        </div>
+                        <label
+                            class="flex-1 cursor-pointer bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs font-bold hover:bg-blue-100 text-center border border-blue-200">
+                            Subir Logo
+                            <input type="file" id="receiptLogoInput" accept="image/*" class="hidden"
+                                onchange="previewReceiptLogo(event)">
+                        </label>
+                        <button onclick="removeReceiptLogo()" class="text-red-500 p-2 hover:bg-red-50 rounded"><i
+                                class="fa-solid fa-trash"></i></button>
+                    </div>
+    
+                    <input type="text" id="cfgCompanyName" placeholder="Nombre de tu Negocio"
+                        class="w-full border rounded p-2 text-sm">
+                    <input type="text" id="cfgFooter" placeholder="Pie de página (Ej: Gracias por su compra)"
+                        class="w-full border rounded p-2 text-sm">
+    
+                    <button onclick="saveReceiptConfig()"
+                        class="w-full bg-green-600 text-white py-2 rounded text-xs font-bold shadow">Guardar
+                        Cambios</button>
+                </div>
+            </div>
+    
+            <div class="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
+    
+                <div class="flex gap-2 items-center bg-white p-2 rounded border">
+                    <i class="fa-solid fa-user text-gray-400"></i>
+                    <input type="text" id="receiptCustomerName" placeholder="Cliente Genérico"
+                        class="w-full outline-none text-sm font-bold text-gray-700" oninput="updateReceiptPreview()">
+                </div>
+    
+                <label class="flex items-center gap-2 cursor-pointer select-none bg-white p-2 rounded border w-fit mx-auto">
+                    <input type="checkbox" id="chkReceiptBs" class="form-checkbox h-4 w-4 text-indigo-600 rounded"
+                        onchange="updateReceiptPreview()">
+                    <span class="text-xs font-bold text-gray-600">Mostrar Bolívares</span>
+                </label>
+    
+                <div class="flex justify-center">
+                    <div id="receiptCanvas"
+                        class="bg-white w-full max-w-[320px] shadow-lg p-4 text-gray-800 font-mono text-xs border border-gray-200 relative">
+                        <div class="text-center mb-4 border-b border-gray-300 pb-2">
+                            <img id="printLogo" src="" class="h-12 mx-auto mb-1 hidden object-contain">
+                            <h2 id="printCompanyName" class="text-lg font-bold uppercase leading-tight">Mi Negocio</h2>
+                            <p class="text-[10px] text-gray-500" id="printDate">DD/MM/AAAA HH:MM</p>
+                        </div>
+    
+                        <table class="w-full mb-4">
+                            <thead>
+                                <tr class="border-b border-black">
+                                    <th class="text-left py-1">Cant/Desc</th>
+                                    <th class="text-right py-1">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="printItemsList" class="divide-y divide-gray-100">
+                            </tbody>
+                        </table>
+    
+                        <div class="border-t border-black pt-2 space-y-1 text-right">
+                            <div class="flex justify-between text-lg font-bold">
+                                <span>TOTAL</span>
+                                <span id="printTotalMain">$0.00</span>
+                            </div>
+                            <div id="printTotalBsRow" class="hidden flex justify-between text-sm text-gray-600 font-bold">
+                                <span>En Bolívares:</span>
+                                <span id="printTotalBs">Bs 0.00</span>
+                            </div>
+                            <div id="printCreditInfo" class="hidden pt-2 mt-2 border-t border-dashed border-gray-300">
+                                <div class="flex justify-between text-[10px]"><span>Abonado:</span> <span
+                                        id="printPaid">$0.00</span></div>
+                                <div class="flex justify-between font-bold text-red-600"><span>Resta:</span> <span
+                                        id="printRemaining">$0.00</span></div>
+                            </div>
+                        </div>
+    
+                        <div class="mt-6 text-center text-[10px] text-gray-500 italic border-t pt-2">
+                            <p id="printFooter">Gracias por su compra</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="p-4 bg-white border-t grid grid-cols-2 gap-3 shrink-0">
+                <button onclick="downloadReceipt('img')"
+                    class="bg-green-100 text-green-700 py-3 rounded-lg font-bold text-xs hover:bg-green-200 flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-image text-lg"></i> Descargar Imagen
+                </button>
+                <button onclick="downloadReceipt('pdf')"
+                    class="bg-red-100 text-red-700 py-3 rounded-lg font-bold text-xs hover:bg-red-200 flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-file-pdf text-lg"></i> Descargar PDF
+                </button>
+                <button onclick="shareReceipt()"
+                    class="col-span-2 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-brands fa-whatsapp text-xl"></i> Compartir
+                </button>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <section class="lg:col-span-7 space-y-6">
@@ -1089,6 +1238,13 @@
             rateMode: localStorage.getItem('inv_rate_mode') || 'USD',
             fiadosRateMode: localStorage.getItem('inv_fiados_rate_mode') || 'DEFAULT',
             creditMode: localStorage.getItem('inv_credit_mode') || 'DYNAMIC', // DYNAMIC o FIXED
+
+            // --- NUEVO: CONFIGURACIÓN DE RECIBO ---
+            receiptConfig: JSON.parse(localStorage.getItem('inv_receipt_config')) || {
+                companyName: 'Mi Negocio',
+                footer: '¡Gracias por su compra!',
+                logo: null
+            },
 
             // Variables de sesión
             cart: [],
@@ -2563,7 +2719,15 @@
                             rate: activeRate
                         });
                     }
-                    alert('Fiado actualizado.');
+                    tempReceiptData = {
+                        items: [...state.cart], // Copia del carrito
+                        total: totalUSD,
+                        paid: initialPay,
+                        date: new Date().toISOString(),
+                        customer: customerName,
+                        isCredit: true
+                    };
+                    $('successModal').classList.remove('hidden'); // Mostrar Modal Éxito
                     switchTab('credits');
                 } else {
                     state.sales.unshift({
@@ -2574,7 +2738,15 @@
                         total: totalUSD,
                         rate: activeRate
                     });
-                    alert('Venta registrada.');
+                    // REEMPLAZAR alert('Venta registrada.'); POR:
+                    tempReceiptData = {
+                        items: [...state.cart], // Copia del carrito
+                        total: totalUSD,
+                        date: new Date().toISOString(),
+                        type: 'sale',
+                        customer: '' // Cliente genérico en venta contado
+                    };
+                    $('successModal').classList.remove('hidden'); // Mostrar Modal Éxito
                 }
 
                 state.cart = [];
@@ -2780,7 +2952,11 @@
                 histBody.innerHTML += `<tr class="border-b">
                     <td class="p-2 text-xs text-gray-500">${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
                     <td class="p-2 text-xs truncate max-w-[200px]">${detail}</td>
-                    <td class="p-2 text-right font-bold text-xs">${formatMoney(amt)}</td>
+                    <td class="p-2 text-right font-bold text-xs">${formatMoney(amt)}
+                        <button onclick="openReceiptFromHistory('${s.id}')" class="ml-2 text-gray-400 hover:text-indigo-600 transition">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                    </td>
                 </tr>`;
             });
         }
@@ -2924,6 +3100,9 @@
                         <button onclick="openSurchargeModal('${c.id}')" class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-xs hover:bg-yellow-200 border border-yellow-200 font-bold flex items-center gap-1" title="Aplicar Recargo"><i class="fa-solid fa-bolt mr-1"></i>Recargo</button>
                         <button onclick="openShareModal('${c.id}')" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs hover:bg-green-200 border border-green-200 font-bold flex items-center gap-1" title="Enviar Recordatorio">
                             <i class="fa-solid fa-share-nodes"></i> Recordar
+                        </button>
+                        <button onclick="openReceiptFromCredit('${c.id}')" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-200 border border-gray-200 font-bold flex items-center gap-1" title="Factura">
+                            <i class="fa-solid fa-receipt"></i> Factura
                         </button>
                     </div>
                     
@@ -4571,6 +4750,285 @@
             if (credit.surcharge) currentTotal += credit.surcharge;
 
             return currentTotal;
+        }
+
+        // ==========================================
+        // 23. SISTEMA DE RECIBOS (v42)
+        // ==========================================
+        let tempReceiptData = null; // Variable volátil para pasar datos al modal
+
+        // --- MANEJO DE CONFIGURACIÓN ---
+        function toggleReceiptConfig() {
+            const panel = $('receiptConfigPanel');
+            panel.classList.toggle('hidden');
+            
+            // Cargar datos actuales
+            if (!panel.classList.contains('hidden')) {
+                $('cfgCompanyName').value = state.receiptConfig.companyName || '';
+                $('cfgFooter').value = state.receiptConfig.footer || '';
+                if (state.receiptConfig.logo) {
+                    $('receiptLogoPreview').src = state.receiptConfig.logo;
+                    $('receiptLogoPreview').classList.remove('hidden');
+                    $('receiptLogoIcon').classList.add('hidden');
+                }
+            }
+        }
+
+        function previewReceiptLogo(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                $('receiptLogoPreview').src = e.target.result;
+                $('receiptLogoPreview').classList.remove('hidden');
+                $('receiptLogoIcon').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeReceiptLogo() {
+            $('receiptLogoInput').value = '';
+            $('receiptLogoPreview').src = '';
+            $('receiptLogoPreview').classList.add('hidden');
+            $('receiptLogoIcon').classList.remove('hidden');
+        }
+
+        function saveReceiptConfig() {
+            state.receiptConfig.companyName = $('cfgCompanyName').value;
+            state.receiptConfig.footer = $('cfgFooter').value;
+            
+            const imgSrc = $('receiptLogoPreview').src;
+            if (imgSrc && !$('receiptLogoPreview').classList.contains('hidden')) {
+                state.receiptConfig.logo = imgSrc;
+            } else {
+                state.receiptConfig.logo = null;
+            }
+
+            localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
+            saveData();
+            toggleReceiptConfig();
+            updateReceiptPreview(); // Refrescar vista previa si está abierta
+            alert('Configuración guardada');
+        }
+
+        // --- APERTURA DE MODALES ---
+
+        // A. Desde el Modal de Éxito
+        function openReceiptFromSuccess() {
+            if (!tempReceiptData) return;
+            closeSuccessModal();
+            prepareReceiptModal(tempReceiptData);
+        }
+
+        function closeSuccessModal() {
+            $('successModal').classList.add('hidden');
+            tempReceiptData = null; // Limpiar memoria
+        }
+
+        // B. Desde Historial (Pasar objeto venta)
+        function openReceiptFromHistory(saleId) {
+            const sale = state.sales.find(s => s.id == saleId);
+            if (!sale) return;
+            prepareReceiptModal({
+                items: sale.items,
+                total: sale.total,
+                date: sale.date,
+                customer: sale.description ? sale.description.replace('Abono: ', '') : '',
+                type: sale.type,
+                isHistory: true
+            });
+        }
+
+        // C. Desde Fiados (Pasar objeto crédito)
+        function openReceiptFromCredit(creditId) {
+            const credit = state.credits.find(c => c.id == creditId);
+            if (!credit) return;
+            
+            // Calculamos deuda actual real
+            const realTotal = calculateRealDebt(credit);
+
+            prepareReceiptModal({
+                items: credit.items,
+                total: realTotal,
+                paid: credit.paid,
+                date: credit.date,
+                customer: credit.customer,
+                isCredit: true
+            });
+        }
+
+        // --- RENDERIZADO DEL TICKET ---
+        function prepareReceiptModal(data) {
+            tempReceiptData = data; // Guardamos contexto actual
+            
+            // 1. Rellenar Inputs
+            $('receiptCustomerName').value = data.customer || '';
+            
+            // 2. Renderizar visualmente
+            updateReceiptPreview();
+
+            // 3. Mostrar Modal
+            $('receiptModal').classList.remove('hidden');
+        }
+
+        function closeReceiptModal() {
+            $('receiptModal').classList.add('hidden');
+        }
+
+        function updateReceiptPreview() {
+            const data = tempReceiptData;
+            if (!data) return;
+
+            const conf = state.receiptConfig;
+            const sym = getSymbol();
+            const rate = getActiveRate(); // Usamos tasa global o específica si guardáramos la de la venta (para simplificar usamos actual)
+
+            // Header
+            $('printCompanyName').textContent = conf.companyName || "Mi Negocio";
+            $('printFooter').textContent = conf.footer || "Gracias por su compra";
+            
+            if (conf.logo) {
+                $('printLogo').src = conf.logo;
+                $('printLogo').classList.remove('hidden');
+            } else {
+                $('printLogo').classList.add('hidden');
+            }
+
+            const d = new Date(data.date);
+            $('printDate').textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+
+            // Items
+            const tbody = $('printItemsList');
+            tbody.innerHTML = '';
+            
+            if (data.items) {
+                data.items.forEach(item => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="py-1">
+                                <div class="font-bold">${item.name}</div>
+                                <div class="text-[10px] text-gray-500">${item.qty} x ${formatMoney(item.price)}</div>
+                            </td>
+                            <td class="text-right py-1 align-top font-mono">
+                                ${formatMoney(item.qty * item.price)}
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else if (data.type === 'payment') {
+                // Caso especial: Recibo de un abono simple desde historial
+                tbody.innerHTML = `<tr><td class="py-1 font-bold">Abono a Deuda</td><td class="text-right py-1">${formatMoney(data.total)}</td></tr>`;
+            }
+
+            // Totales
+            const showBs = $('chkReceiptBs').checked;
+            $('printTotalMain').textContent = formatMoney(data.total);
+
+            if (showBs) {
+                $('printTotalBsRow').classList.remove('hidden');
+                $('printTotalBs').textContent = `Bs ${(data.total * rate).toFixed(2)}`;
+            } else {
+                $('printTotalBsRow').classList.add('hidden');
+            }
+
+            // Información de Crédito (Si aplica)
+            if (data.isCredit) {
+                $('printCreditInfo').classList.remove('hidden');
+                $('printPaid').textContent = formatMoney(data.paid);
+                $('printRemaining').textContent = formatMoney(data.total - data.paid);
+            } else {
+                $('printCreditInfo').classList.add('hidden');
+            }
+        }
+
+        // --- DESCARGA Y COMPARTIR ---
+        async function generateReceiptImage() {
+            const element = document.getElementById('receiptCanvas');
+            // Usamos scale: 2 para mejor calidad (retina)
+            const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+            return canvas.toDataURL('image/png');
+        }
+
+        async function downloadReceipt(type) {
+            const btn = event.currentTarget;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                const imgData = await generateReceiptImage();
+                const fileName = `recibo_${Date.now()}`;
+
+                if (type === 'img') {
+                    const link = document.createElement('a');
+                    link.download = `${fileName}.png`;
+                    link.href = imgData;
+                    link.click();
+                } else {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: [80, 150] // Tamaño ticket térmico aprox
+                    });
+                    
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    // Ajustar altura de imagen proporcionalmente
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save(`${fileName}.pdf`);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error generando recibo.');
+            } finally {
+                btn.innerHTML = originalContent;
+            }
+        }
+
+        async function shareReceipt() {
+            const btn = event.currentTarget;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
+
+            try {
+                const imgData = await generateReceiptImage();
+                
+                // 1. Intentar API Nativa (Móviles modernos)
+                if (navigator.share) {
+                    const blob = await (await fetch(imgData)).blob();
+                    const file = new File([blob], "recibo.png", { type: "image/png" });
+                    
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Recibo de Compra',
+                            text: `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`
+                        });
+                        btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
+                        return;
+                    }
+                }
+
+                // 2. Fallback: WhatsApp Web (Solo texto con aviso)
+                // WhatsApp Web no permite enviar imágenes programáticamente por seguridad.
+                // Descargamos la imagen y abrimos WhatsApp para que el usuario la adjunte.
+                const link = document.createElement('a');
+                link.download = `recibo_para_enviar.png`;
+                link.href = imgData;
+                link.click();
+
+                const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo (Adjuntar imagen descargada).`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                
+                alert('La imagen se ha descargado. Por favor adjúntala en el chat de WhatsApp que se abrirá.');
+
+            } catch (e) {
+                console.error(e);
+                alert('Tu dispositivo no soporta compartir imágenes directas.');
+            } finally {
+                btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
+            }
         }
 
     </script>

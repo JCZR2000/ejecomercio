@@ -11,7 +11,9 @@ const ASSETS_TO_CACHE = [
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
-  'https://cdn.jsdelivr.net/npm/chart.js'
+  'https://cdn.jsdelivr.net/npm/chart.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
 ];
 
 // 1. INSTALACIÓN: Descargar recursos
