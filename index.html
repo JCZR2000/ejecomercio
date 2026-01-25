@@ -3,9 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventario Pro v39.7.1</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0F172A">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <title>Inventario Pro v42</title>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -47,7 +63,26 @@
         }
     </style>
 </head>
+
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
+
+    <div id="loginOverlay" class="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-4 transition-all duration-500">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
+            <div class="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
+                <i class="fa-solid fa-cloud text-4xl text-slate-900"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-800 mb-2">EjeComercio Cloud</h1>
+            <p class="text-gray-500 text-sm mb-8">Tus datos sincronizados en todos tus dispositivos a tiempo real.</p>
+            
+            <button onclick="loginWithGoogle()" class="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 hover:bg-gray-50 transition shadow-sm">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6">
+                <span>Continuar con Google</span>
+            </button>
+
+            <p id="loginStatus" class="mt-4 text-xs text-blue-500 hidden animate-pulse">Conectando al inventario...</p>
+        </div>
+        <p class="text-slate-500 text-xs mt-8">Versión 42.0</p>
+    </div>
 
     <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
         <div class="container mx-auto px-4 py-3 flex flex-row justify-between items-center">
@@ -55,7 +90,7 @@
                 <h1 class="text-lg md:text-2xl font-bold text-yellow-500 flex items-center gap-2 truncate">
                     <i class="fa-solid fa-file-invoice-dollar"></i> 
                     <span class="hidden md:inline">Inventario Pro</span> 
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v39.7</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v42</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -65,6 +100,9 @@
                 </span>
             </div>
             <div class="flex items-center gap-3">
+                <div id="cloudStatus" class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 border border-slate-700 transition-all duration-300" title="Estado de conexión">
+                    <div id="cloudDot" class="w-2.5 h-2.5 rounded-full bg-gray-400"></div> <span id="cloudText" class="text-[10px] font-bold text-gray-400 uppercase hidden md:inline">Conectando</span>
+                </div>
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
                     <input type="number" id="displayRate" readonly class="bg-transparent text-white w-16 text-sm font-mono focus:outline-none text-right cursor-default" placeholder="0.00">
@@ -72,9 +110,30 @@
                         <i class="fa-solid fa-sync-alt"></i>
                     </button>
                 </div>
-                <button onclick="toggleMenu('config')" class="bg-gray-700 hover:bg-gray-600 text-white p-2 rounded transition shadow">
-                    <i class="fa-solid fa-gear"></i>
-                </button>
+                <div class="relative">
+                    <button onclick="toggleUserMenu()" class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
+                        <img id="userAvatar" src="" class="w-full h-full object-cover hidden rounded-full">
+                        <i id="userIcon" class="fa-solid fa-user"></i>
+                    </button>
+                    
+                    <div id="userMenuDropdown" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden z-50 border border-gray-100">
+                        <div class="px-4 py-2 border-b border-gray-100 bg-gray-50">
+                            <p class="text-xs font-bold text-gray-800 truncate" id="userNameDisplay">Usuario</p>
+                            <p class="text-[10px] text-gray-500 truncate" id="userEmailDisplay">...</p>
+                        </div>
+                        
+                        <button onclick="toggleMenu('config'); toggleUserMenu()" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition">
+                            <i class="fa-solid fa-gear text-gray-400"></i> Configuración
+                        </button>
+                        
+                        <div class="border-t border-gray-100 my-1"></div>
+                        
+                        <button id="btnAuthAction" onclick="handleAuthAction()" class="w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition">
+                            <i id="iconAuthAction" class="fa-solid fa-right-to-bracket"></i> 
+                            <span id="textAuthAction">Iniciar Sesión</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
@@ -312,6 +371,17 @@
                     </div>
                 </div>
                 <hr class="border-gray-200">
+                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-4">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[10px] font-bold text-gray-500 uppercase">Uso de Almacenamiento (Nube)</span>
+                        <span id="storageText" class="text-[10px] font-bold text-gray-700">Calculando...</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                        <div id="storageBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" style="width: 0%">
+                        </div>
+                    </div>
+                    <p class="text-[9px] text-gray-400 mt-1 text-right">Límite recomendado: ~1 MB</p>
+                </div>
                 <div class="grid grid-cols-2 gap-3">
                     <button onclick="downloadBackup()" class="flex flex-col items-center justify-center p-3 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition text-green-700">
                         <i class="fa-solid fa-download text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Backup</span>
@@ -320,6 +390,32 @@
                         <i class="fa-solid fa-upload text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Restaurar</span>
                         <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="restoreBackup(event)">
                     </label>
+                </div>
+                <hr class="border-gray-200">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Configuración de Fiados</p>
+                    <div class="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
+                        <p class="text-[10px] text-gray-400 mb-2">Define cómo se calcula el total de la deuda si los precios cambian.
+                        </p>
+                
+                        <button onclick="setCreditMode('DYNAMIC')" id="btnCredDynamic"
+                            class="w-full text-left p-2 rounded border flex items-center gap-2 transition bg-blue-50 border-blue-200 text-blue-700">
+                            <i class="fa-solid fa-arrow-trend-up"></i>
+                            <div>
+                                <div class="text-xs font-bold">Precios Dinámicos (Recomendado)</div>
+                                <div class="text-[9px]">La deuda se actualiza si el producto sube de precio.</div>
+                            </div>
+                        </button>
+                
+                        <button onclick="setCreditMode('FIXED')" id="btnCredFixed"
+                            class="w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600">
+                            <i class="fa-solid fa-lock"></i>
+                            <div>
+                                <div class="text-xs font-bold">Precios Fijos</div>
+                                <div class="text-[9px]">La deuda se congela al momento de la venta.</div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
                 <hr class="border-gray-200">
                 <div class="border border-indigo-200 bg-indigo-50 rounded-lg p-4">
@@ -350,6 +446,10 @@
                         </div>
                     </div>
                 </div>
+                <div class="mt-4 border-t pt-4">
+                    <div id="encryptionUI" class="transition-all duration-300">
+                        </div>
+                </div>
                 <hr class="border-gray-200">
                 <div class="space-y-2">
                     <p class="text-xs text-gray-500 uppercase font-bold mb-2">Zona de Limpieza</p>
@@ -360,6 +460,13 @@
                     <button onclick="requestAction('clean_hist')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group">
                         <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-history"></i></div>
                         <div class="text-left"><div class="font-bold text-sm">Borrar Historial</div><div class="text-[10px] text-gray-500">Elimina registros de venta.</div></div>
+                    </button>
+                    <button onclick="requestAction('clean_credits')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group mt-2">
+                        <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                        <div class="text-left">
+                            <div class="font-bold text-sm">Borrar Fiados</div>
+                            <div class="text-[10px] text-gray-500">Elimina todas las deudas pendientes.</div>
+                        </div>
                     </button>
                     <button onclick="requestAction('factory_reset')" class="w-full flex items-center p-3 bg-red-600 text-white rounded hover:bg-red-700 transition shadow mt-4">
                         <div class="p-2 mr-2"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -485,11 +592,308 @@
         </div>
     </div>
 
+    <div id="calculatorModal" class="fixed inset-0 modal-bg z-[95] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all flex flex-col max-h-[90vh]">
+            <div class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold"><i class="fa-solid fa-calculator mr-2"></i>Calculadora de Precios</h3>
+                <button onclick="closeCalculator()" class="text-white hover:text-yellow-100 bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto">
+                
+                <div class="mb-4">
+                    <label class="text-xs font-bold text-gray-600 block mb-1">Costo Base (Factura Total)</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold dynamic-symbol-span">$</span>
+                            <input type="number" id="calcBaseUSD" step="0.01" class="w-full pl-7 pr-2 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-yellow-400 font-bold" placeholder="0.00" oninput="syncCalcCurrency('USD'); calculatePriceResult()">
+                        </div>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">Bs</span>
+                            <input type="number" id="calcBaseBs" step="0.01" class="w-full pl-8 pr-2 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-yellow-400 font-bold bg-gray-50" placeholder="0.00" oninput="syncCalcCurrency('BS'); calculatePriceResult()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-4 bg-gray-50 p-3 rounded border border-gray-100">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="chkCalcTax" class="form-checkbox h-4 w-4 text-yellow-500 rounded border-gray-300 focus:ring-yellow-400" onchange="toggleCalcTax()">
+                            <span class="text-xs font-bold text-gray-700">Incluir Impuesto (IVA)</span>
+                        </label>
+                    </div>
+                    <div id="taxInputContainer" class="hidden relative animate-fade-in">
+                         <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-bold">%</span>
+                         <input type="number" id="calcTaxRate" value="16" class="w-full px-3 py-1.5 border rounded text-sm outline-none focus:border-yellow-400" oninput="calculatePriceResult()">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-5">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Unidades</label>
+                        <input type="number" id="calcQty" value="1" min="1" class="w-full px-3 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-blue-400 font-bold text-center" oninput="calculatePriceResult()">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Margen %</label>
+                        <div class="relative">
+                             <input type="number" id="calcMargin" value="30" class="w-full px-3 py-2 border rounded text-sm outline-none focus:ring-2 focus:ring-green-400 font-bold text-center text-green-700" oninput="calculatePriceResult()">
+                             <span class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px]">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 text-center space-y-3">
+                    <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                        <span class="text-xs text-gray-500">Costo Unitario Real:</span>
+                        <span id="displayUnitCost" class="text-sm font-bold text-gray-700">$0.00</span>
+                    </div>
+                    <div>
+                        <span class="text-xs text-blue-600 font-bold uppercase tracking-wider block mb-1">Precio Sugerido</span>
+                        <div id="displayFinalPrice" class="text-3xl font-bold text-slate-800 font-mono tracking-tight">$0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 bg-gray-50 shrink-0">
+                <button onclick="applyCalculatedPrice()" class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 shadow-lg flex items-center justify-center gap-2 transition transform active:scale-95">
+                    <i class="fa-solid fa-check"></i> Usar este Precio
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="creditHistoryModal" class="fixed inset-0 modal-bg z-[85] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[85vh]">
+            <div class="bg-gray-100 p-4 border-b flex justify-between items-center shrink-0">
+                <div>
+                    <h3 class="font-bold text-gray-800"><i
+                            class="fa-solid fa-clock-rotate-left mr-2 text-gray-500"></i>Historial de Pagos</h3>
+                    <p class="text-[10px] text-gray-500">Últimos 5 clientes solventes</p>
+                </div>
+                <button onclick="closeCreditHistory()"
+                    class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 transition">
+                    <i class="fa-solid fa-times text-lg"></i>
+                </button>
+            </div>
+    
+            <div class="p-4 overflow-y-auto bg-gray-50" id="creditHistoryList">
+            </div>
+    
+            <div class="p-3 bg-white border-t text-center shrink-0">
+                <p class="text-[10px] text-gray-400 italic">Los registros antiguos se eliminan automáticamente para ahorrar
+                    espacio.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold"><i class="fa-solid fa-chart-line mr-2"></i>Estadísticas</h3>
+                <button onclick="closeDashboard()" class="text-white hover:text-indigo-200"><i
+                        class="fa-solid fa-times text-xl"></i></button>
+            </div>
+    
+            <div class="p-4 overflow-y-auto space-y-4">
+    
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="updateChart('7d')" id="btnChart7d"
+                        class="flex-1 py-1 text-xs font-bold rounded shadow bg-white text-indigo-600 transition">7
+                        Días</button>
+                    <button onclick="updateChart('30d')" id="btnChart30d"
+                        class="flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition">30
+                        Días</button>
+                    <button onclick="updateChart('12m')" id="btnChart12m"
+                        class="flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition">Año</button>
+                </div>
+    
+                <div class="bg-white border rounded-lg p-2 h-64 relative">
+                    <canvas id="salesChartCanvas"></canvas>
+                </div>
+    
+                <div
+                    class="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-3 flex items-center gap-3">
+                    <div id="starProductImg"
+                        class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm text-yellow-500 text-xl border border-yellow-100 overflow-hidden">
+                        <i class="fa-solid fa-trophy"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-[10px] text-yellow-800 font-bold uppercase tracking-wider">Producto Estrella
+                            (Periodo)</p>
+                        <h4 id="starProductName" class="font-bold text-gray-800 text-sm leading-tight">Calculando...</h4>
+                        <p id="starProductQty" class="text-xs text-gray-600">0 unidades vendidas</p>
+                    </div>
+                </div>
+    
+                <button onclick="downloadChartImage()"
+                    class="w-full py-3 bg-gray-800 text-white rounded-lg font-bold text-sm hover:bg-gray-900 flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-download"></i> Descargar Gráfico
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="successModal" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs p-6 text-center animate-bounce-in">
+            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-check text-3xl text-green-600"></i>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-2">¡Operación Exitosa!</h3>
+            <p class="text-sm text-gray-500 mb-6">Los datos se han guardado correctamente.</p>
+    
+            <div class="space-y-3">
+                <button onclick="openReceiptFromSuccess()"
+                    class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow hover:bg-indigo-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-receipt"></i> Generar Recibo
+                </button>
+                <button onclick="closeSuccessModal()"
+                    class="w-full bg-gray-100 text-gray-600 py-3 rounded-lg font-bold hover:bg-gray-200">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="receiptModal"
+        class="fixed inset-0 modal-bg z-[95] hidden flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-gray-100 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[95vh] relative">
+    
+            <div class="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0 rounded-t-xl">
+                <h3 class="font-bold"><i class="fa-solid fa-print mr-2"></i>Recibo</h3>
+                <div class="flex gap-2">
+                    <button onclick="toggleReceiptConfig()"
+                        class="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center"
+                        title="Configurar Recibo">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                    <button onclick="closeReceiptModal()"
+                        class="w-8 h-8 rounded-full bg-slate-700 hover:bg-red-500 flex items-center justify-center transition">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+            </div>
+    
+            <div id="receiptConfigPanel" class="hidden bg-white p-4 border-b border-gray-200 animate-fade-in">
+                <h4 class="text-xs font-bold text-gray-500 uppercase mb-3">Configurar Apariencia</h4>
+    
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="w-12 h-12 border border-gray-300 rounded flex items-center justify-center bg-gray-50 overflow-hidden relative">
+                            <img id="receiptLogoPreview" class="hidden w-full h-full object-contain">
+                            <i id="receiptLogoIcon" class="fa-solid fa-image text-gray-300"></i>
+                        </div>
+                        <label
+                            class="flex-1 cursor-pointer bg-blue-50 text-blue-600 px-3 py-2 rounded text-xs font-bold hover:bg-blue-100 text-center border border-blue-200">
+                            Subir Logo
+                            <input type="file" id="receiptLogoInput" accept="image/*" class="hidden"
+                                onchange="previewReceiptLogo(event)">
+                        </label>
+                        <button onclick="removeReceiptLogo()" class="text-red-500 p-2 hover:bg-red-50 rounded"><i
+                                class="fa-solid fa-trash"></i></button>
+                    </div>
+    
+                    <input type="text" id="cfgCompanyName" placeholder="Nombre de tu Negocio"
+                        class="w-full border rounded p-2 text-sm">
+                    <input type="text" id="cfgFooter" placeholder="Pie de página (Ej: Gracias por su compra)"
+                        class="w-full border rounded p-2 text-sm">
+    
+                    <button onclick="saveReceiptConfig()"
+                        class="w-full bg-green-600 text-white py-2 rounded text-xs font-bold shadow">Guardar
+                        Cambios</button>
+                </div>
+            </div>
+    
+            <div class="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
+    
+                <div class="flex gap-2 items-center bg-white p-2 rounded border">
+                    <i class="fa-solid fa-user text-gray-400"></i>
+                    <input type="text" id="receiptCustomerName" placeholder="Cliente Genérico"
+                        class="w-full outline-none text-sm font-bold text-gray-700" oninput="updateReceiptPreview()">
+                </div>
+    
+                <label class="flex items-center gap-2 cursor-pointer select-none bg-white p-2 rounded border w-fit mx-auto">
+                    <input type="checkbox" id="chkReceiptBs" class="form-checkbox h-4 w-4 text-indigo-600 rounded"
+                        onchange="updateReceiptPreview()">
+                    <span class="text-xs font-bold text-gray-600">Mostrar Bolívares</span>
+                </label>
+    
+                <div class="flex justify-center">
+                    <div id="receiptCanvas"
+                        class="bg-white w-full max-w-[320px] shadow-lg p-4 text-gray-800 font-mono text-xs border border-gray-200 relative">
+                        <div class="text-center mb-4 border-b border-gray-300 pb-2">
+                            <img id="printLogo" src="" class="h-12 mx-auto mb-1 hidden object-contain">
+                            <h2 id="printCompanyName" class="text-lg font-bold uppercase leading-tight">Mi Negocio</h2>
+                            <p class="text-[10px] text-gray-500" id="printDate">DD/MM/AAAA HH:MM</p>
+                        </div>
+
+                        <div id="printCustomerContainer" class="hidden mb-2 pb-1 border-b border-dashed border-gray-300 text-left">
+                            <span class="text-[10px] text-gray-500 font-bold uppercase">Cliente:</span>
+                            <div id="printCustomerNameDisplay" class="text-sm font-bold text-gray-800 uppercase truncate"></div>
+                        </div>
+                        <table class="w-full mb-4">
+                            <thead>
+                                <tr class="border-b border-black">
+                                    <th class="text-left py-1">Cant/Desc</th>
+                                    <th class="text-right py-1">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="printItemsList" class="divide-y divide-gray-100">
+                            </tbody>
+                        </table>
+    
+                        <div class="border-t border-black pt-2 space-y-1 text-right">
+                            <div class="flex justify-between text-lg font-bold">
+                                <span>TOTAL</span>
+                                <span id="printTotalMain">$0.00</span>
+                            </div>
+                            <div id="printTotalBsRow" class="hidden flex justify-between text-sm text-gray-600 font-bold">
+                                <span>En Bolívares:</span>
+                                <span id="printTotalBs">Bs 0.00</span>
+                            </div>
+                            <div id="printCreditInfo" class="hidden pt-2 mt-2 border-t border-dashed border-gray-300">
+                                <div class="flex justify-between text-[10px]"><span>Abonado:</span> <span
+                                        id="printPaid">$0.00</span></div>
+                                <div class="flex justify-between font-bold text-red-600"><span>Resta:</span> <span
+                                        id="printRemaining">$0.00</span></div>
+                            </div>
+                        </div>
+    
+                        <div class="mt-6 text-center text-[10px] text-gray-500 italic border-t pt-2">
+                            <p id="printFooter">Gracias por su compra</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    
+            <div class="p-4 bg-white border-t grid grid-cols-2 gap-3 shrink-0">
+                <button onclick="downloadReceipt('img')"
+                    class="bg-green-100 text-green-700 py-3 rounded-lg font-bold text-xs hover:bg-green-200 flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-image text-lg"></i> Descargar Imagen
+                </button>
+                <button onclick="downloadReceipt('pdf')"
+                    class="bg-red-100 text-red-700 py-3 rounded-lg font-bold text-xs hover:bg-red-200 flex flex-col items-center justify-center gap-1">
+                    <i class="fa-solid fa-file-pdf text-lg"></i> Descargar PDF
+                </button>
+                <button onclick="shareReceipt()"
+                    class="col-span-2 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-700 flex items-center justify-center gap-2 shadow-lg">
+                    <i class="fa-brands fa-whatsapp text-xl"></i> Compartir
+                </button>
+            </div>
+        </div>
+    </div>
+
     <main class="container mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <section class="lg:col-span-7 space-y-6">
             <div class="bg-white p-5 rounded-xl shadow-md border-l-4 border-blue-500">
-                <h2 class="text-lg font-bold text-gray-700 mb-3"><i class="fa-solid fa-box mr-2"></i>Gestión de Producto</h2>
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-bold text-gray-700"><i class="fa-solid fa-box mr-2"></i>Gestión de Producto</h2>
+                    <button onclick="openCalculator()" class="bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-yellow-200 border border-yellow-300 shadow-sm transition flex items-center gap-2">
+                        <i class="fa-solid fa-calculator"></i>
+                        <span class="hidden sm:inline">Calculadora</span>
+                    </button>
+                </div>
                 <form id="productForm" class="grid grid-cols-12 gap-3">
                     <input type="hidden" id="productId">
                     
@@ -501,7 +905,7 @@
                             <input type="text" id="prodBarcode" placeholder="Código de Barras (EAN/UPC)" class="w-full pl-9 pr-3 py-1.5 border rounded text-sm outline-none focus:border-blue-500 font-mono text-gray-700 bg-white">
                         </div>
                         <button type="button" onclick="startScanner('LINK')" class="bg-gray-700 text-white px-3 py-1.5 rounded hover:bg-gray-800 transition shadow" title="Escanear">
-                            <i class="fa-solid fa-camera"></i>
+                            <i class="fa-solid fa-barcode"></i>
                         </button>
                         <button type="button" onclick="fetchProductData($('prodBarcode').value)" class="bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition shadow" title="Buscar en API">
                             <i class="fa-solid fa-cloud-arrow-down"></i>
@@ -509,10 +913,15 @@
                     </div>
 
                     <div class="col-span-12 md:col-span-2 flex justify-center items-center">
-                        <label class="w-16 h-16 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500 flex flex-col justify-center items-center overflow-hidden bg-gray-50 relative">
-                            <img id="imgPreview" class="hidden w-full h-full object-cover">
-                            <i id="imgIcon" class="fa-solid fa-camera text-gray-400"></i>
+                        <label class="w-16 h-16 border-2 border-dashed border-gray-300 rounded cursor-pointer hover:border-blue-500 flex flex-col justify-center items-center overflow-hidden bg-gray-50 relative group">
+                            
+                            <img id="imgPreview" class="hidden w-full h-full object-cover z-10">
+                            <i id="imgIcon" class="fa-solid fa-camera text-gray-400 z-0"></i>
                             <input type="file" id="prodImg" accept="image/*" class="hidden" onchange="previewImage(event)">
+
+                            <button type="button" id="btnRemoveImg" onclick="removeImage(event)" class="hidden absolute top-0 right-0 bg-red-600 text-white w-5 h-5 flex items-center justify-center z-20 hover:bg-red-700 transition shadow-sm" title="Borrar imagen">
+                                <i class="fa-solid fa-times text-xs"></i>
+                            </button>
                         </label>
                     </div>
                     <div class="col-span-12 md:col-span-4">
@@ -635,7 +1044,7 @@
                         </div>
 
                         <button onclick="startScanner('POS')" class="bg-slate-800 hover:bg-slate-700 text-white w-10 h-full rounded shadow flex items-center justify-center transition-colors" title="Escanear">
-                            <i class="fa-solid fa-camera"></i>
+                            <i class="fa-solid fa-barcode"></i>
                         </button>
         
                         <input type="number" id="saleQty" value="1" min="1" class="w-14 h-full border rounded px-1 text-center text-sm font-bold text-gray-700 outline-none focus:border-indigo-500">
@@ -665,8 +1074,10 @@
                     <button onclick="switchTab('credits')" id="tab-credits" class="flex-1 py-3 text-center tab-inactive hover:bg-gray-50 text-red-600 relative">
                         Fiados <span id="creditBadge" class="hidden bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full absolute top-2 right-2">0</span>
                     </button>
-                    <button onclick="fetchAllRates()" class="ml-2 bg-blue-100 text-blue-600 w-8 h-8 rounded-full hover:bg-blue-200 shadow flex items-center justify-center text-xs">
-                        <i class="fa-solid fa-rotate"></i>
+                    <button onclick="openCreditHistory()"
+                        class="ml-2 bg-purple-100 text-purple-600 w-8 h-8 rounded-full hover:bg-purple-200 shadow flex items-center justify-center text-xs transition transform active:scale-90"
+                        title="Ver clientes anteriores">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
                     </button>
                     <button onclick="toggleMenu('fiados')" id="fiadosRateBtn" class="ml-2 bg-gray-200 text-gray-600 w-8 h-8 rounded-full hover:bg-gray-300 shadow flex items-center justify-center text-xs transition-colors" title="Cambiar Tasa de Fiados">
                         <i class="fa-solid fa-calculator"></i>
@@ -674,9 +1085,18 @@
                 </div>
                 
                 <div id="view-history" class="p-4">
-                    <div class="flex justify-between mb-2">
-                        <div class="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-bold">Hoy: <span id="todayTotal">0.00</span></div>
-                        <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded text-xs font-bold">Mes: <span id="monthTotal">0.00</span></div>
+                    <div class="flex justify-between items-center mb-2 gap-2">
+                        <div class="flex gap-2">
+                            <div class="bg-green-100 text-green-800 px-3 py-1 rounded text-xs font-bold whitespace-nowrap">Hoy: <span
+                                    id="todayTotal">0.00</span></div>
+                            <div class="bg-purple-100 text-purple-800 px-3 py-1 rounded text-xs font-bold whitespace-nowrap">Mes: <span
+                                    id="monthTotal">0.00</span></div>
+                        </div>
+                        <button onclick="openDashboard()"
+                            class="bg-indigo-600 text-white w-8 h-8 rounded-lg shadow-lg hover:bg-indigo-700 flex items-center justify-center transition transform active:scale-95"
+                            title="Ver Estadísticas">
+                            <i class="fa-solid fa-chart-pie"></i>
+                        </button>
                     </div>
                     <div class="overflow-y-auto max-h-[300px]">
                         <table class="w-full text-xs text-left">
@@ -766,42 +1186,404 @@
         </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Service Worker registrado: ', reg.scope))
+                    .catch(err => console.log('Service Worker falló: ', err));
+            });
+        }
+    </script>
+
+    <script>
+
+        // ==========================================
+        // 0. CONFIGURACIÓN FIREBASE (v40)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBMjRVdh6_3-eqOlxFpjjIPOJhWgIsaJOo",
+            authDomain: "ejecomercio-27f57.firebaseapp.com",
+            projectId: "ejecomercio-27f57",
+            storageBucket: "ejecomercio-27f57.firebasestorage.app",
+            messagingSenderId: "308793787242",
+            appId: "1:308793787242:web:d30cbbba17735f24e59b13",
+            measurementId: "G-WEZ45JMDRS"
+        };
+
+        // Inicializar
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        let unsubscribe = null; // Para control de sincronización
+
+        // Habilitar Persistencia Offline
+        db.enablePersistence().catch(err => {
+            if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
+            else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
+        });
+
+        const $ = (id) => document.getElementById(id);
+
         // ==========================================
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
         let state = {
-            products: [],
-            sales: [],
-            credits: [],
-            cart: [],
-            bcvUsd: 0,
-            bcvEur: 0,
-            customRate: 0,
-            rateMode: 'USD',
-            fiadosRateMode: 'DEFAULT',
-            security: {
-                pin: null,
-                lockAdd: false,
-                lockEdit: false,
-                lockCreditAdd: false,
-                lockCreditPay: false
+            // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
+            products: JSON.parse(localStorage.getItem('inv_products')) || [],
+            sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
+            credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
+            paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
+            security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
+            
+            // Configs
+            bcvUsd: parseFloat(localStorage.getItem('inv_bcv_usd')) || 0,
+            bcvEur: parseFloat(localStorage.getItem('inv_bcv_eur')) || 0,
+            customRate: parseFloat(localStorage.getItem('inv_custom_rate')) || 0,
+            rateMode: localStorage.getItem('inv_rate_mode') || 'USD',
+            fiadosRateMode: localStorage.getItem('inv_fiados_rate_mode') || 'DEFAULT',
+            creditMode: localStorage.getItem('inv_credit_mode') || 'DYNAMIC', // DYNAMIC o FIXED
+
+            // --- NUEVO: CONFIGURACIÓN DE RECIBO ---
+            receiptConfig: JSON.parse(localStorage.getItem('inv_receipt_config')) || {
+                companyName: 'Mi Negocio',
+                footer: '¡Gracias por su compra!',
+                logo: null
             },
-            editingId: null,
-            tempImg: null,
-            activeCreditId: null,
-            dateEditId: null,
-            sortCol: 'name',
-            sortAsc: true,
-            filterText: '',
-            surchargeType: 'PERCENT',
-            creditSortMode: 'URGENCY' // <--- NUEVO: Modo de ordenamiento por defecto
+
+            // Variables de sesión
+            cart: [],
+            isCloudSynced: false, 
+            editingId: null, tempImg: null, activeCreditId: null, dateEditId: null,
+            sortCol: 'name', sortAsc: true, filterText: '', surchargeType: 'PERCENT', creditSortMode: 'URGENCY', currentShareId: null
         };
 
-        let pendingAction = null;
-        const $ = (id) => document.getElementById(id);
+        let pendingAction = null; // Para acciones que requieren autenticación
+
+        // --- E2EE (ENCRIPTACIÓN) ---
+        let encryptionKey = localStorage.getItem('inv_enc_key') || null;
+
+        // Encripta un objeto a texto cifrado
+        function encryptPayload(dataObj) {
+            if (!encryptionKey) return null;
+            try {
+                return CryptoJS.AES.encrypt(JSON.stringify(dataObj), encryptionKey).toString();
+            } catch (e) {
+                console.error("Error encriptando:", e);
+                return null;
+            }
+        }
+
+        // Desencripta texto cifrado a objeto
+        function decryptPayload(ciphertext) {
+            if (!encryptionKey) return null;
+            try {
+                const bytes = CryptoJS.AES.decrypt(ciphertext, encryptionKey);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                return originalText ? JSON.parse(originalText) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // ------------------------------------------
+        // LÓGICA DE AUTENTICACIÓN BLINDADA (v41.2)
+        // ------------------------------------------
+        
+        // 1. Configurar persistencia
+        auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(console.error);
+
+        // 2. Función Centralizada de UI (El Cerebro Visual)
+        function renderUserUI(user) {
+            const btnAuth = document.getElementById('btnAuthAction');
+            const txtAuth = document.getElementById('textAuthAction');
+            const iconAuth = document.getElementById('iconAuthAction');
+            
+            const userName = document.getElementById('userNameDisplay');
+            const userEmail = document.getElementById('userEmailDisplay');
+            const avatar = document.getElementById('userAvatar');
+            const icon = document.getElementById('userIcon');
+
+            if (user) {
+                // MODO: CONECTADO
+                userName.textContent = user.displayName || 'Usuario';
+                userEmail.textContent = user.email;
+                
+                if(user.photoURL) {
+                    avatar.src = user.photoURL;
+                    avatar.classList.remove('hidden');
+                    icon.classList.add('hidden');
+                }
+
+                // Botón se convierte en "Cerrar Sesión" (Rojo)
+                txtAuth.textContent = "Cerrar Sesión";
+                iconAuth.className = "fa-solid fa-right-from-bracket";
+                btnAuth.className = "w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition";
+            
+            } else {
+                // MODO: DESCONECTADO / OFFLINE
+                userName.textContent = "Modo Offline";
+                userEmail.textContent = "Sin sincronización";
+                avatar.classList.add('hidden');
+                icon.classList.remove('hidden');
+
+                // Botón se convierte en "Iniciar Sesión" (Azul)
+                txtAuth.textContent = "Iniciar Sesión";
+                iconAuth.className = "fa-solid fa-right-to-bracket";
+                btnAuth.className = "w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition";
+            }
+        }
+
+        // 3. Ejecutar renderizado inicial (Para evitar parpadeos)
+        renderUserUI(null); // Asumimos desconectado al arrancar
+
+        // 4. Lógica de Arranque Rápido (Quitar cortina si hay datos)
+        if (state.products && state.products.length > 0) {
+            document.getElementById('loginOverlay').classList.add('hidden');
+            updateCloudStatus('OFFLINE'); 
+        } else {
+            document.getElementById('loginOverlay').classList.remove('hidden');
+        }
+
+        // 5. Monitor de Firebase (La Verdad Absoluta)
+        auth.onAuthStateChanged(user => {
+            const loginOverlay = document.getElementById('loginOverlay');
+            const loginStatus = document.getElementById('loginStatus');
+
+            // Actualizamos la UI con la verdad de Firebase
+            renderUserUI(user);
+
+            if (user) {
+                console.log("✅ Auth: Conectado");
+                loginOverlay.classList.add('hidden');
+                loginStatus.classList.add('hidden');
+                initDataSync(user); // Arrancar sincronización
+            } else {
+                console.log("💤 Auth: Desconectado");
+                updateCloudStatus('OFFLINE');
+                
+                // Si no hay datos y no hay usuario, mostramos login.
+                // Si hay datos, dejamos al usuario trabajar offline.
+                if (state.products.length === 0) {
+                    loginOverlay.classList.remove('hidden');
+                    loginStatus.classList.add('hidden');
+                }
+                if (unsubscribe) unsubscribe();
+            }
+        });
+
+        // 6. Botón Inteligente
+        function handleAuthAction() {
+            const user = auth.currentUser;
+            if (user) {
+                if(confirm("¿Cerrar sesión y detener sincronización?")) {
+                    auth.signOut().then(() => location.reload());
+                }
+            } else {
+                loginWithGoogle();
+            }
+        }
+
+        // Bandera para evitar doble clic
+        let isLoggingIn = false;
+
+        function loginWithGoogle() {
+            if (isLoggingIn) return; // Si ya está cargando, no hacemos nada
+            isLoggingIn = true;
+
+            const provider = new firebase.auth.GoogleAuthProvider();
+            const statusText = document.getElementById('loginStatus');
+            
+            // Feedback visual si la cortina está visible
+            if(!document.getElementById('loginOverlay').classList.contains('hidden')) {
+                statusText.textContent = "Cargando Google...";
+                statusText.classList.remove('hidden');
+            }
+
+            auth.signInWithPopup(provider)
+                .then(() => {
+                    // Éxito: El onAuthStateChanged se encarga
+                })
+                .catch(error => {
+                    // Filtro de Errores: Solo mostramos alerta si es un error REAL
+                    const ignoredErrors = [
+                        'auth/cancelled-popup-request', // Doble clic
+                        'auth/popup-closed-by-user',    // Usuario cerró la ventana
+                        'auth/popup-blocked'            // Navegador bloqueó (a veces se recupera solo)
+                    ];
+
+                    if (!ignoredErrors.includes(error.code)) {
+                        console.error("Login Error:", error);
+                        alert("Aviso: " + error.message);
+                    } else {
+                        console.log("Aviso menor de login:", error.code);
+                    }
+                })
+                .finally(() => {
+                    // Liberamos el botón pase lo que pase
+                    isLoggingIn = false;
+                    if(statusText) statusText.classList.add('hidden');
+                });
+        }
+
+        function logout() {
+            if(confirm("¿Cerrar sesión y detener sincronización?")) {
+                auth.signOut();
+                location.reload();
+            }
+        }
+
+        // ==========================================
+        // UI: SEMÁFORO DE SINCRONIZACIÓN
+        // ==========================================
+        function updateCloudStatus(status) {
+            const container = $('cloudStatus');
+            const dot = $('cloudDot');
+            const text = $('cloudText');
+
+            // Reseteamos clases de color
+            dot.className = "w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(0,0,0,0.5)]";
+            text.className = "text-[10px] font-bold uppercase hidden md:inline transition-colors";
+
+            if (status === 'ONLINE') {
+                // VERDE: Todo sincronizado
+                dot.classList.add('bg-green-500', 'shadow-green-500/50');
+                text.classList.add('text-green-500');
+                text.textContent = "Sincronizado";
+                container.classList.replace('border-red-900', 'border-slate-700'); // Quitar borde rojo si existía
+            } 
+            else if (status === 'SYNCING') {
+                // AMARILLO: Subiendo cambios o procesando
+                dot.classList.add('bg-yellow-400', 'animate-ping'); // Ping para efecto de actividad
+                text.classList.add('text-yellow-400');
+                text.textContent = "Guardando...";
+            } 
+            else if (status === 'OFFLINE') {
+                // ROJO: Sin internet
+                dot.classList.add('bg-red-500', 'shadow-red-500/50');
+                text.classList.add('text-red-500');
+                text.textContent = "Sin Conexión";
+                // Añadimos un borde rojo sutil al contenedor para alertar
+                container.classList.replace('border-slate-700', 'border-red-900'); 
+            }
+        }
+
+        // Listeners del Navegador (Detectar si se cae el cable de red)
+        window.addEventListener('online', () => updateCloudStatus('SYNCING'));
+        window.addEventListener('offline', () => updateCloudStatus('OFFLINE'));
+
+        // -------------------------------------------------------------
+        // LÓGICA DE SINCRONIZACIÓN (NUBE <-> LOCAL) [Con soporte E2EE]
+        // -------------------------------------------------------------
+        
+        function initDataSync(user) {
+            const docRef = db.collection('users').doc(user.uid);
+
+            // Escuchar cambios INCLUYENDO METADATA (Para saber si está pendiente de escribir)
+            unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
+
+                // 1. CONTROL DEL SEMÁFORO (UI)
+                if (doc.metadata.hasPendingWrites) {
+                    updateCloudStatus('SYNCING'); // Amarillo
+                } else {
+                    updateCloudStatus('ONLINE');  // Verde
+                }
+
+                if (doc.exists) {
+                    const cloudData = doc.data();
+                    let finalData = null;
+
+                    // -------------------------------------------------
+                    // FASE DE DESENCRIPTACIÓN 🔓
+                    // -------------------------------------------------
+            
+                    // CASO A: Datos vienen ENCRIPTADOS
+                    if (cloudData.isEncrypted && cloudData.encryptedData) {
+                
+                        // Intentamos desencriptar con la llave que tengamos en memoria
+                        finalData = decryptPayload(cloudData.encryptedData);
+
+                        // Si falla (porque no hay clave o es incorrecta), pedimos la clave
+                        if (!finalData) {
+                            let validKey = false;
+                            // Bucle de seguridad: No dejamos pasar hasta tener la clave o que el usuario cancele
+                            while (!validKey) {
+                                const userInput = prompt("🔒 DATOS PROTEGIDOS DETECTADOS\n\nIngresa tu Clave Maestra para descargar y leer tus datos:");
+                        
+                                if (userInput === null) { 
+                                    // Usuario canceló: Cortamos ejecución para proteger la app
+                                    alert("Sincronización detenida. No se pueden mostrar los datos sin la clave.");
+                                    updateCloudStatus('OFFLINE');
+                                    return; 
+                                }
+
+                                encryptionKey = userInput; // Probamos la clave temporalmente
+                                finalData = decryptPayload(cloudData.encryptedData);
+
+                                if (finalData) {
+                                    validKey = true;
+                                    // ÉXITO: Guardamos la clave para no volver a molestar
+                                    localStorage.setItem('inv_enc_key', encryptionKey); 
+                                } else {
+                                    alert("❌ Clave incorrecta. Intenta de nuevo.");
+                                }
+                            }
+                        }
+                        console.log("🔓 Datos desencriptados correctamente desde la nube.");
+
+                    } 
+                    // CASO B: Datos NORMALES (Texto plano / Usuario Default)
+                    else {
+                        finalData = cloudData;
+                    }
+
+                    // -------------------------------------------------
+                    // FASE DE ACTUALIZACIÓN DE ESTADO 💾
+                    // -------------------------------------------------
+
+                    // Fusionamos los datos (ya sean desencriptados o planos) con el estado
+                    if (finalData) {
+                        state = { ...state, ...finalData };
+                        state.isCloudSynced = true; // Quitamos el seguro ✅
+
+                        // 2. OPTIMIZACIÓN DE RENDERIZADO (Tu lógica original intacta)
+                        // Solo guardamos en disco y repintamos si el dato viene CONFIRMADO del servidor.
+                        if (!doc.metadata.hasPendingWrites) {
+                            // Guardado manual en LocalStorage (Vital para evitar bucles con saveData)
+                            localStorage.setItem('inv_products', JSON.stringify(state.products));
+                            localStorage.setItem('inv_sales', JSON.stringify(state.sales));
+                            localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+                            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                            localStorage.setItem('inv_security', JSON.stringify(state.security));
+                            localStorage.setItem('inv_custom_rate', state.customRate);
+                            localStorage.setItem('inv_rate_mode', state.rateMode);
+                            localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
+                            localStorage.setItem('inv_bcv_usd', state.bcvUsd);
+                            localStorage.setItem('inv_bcv_eur', state.bcvEur);
+                    
+                            // Si tenemos clave, refrescamos también eso
+                            if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
+                    
+                            renderAll();
+                            console.log("☁️ Sincronizado y guardado en disco local.");
+                        }
+                    }
+
+                } else {
+                    // CASO C: Usuario Nuevo en Nube -> Subir Local
+                    // Aquí SI usamos saveData() porque queremos empujar lo local a la nube
+                    console.log("⬆️ Usuario nuevo: Subiendo datos locales...");
+                    state.isCloudSynced = true; 
+                    saveData(); 
+                }
+            }, error => {
+                console.error("Error Sync:", error);
+                updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
+            });
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
+            // NO cargamos datos aquí. Esperamos a Firebase Auth.
+            // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
             fetchAllRates();
             renderAll();
         });
@@ -999,16 +1781,91 @@
             updateSecurityUI();
         }
 
+        // ---------------------------------------------------------
+        // GUARDADO BLINDADO (Con Anti-Wipe + E2EE)
+        // ---------------------------------------------------------
         function saveData() {
+            // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+            localStorage.setItem('inv_security', JSON.stringify(state.security));
             localStorage.setItem('inv_custom_rate', state.customRate);
             localStorage.setItem('inv_rate_mode', state.rateMode);
             localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
             localStorage.setItem('inv_bcv_usd', state.bcvUsd);
             localStorage.setItem('inv_bcv_eur', state.bcvEur);
-            localStorage.setItem('inv_security', JSON.stringify(state.security));
+    
+            // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
+            if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
+
+            // -----------------------------------------------------
+            // ZONA DE SEGURIDAD (Tus protecciones originales)
+            // -----------------------------------------------------
+    
+            // SEGURO 1: No subir si no estamos sincronizados (Evita sobrescribir la nube con datos viejos)
+            if (!state.isCloudSynced) return;
+
+            // SEGURO 2: ¡CRÍTICO! Anti-Wipe (Evita borrar la DB por error de carga)
+            if (state.products.length === 0 && state.sales.length === 0) {
+                console.warn("🛡️ BLOQUEO DE SEGURIDAD: Se intentó subir una base de datos vacía.");
+                return; 
+            }
+
+            // -----------------------------------------------------
+            // PREPARACIÓN DE SUBIDA (Lógica Nueva)
+            // -----------------------------------------------------
+            const user = auth.currentUser;
+    
+            if (user) {
+                // Preparamos el objeto completo tal cual lo tienes hoy
+                const rawData = {
+                    products: state.products,
+                    sales: state.sales,
+                    credits: state.credits,
+                    paymentMethods: state.paymentMethods,
+                    security: state.security,
+                    customRate: state.customRate,
+                    rateMode: state.rateMode,
+                    fiadosRateMode: state.fiadosRateMode,
+                    bcvUsd: state.bcvUsd,
+                    bcvEur: state.bcvEur,
+                    lastUpdated: new Date().toISOString()
+                };
+
+                let dataToUpload = {};
+
+                // [DECISIÓN] ¿Encriptar o No?
+                if (encryptionKey) {
+                    console.log("🔒 Subiendo datos encriptados...");
+                    // MODO E2EE: Encriptamos todo el objeto 'rawData'
+                    const encryptedString = encryptPayload(rawData);
+            
+                    dataToUpload = {
+                        encryptedData: encryptedString,
+                        isEncrypted: true,
+                        lastUpdated: new Date().toISOString()
+                    };
+                } else {
+                    // MODO CLÁSICO: Subimos los datos planos (como lo haces hoy)
+                    dataToUpload = { 
+                        ...rawData, 
+                        isEncrypted: false 
+                    };
+                }
+
+                updateCloudStatus('SYNCING'); 
+        
+                // NOTA TÉCNICA: Usamos .set() sin merge:true intencionalmente en el modo encriptado
+                // para limpiar la estructura del documento si cambia de "Plano" a "Encriptado".
+                // Pero como dataToUpload tiene TODOS los campos necesarios, es seguro.
+                db.collection('users').doc(user.uid).set(dataToUpload)
+                    .catch(err => {
+                        console.error("Error nube:", err);
+                        updateCloudStatus('OFFLINE');
+                    });
+            }
         }
 
         // ==========================================
@@ -1115,6 +1972,8 @@
         // ==========================================
         function attemptSubmit() {
             const isEdit = state.editingId !== null;
+
+            // Usamos checkAuth para verificar permisos
             checkAuth(isEdit ? 'edit' : 'add', () => {
                 const name = $('prodName').value.trim();
                 const barcode = $('prodBarcode').value.trim();
@@ -1124,34 +1983,53 @@
                 if (!name || isNaN(qty) || isNaN(price)) return alert('Datos inválidos');
                 
                 if (state.editingId) {
+                    // --- MODO EDICIÓN ---
                     const idx = state.products.findIndex(p => p.id == state.editingId);
                     if (idx !== -1) {
+
+                        // LÓGICA DE DECISIÓN DE IMAGEN 🧠
+                        let finalImg = state.products[idx].img; // 1. Por defecto: Mantener la vieja
+                        
+                        if (state.tempImg) {
+                            finalImg = state.tempImg; // 2. Si subiste una nueva: Úsala
+                        } else if (state.isImageDeleted) {
+                            finalImg = null; // 3. Solo si diste click a la X: Bórrala
+                        }
+
                         state.products[idx] = {
-                            ...state.products[idx],
+                            ...state.products[idx], // Mantenemos ID y otros datos
                             name,
                             qty,
                             price,
-                            barcode // <--- CODIGO DE BARRAS
+                            barcode, // <--- CODIGO DE BARRAS
+                            img: finalImg // <--- ¡AQUÍ ESTÁ EL CAMBIO!
+                            // Antes había un 'if'. Ahora asignamos DIRECTAMENTE.
+                            // Si state.tempImg es null (porque la borraste), se guardará como null.
                         };
                         if (state.tempImg) state.products[idx].img = state.tempImg;
                     }
                     cancelEdit();
                 } else {
+                    // --- MODO CREACIÓN ---
                     state.products.push({
                         id: Date.now(),
                         name,
                         qty,
                         price,
-                        img: state.tempImg,
+                        img: state.tempImg, // Asignamos lo que haya (imagen o null)
                         barcode // <--- CODIGO DE BARRAS
                     });
                 }
-                saveData();
-                renderAll();
+                saveData(); // Guardar en Local y Nube
+                renderAll(); // Actualizar tabla visualmente
+
+                // Limpieza final
                 $('productForm').reset();
                 state.tempImg = null;
+                state.isImageDeleted = false; // Reset final
                 $('imgPreview').classList.add('hidden');
                 $('imgIcon').classList.remove('hidden');
+                $('btnRemoveImg').classList.add('hidden'); // Ocultar la X
             });
         }
 
@@ -1181,15 +2059,28 @@
         window.startEdit = (id) => {
             const p = state.products.find(x => x.id == id);
             if (!p) return;
+
             $('prodName').value = p.name;
             $('prodQty').value = p.qty;
             $('prodPrice').value = p.price;
             $('prodBarcode').value = p.barcode || '';
             state.editingId = id;
+
+            // --- LÓGICA DE IMAGEN MEJORADA ---
+            state.tempImg = null;       // Empezamos limpio (sin ocupar memoria)
+            state.isImageDeleted = false; // Reseteamos la bandera
+
             if (p.img) {
                 $('imgPreview').src = p.img;
                 $('imgPreview').classList.remove('hidden');
+                $('btnRemoveImg').classList.remove('hidden'); // <--- MOSTRAR LA X
                 $('imgIcon').classList.add('hidden');
+            } else {
+                // Aseguramos que esté limpio si no tiene imagen
+                state.tempImg = null;
+                $('imgPreview').classList.add('hidden');
+                $('imgIcon').classList.remove('hidden');
+                $('btnRemoveImg').classList.add('hidden');
             }
             $('submitBtn').textContent = 'Actualizar';
             $('submitBtn').className = 'flex-1 bg-yellow-500 text-white py-2 rounded text-sm hover:bg-yellow-600 shadow font-semibold';
@@ -1205,6 +2096,7 @@
             $('prodBarcode').value = '';
             state.tempImg = null;
             $('imgPreview').classList.add('hidden');
+            $('btnRemoveImg').classList.add('hidden'); // <--- OCULTAR LA X
             $('imgIcon').classList.remove('hidden');
             $('submitBtn').textContent = 'Guardar';
             $('submitBtn').className = 'flex-1 bg-blue-600 text-white py-2 rounded text-sm hover:bg-blue-700 shadow font-semibold';
@@ -1306,6 +2198,56 @@
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
         }
 
+        function renderEncryptionUI() {
+            const container = document.getElementById('encryptionUI');
+            if (!container) return;
+
+            if (encryptionKey) {
+                // --- ESTADO: ACTIVADA (Modo Seguro) 🟢 ---
+                container.innerHTML = `
+                    <div class="bg-green-50 p-3 rounded border border-green-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-shield-halved text-green-600"></i>
+                                <h4 class="font-bold text-xs text-green-800 uppercase">Encriptación E2EE</h4>
+                            </div>
+                            <span class="bg-green-200 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Activada</span>
+                        </div>
+                        <p class="text-[10px] text-green-700 mb-3">
+                            Tus datos están blindados. Solo tú tienes la llave.
+                        </p>
+                
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="changeEncryptionPassword()" class="bg-white border border-green-300 text-green-700 py-2 rounded text-xs font-bold hover:bg-green-50 transition">
+                                <i class="fa-solid fa-key mr-1"></i> Cambiar Clave
+                            </button>
+                            <button onclick="disableEncryption()" class="bg-white border border-red-200 text-red-600 py-2 rounded text-xs font-bold hover:bg-red-50 transition">
+                                <i class="fa-solid fa-lock-open mr-1"></i> Desactivar
+                            </button>
+                        </div>
+                    </div>`;
+            } else {
+                // --- ESTADO: DESACTIVADA (Modo Estándar) ⚪ ---
+                container.innerHTML = `
+                    <div class="bg-purple-50 p-3 rounded border border-purple-200">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex items-center gap-2">
+                                <i class="fa-solid fa-lock text-purple-600"></i>
+                                <h4 class="font-bold text-xs text-purple-800 uppercase">Encriptación E2EE</h4>
+                            </div>
+                            <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Desactivada</span>
+                        </div>
+                        <p class="text-[10px] text-purple-600 mb-3 leading-tight">
+                            Protege tus datos en la nube para que sean ilegibles sin tu contraseña.
+                            <br><span class="font-bold text-red-500">Advertencia: Si olvidas la clave, pierdes los datos.</span>
+                        </p>
+                        <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-purple-700 transition">
+                            <i class="fa-solid fa-shield-halved mr-1"></i> Activar Protección Extrema
+                        </button>
+                    </div>`;
+            }
+        }
+
         // ==========================================
         // 8. CONVERSIONES Y UTILIDADES
         // ==========================================
@@ -1336,7 +2278,14 @@
         function toggleMenu(menu) {
             if (menu === 'config') {
                 $('configModal').classList.toggle('hidden');
-                updateRateUI();
+
+                // Si el menú se está abriendo (no tiene hidden), calculamos
+                if (!$('configModal').classList.contains('hidden')) {
+                    updateRateUI(); // Actualizar UI de tasa
+                    renderEncryptionUI(); // Menú de encriptación
+                    updateStorageUsage(); // Uso de almacenamiento
+                    updateCreditConfigUI(); // Configuración de créditos
+                }
             }
             if (menu === 'fiados') {
                 $('fiadosRateModal').classList.toggle('hidden');
@@ -1344,28 +2293,107 @@
         }
 
         function clearData(action) {
+            // 1. REINICIO DE FÁBRICA (NUCLEAR) ☢️
             if (action === 'factory_reset') {
-                if (confirm('¿BORRAR TODO?')) {
-                    localStorage.clear();
-                    location.reload();
+                if (confirm('⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.')) {
+                    
+                    const user = auth.currentUser;
+                    
+                    // Función interna para borrar local y recargar
+                    const wipeLocalAndReload = () => {
+                        console.log("🧹 Borrando datos locales...");
+                        localStorage.clear();
+                        window.location.reload();
+                    };
+
+                    if (user) {
+                        // Feedback visual
+                        const btn = document.querySelector('button[onclick="requestAction(\'factory_reset\')"]');
+                        if(btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Borrando nube...';
+
+                        // SOBRESCRIBIMOS el documento con un objeto casi vacío.
+                        // Al NO usar { merge: true }, esto elimina todos los campos anteriores (fiados, productos, etc).
+                        db.collection('users').doc(user.uid).set({
+                            products: [],
+                            sales: [],
+                            credits: [],
+                            paymentMethods: {},
+                            security: { pin: null },
+                            lastUpdated: new Date().toISOString()
+                        })
+                        .then(() => {
+                            console.log("✅ Nube formateada exitosamente.");
+                            // SOLO AHORA, que la nube confirmó, borramos local y recargamos.
+                            wipeLocalAndReload();
+                        })
+                        .catch(error => {
+                            console.error("Error borrando nube:", error);
+                            alert("Hubo un error al borrar la nube. Sin embargo, se borrarán los datos locales.");
+                            wipeLocalAndReload();
+                        });
+                    } else {
+                        // Si es modo offline, borramos directo
+                        wipeLocalAndReload();
+                    }
                 }
-            } else if (action === 'clean_inv') {
-                if (confirm('¿Vaciar inventario?')) {
+            } 
+            
+            // 2. VACIAR SOLO INVENTARIO
+            else if (action === 'clean_inv') {
+                if (confirm('¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)')) {
                     state.products = [];
-                    saveData();
+                    localStorage.setItem('inv_products', '[]');
+                    forceClearCloud('products');
                     renderAll();
                     toggleMenu('config');
-                    alert('Vaciado');
+                    alert('Inventario vaciado.');
                 }
-            } else if (action === 'clean_hist') {
-                if (confirm('¿Borrar historial?')) {
+            } 
+            
+            // 3. BORRAR SOLO HISTORIAL
+            else if (action === 'clean_hist') {
+                if (confirm('¿Borrar todo el historial de ventas?')) {
                     state.sales = [];
-                    saveData();
+                    localStorage.setItem('inv_sales', '[]');
+                    forceClearCloud('sales');
                     renderAll();
                     toggleMenu('config');
-                    alert('Borrado');
+                    alert('Historial borrado.');
                 }
             }
+
+            // 4. BORRAR SOLO FIADOS
+            else if (action === 'clean_credits') {
+                if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nEsta acción no se puede deshacer.')) {
+                    state.credits = [];
+                    localStorage.setItem('inv_credits', '[]');
+                    forceClearCloud('credits');
+                    renderAll();
+                    toggleMenu('config');
+                    alert('Lista de fiados eliminada.');
+                }
+            }
+        }
+
+        // ==========================================
+        // FUNCIÓN ESPECIAL: BORRADO INTENCIONAL EN NUBE
+        // ==========================================
+        function forceClearCloud(fieldToClear) {
+            const user = auth.currentUser;
+            if (!user) return;
+
+            // Preparamos el objeto con el campo vacío
+            let updateData = {};
+            updateData[fieldToClear] = []; // Envia un array vacío explícitamente
+            updateData['lastUpdated'] = new Date().toISOString();
+
+            console.log(`⚠️ EJECUTANDO BORRADO FORZADO DE: ${fieldToClear}`);
+
+            // Usamos .update() en lugar de .set() para borrar solo ese campo
+            // y saltarnos la validación interna de saveData()
+            db.collection('users').doc(user.uid).update(updateData)
+                .then(() => console.log("✅ Nube limpiada correctamente."))
+                .catch(err => console.error("Error limpiando nube:", err));
         }
 
         function saveCustomRate() {
@@ -1695,7 +2723,15 @@
                             rate: activeRate
                         });
                     }
-                    alert('Fiado actualizado.');
+                    tempReceiptData = {
+                        items: [...state.cart], // Copia del carrito
+                        total: totalUSD,
+                        paid: initialPay,
+                        date: new Date().toISOString(),
+                        customer: customerName,
+                        isCredit: true
+                    };
+                    $('successModal').classList.remove('hidden'); // Mostrar Modal Éxito
                     switchTab('credits');
                 } else {
                     state.sales.unshift({
@@ -1706,7 +2742,15 @@
                         total: totalUSD,
                         rate: activeRate
                     });
-                    alert('Venta registrada.');
+                    // REEMPLAZAR alert('Venta registrada.'); POR:
+                    tempReceiptData = {
+                        items: [...state.cart], // Copia del carrito
+                        total: totalUSD,
+                        date: new Date().toISOString(),
+                        type: 'sale',
+                        customer: '' // Cliente genérico en venta contado
+                    };
+                    $('successModal').classList.remove('hidden'); // Mostrar Modal Éxito
                 }
 
                 state.cart = [];
@@ -1741,11 +2785,31 @@
 
             const idx = state.credits.findIndex(c => c.id == id);
             if (idx === -1) return;
+
+            // Antes de cobrar, actualizamos la deuda total en la base de datos
+            // con el valor real calculado (incluyendo aumentos)
+            const realTotal = calculateRealDebt(state.credits[idx]);
+            state.credits[idx].totalDebt = realTotal;
+            // ----------------------------------
+            
             const c = state.credits[idx];
 
-            if (amount > (c.totalDebt - c.paid + 0.1)) return alert('El monto excede la deuda');
+            // Tolerancia de 0.01 para errores de punto flotante
+            if (amount > (c.totalDebt - c.paid + 0.01)) return alert('El monto excede la deuda');
 
             state.credits[idx].paid += amount;
+            
+            // --- NUEVO: Detectar si se completó el pago ---
+            const remaining = state.credits[idx].totalDebt - state.credits[idx].paid;
+            if (remaining <= 0.01) {
+                // Se pagó completo: Marcamos la fecha de finalización
+                state.credits[idx].paidDate = new Date().toISOString();
+                
+                // Ejecutamos limpieza automática para borrar los viejos
+                setTimeout(autoPruneCredits, 500); 
+            }
+            // ----------------------------------------------
+
             state.sales.unshift({
                 id: Date.now(),
                 date: new Date().toISOString(),
@@ -1757,8 +2821,11 @@
 
             saveData();
             renderAll();
+            
+            // Pequeño delay para que la UI se actualice antes de la alerta
             setTimeout(() => {
-                alert('Abono registrado.');
+                if (remaining <= 0.01) alert(`¡Deuda de ${c.customer} saldada! Se ha movido al historial.`);
+                else alert('Abono registrado.');
             }, 100);
         }
 
@@ -1889,7 +2956,11 @@
                 histBody.innerHTML += `<tr class="border-b">
                     <td class="p-2 text-xs text-gray-500">${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</td>
                     <td class="p-2 text-xs truncate max-w-[200px]">${detail}</td>
-                    <td class="p-2 text-right font-bold text-xs">${formatMoney(amt)}</td>
+                    <td class="p-2 text-right font-bold text-xs">${formatMoney(amt)}
+                        <button onclick="openReceiptFromHistory('${s.id}')" class="ml-2 text-gray-400 hover:text-indigo-600 transition">
+                            <i class="fa-solid fa-print"></i>
+                        </button>
+                    </td>
                 </tr>`;
             });
         }
@@ -1962,10 +3033,25 @@
 
             // 7. Renderizar tarjetas (Ya ordenadas)
             filteredList.forEach(c => {
-                // ... (cálculos de debt, consolidated, etc. siguen igual que antes) ...
-                const debt = c.totalDebt - c.paid;
+                
+                // --- INICIO DEL CAMBIO v42 ---
+                // 1. Calculamos la deuda real (Dinámica o Fija según config)
+                const currentTotalDebt = calculateRealDebt(c);
+
+                // 2. Detectamos si subió de precio (para la etiqueta azul)
+                const hasPriceIncrease = currentTotalDebt > c.totalDebt;
+
+                // 3. Calculamos el saldo pendiente
+                const debt = currentTotalDebt - c.paid;
+
+                // Protección: Si el recálculo da 0 o negativo (error de precisión), saltamos
+                if (debt <= 0.01) return;
+
+                // 4. Cálculos visuales estándar
                 const roundedDebt = Math.round((debt + Number.EPSILON) * 100) / 100;
                 const debtBs = roundedDebt * fiadosRate;
+                // --- FIN DEL CAMBIO v42 ---
+
                 const date = new Date(c.date).toLocaleDateString();
                 
                 const consolidated = {};
@@ -1997,13 +3083,17 @@
                             <p class="text-xs text-gray-600 mt-1 italic"><i class="fa-solid fa-basket-shopping mr-1"></i>${itemsSummary}</p>
                         </div>
                         
-                        <div class="text-right w-1/3"> 
+                        <div class="text-right w-1/3">
                             <div class="font-bold text-red-600 text-lg">${formatMoney(debt)}</div>
-                            <div class="text-xs text-blue-600 font-bold">Bs ${debtBs.toFixed(2)}</div>
                             
-                            <div class="mt-4">
-                                <div class="text-xs text-gray-400">Orig: ${formatMoney(originalDebt)}</div>
-                                ${surchargeDisplay}
+                            <div class="text-xs text-blue-600 font-bold mb-1">Bs ${debtBs.toFixed(2)}</div>
+                            
+                            ${hasPriceIncrease && state.creditMode === 'DYNAMIC' ?
+                                '<div class="mb-2"><span class="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-bold uppercase border border-blue-200 inline-flex items-center gap-1"><i class="fa-solid fa-arrow-trend-up"></i> Ajustado</span></div>'
+                                : ''}
+                            
+                            <div>
+                                <div class="text-xs text-gray-400">Orig: ${formatMoney(c.totalDebt - (c.surcharge || 0))}</div> ${surchargeDisplay}
                             </div>
                         </div>
                     </div>
@@ -2014,6 +3104,9 @@
                         <button onclick="openSurchargeModal('${c.id}')" class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-xs hover:bg-yellow-200 border border-yellow-200 font-bold flex items-center gap-1" title="Aplicar Recargo"><i class="fa-solid fa-bolt mr-1"></i>Recargo</button>
                         <button onclick="openShareModal('${c.id}')" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs hover:bg-green-200 border border-green-200 font-bold flex items-center gap-1" title="Enviar Recordatorio">
                             <i class="fa-solid fa-share-nodes"></i> Recordar
+                        </button>
+                        <button onclick="openReceiptFromCredit('${c.id}')" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-200 border border-gray-200 font-bold flex items-center gap-1" title="Factura">
+                            <i class="fa-solid fa-receipt"></i> Factura
                         </button>
                     </div>
                     
@@ -2049,14 +3142,41 @@
             }
         }
 
-        // ==========================================
-        // 12. BACKUP Y RESTAURACIÓN
-        // ==========================================
+        // ---------------------------------------------------------
+        // 3. BACKUPS SEGUROS (Encriptación automática si hay clave)
+        // ---------------------------------------------------------
         window.downloadBackup = () => {
-            const blob = new Blob([JSON.stringify(state)], { type: "application/json" });
+            // Convertimos todo el estado a texto
+            let dataToExport = JSON.stringify(state);
+            let fileName = `backup_inv_v42_${new Date().toISOString().split('T')[0]}`;
+    
+            // Si la seguridad E2EE está activa, encriptamos el archivo
+            if (encryptionKey) {
+                try {
+                    // Empaquetamos en un sobre seguro
+                    const encryptedData = CryptoJS.AES.encrypt(dataToExport, encryptionKey).toString();
+            
+                    const secureBackup = {
+                        isEncryptedBackup: true,
+                        payload: encryptedData,
+                        note: "Este archivo requiere Clave Maestra para ser restaurado",
+                        timestamp: new Date().toISOString()
+                    };
+            
+                    // Reemplazamos el contenido exportable por el sobre encriptado
+                    dataToExport = JSON.stringify(secureBackup);
+                    fileName += '_SECURE'; // Etiqueta visual para el usuario
+                } catch (e) {
+                    alert("Error al encriptar respaldo. Verifica tu clave.");
+                    return;
+                }
+            }
+
+            // Proceso de descarga estándar (Blob)
+            const blob = new Blob([dataToExport], { type: "application/json" });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `backup_inv_v34_${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `${fileName}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2066,36 +3186,160 @@
             const file = event.target.files[0];
             if (!file) return;
             const reader = new FileReader();
+    
             reader.onload = (e) => {
                 try {
-                    const d = JSON.parse(e.target.result);
-                    if (confirm('¿Restaurar backup?')) {
-                        if (d.products) localStorage.setItem('inv_products', JSON.stringify(d.products));
-                        if (d.sales) localStorage.setItem('inv_sales', JSON.stringify(d.sales));
-                        if (d.credits) localStorage.setItem('inv_credits', JSON.stringify(d.credits));
-                        if (d.security) localStorage.setItem('inv_security', JSON.stringify(d.security));
-                        alert('Restaurado.');
-                        location.reload();
+                    let jsonContent = JSON.parse(e.target.result);
+                    let finalData = jsonContent; // Asumimos texto plano por defecto
+
+                    // DETECCIÓN INTELIGENTE: ¿Es un backup encriptado? 🔒
+                    if (jsonContent.isEncryptedBackup) {
+                        let currentKey = encryptionKey;
+                
+                        // Si no tenemos la clave en memoria, la pedimos
+                        if (!currentKey) {
+                            currentKey = prompt("📂 ARCHIVO BLINDADO DETECTADO\n\nIntroduce la Clave Maestra con la que se creó este respaldo:");
+                            if (!currentKey) return alert("Restauración cancelada.");
+                        }
+
+                        try {
+                            // Intentamos desencriptar
+                            const bytes = CryptoJS.AES.decrypt(jsonContent.payload, currentKey);
+                            const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
+                    
+                            if (!decryptedStr) throw new Error("Bad Key");
+                    
+                            finalData = JSON.parse(decryptedStr);
+                    
+                            // Si funcionó y no teníamos clave en sesión, guardamos esta
+                            if (!encryptionKey) {
+                                encryptionKey = currentKey;
+                                localStorage.setItem('inv_enc_key', currentKey);
+                            }
+                        } catch (err) {
+                            return alert("❌ Error: La clave es incorrecta o el archivo está dañado.");
+                        }
+                    }
+
+                    // Confirmación final antes de sobrescribir
+                    if (confirm('¿Restaurar este respaldo?\nSe sobrescribirán los datos actuales y se subirán a la nube.')) {
+                
+                        // INYECCIÓN DE DATOS (Lista Completa)
+                        if (finalData.products) state.products = finalData.products;
+                        if (finalData.sales) state.sales = finalData.sales;
+                        if (finalData.credits) state.credits = finalData.credits;
+                        if (finalData.security) state.security = finalData.security;
+                
+                        // [RECUPERADO] Métodos de pago (¡Faltaba esto!)
+                        if (finalData.paymentMethods) state.paymentMethods = finalData.paymentMethods;
+                
+                        // [MEJORA] Restaurar también configuraciones de tasas si existen
+                        if (finalData.customRate) state.customRate = finalData.customRate;
+                        if (finalData.rateMode) state.rateMode = finalData.rateMode;
+                        if (finalData.fiadosRateMode) state.fiadosRateMode = finalData.fiadosRateMode;
+                
+                        // Guardado inteligente:
+                        // saveData() detectará si hay encryptionKey y subirá todo encriptado a la nube automáticamente
+                        saveData(); 
+                
+                        renderAll();
+                        $('restoreInput').value = ''; // Limpiar input file
+                        alert('¡Restauración exitosa y sincronizada! ☁️✅');
                     }
                 } catch (err) {
-                    alert('Error archivo');
+                    console.error(err);
+                    alert('Error: El archivo no tiene un formato válido.');
                 }
             };
             reader.readAsText(file);
         };
         
-        // Carga de imágenes (Función helper)
+        // ==========================================
+        // COMPRESOR DE IMÁGENES (SOLUCIÓN AL LÍMITE DE 1MB)
+        // ==========================================
         function previewImage(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // 1. Crear un lector de archivos
             const reader = new FileReader();
+            
             reader.onload = function(e) {
-                state.tempImg = e.target.result;
-                $('imgPreview').src = state.tempImg;
-                $('imgPreview').classList.remove('hidden');
-                $('imgIcon').classList.add('hidden');
+                const img = new Image();
+                img.src = e.target.result;
+
+                img.onload = function() {
+                    // 2. Configurar dimensiones máximas (Thumbnail)
+                    const maxWidth = 300; // Máximo 300px de ancho
+                    const maxHeight = 300; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Calcular nueva proporción (para no deformar)
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    // 3. Crear Canvas (Lienzo invisible)
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // 4. Dibujar la imagen redimensionada
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 5. EXPORTAR COMPRIMIDO (JPEG al 70% de calidad)
+                    // Esto reduce una imagen de 3MB a aprox 20KB-50KB
+                    state.tempImg = canvas.toDataURL('image/jpeg', 0.7);
+                    state.isImageDeleted = false; // <--- ¡BANDERA APAGADA! 🏳️
+
+                    // 6. Mostrar resultado
+                    $('imgPreview').src = state.tempImg;
+                    $('imgPreview').classList.remove('hidden');
+                    $('imgIcon').classList.add('hidden');
+                    $('btnRemoveImg').classList.remove('hidden');
+                    
+                    // Feedback para el usuario (opcional en consola)
+                    console.log("📸 Imagen comprimida para Firestore.");
+                };
             };
+            
             reader.readAsDataURL(file);
+        }
+
+        // ==========================================
+        // BORRAR IMAGEN (LIBERAR ESPACIO)
+        // ==========================================
+        function removeImage(e) {
+            // Evitamos que el clic traspase y abra el selector de archivos
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 1. Limpiamos la memoria temporal
+            state.tempImg = null;
+            state.isImageDeleted = true; // <--- ¡NUEVA BANDERA ACTIVADA! 🚩
+            
+            // 2. Limpiamos el input file (por si quiere subir la misma foto después)
+            document.getElementById('prodImg').value = "";
+
+            // 3. Reseteamos la UI
+            const img = document.getElementById('imgPreview');
+            const icon = document.getElementById('imgIcon');
+            const btn = document.getElementById('btnRemoveImg');
+
+            img.src = "";
+            img.classList.add('hidden');
+            btn.classList.add('hidden');
+            icon.classList.remove('hidden');
         }
 
         // ==========================================
@@ -2903,6 +4147,921 @@
                     closeDeleteCreditModal();
                 }
             });
+        }
+
+        // ==========================================
+        // UI: MENÚ DE USUARIO (CLICK MODE)
+        // ==========================================
+        function toggleUserMenu() {
+            const menu = document.getElementById('userMenuDropdown');
+            menu.classList.toggle('hidden');
+        }
+
+        // CERRAR MENÚ AL HACER CLIC FUERA
+        window.addEventListener('click', (e) => {
+            const menu = document.getElementById('userMenuDropdown');
+            const btn = document.querySelector('button[onclick="toggleUserMenu()"]');
+            
+            // Si el clic NO fue en el botón Y NO fue dentro del menú...
+            if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+                // ...entonces ciérralo.
+                menu.classList.add('hidden');
+            }
+        });
+
+        // ==========================================
+        // CALCULADORA DE PRECIOS (v42.0)
+        // ==========================================
+        
+        // 1. Abrir Modal y Cargar Preferencias
+        function openCalculator() {
+            const modal = document.getElementById('calculatorModal');
+            modal.classList.remove('hidden');
+
+            // Cargar preferencias guardadas
+            const savedTax = localStorage.getItem('calc_use_tax');
+            const savedRate = localStorage.getItem('calc_tax_rate');
+            const savedMargin = localStorage.getItem('calc_margin');
+
+            if (savedTax === 'true') {
+                document.getElementById('chkCalcTax').checked = true;
+                document.getElementById('taxInputContainer').classList.remove('hidden');
+            }
+            if (savedRate) document.getElementById('calcTaxRate').value = savedRate;
+            if (savedMargin) document.getElementById('calcMargin').value = savedMargin;
+            
+            // Enfocar en el primer input
+            document.getElementById('calcBaseUSD').focus();
+            calculatePriceResult();
+        }
+
+        function closeCalculator() {
+            document.getElementById('calculatorModal').classList.add('hidden');
+        }
+
+        // 2. Toggle IVA (Mostrar/Ocultar y Guardar)
+        function toggleCalcTax() {
+            const chk = document.getElementById('chkCalcTax');
+            const container = document.getElementById('taxInputContainer');
+            
+            if (chk.checked) {
+                container.classList.remove('hidden');
+                document.getElementById('calcTaxRate').focus();
+            } else {
+                container.classList.add('hidden');
+            }
+            
+            localStorage.setItem('calc_use_tax', chk.checked);
+            calculatePriceResult();
+        }
+
+        // 3. Sincronizar Divisas (Bs <-> USD)
+        function syncCalcCurrency(source) {
+            const rate = getActiveRate();
+            if (rate <= 0) return;
+
+            const inputUSD = document.getElementById('calcBaseUSD');
+            const inputBs = document.getElementById('calcBaseBs');
+
+            if (source === 'USD') {
+                const val = parseFloat(inputUSD.value);
+                inputBs.value = val ? (val * rate).toFixed(2) : '';
+            } else {
+                const val = parseFloat(inputBs.value);
+                inputUSD.value = val ? (val / rate).toFixed(2) : '';
+            }
+        }
+
+        // 4. EL CÁLCULO MATEMÁTICO PRINCIPAL (Con Conversión a Bs Visual)
+        function calculatePriceResult() {
+            // Inputs
+            const base = parseFloat(document.getElementById('calcBaseUSD').value) || 0;
+            const useTax = document.getElementById('chkCalcTax').checked;
+            const taxRate = useTax ? (parseFloat(document.getElementById('calcTaxRate').value) || 0) : 0;
+            const qty = parseFloat(document.getElementById('calcQty').value) || 1;
+            const margin = parseFloat(document.getElementById('calcMargin').value) || 0;
+
+            // Guardar preferencias en vivo
+            if(useTax) localStorage.setItem('calc_tax_rate', taxRate);
+            localStorage.setItem('calc_margin', margin);
+
+            // 1. Costo Total Lote (Base + IVA)
+            const totalCost = base * (1 + (taxRate / 100));
+
+            // 2. Costo Unitario Real
+            const unitCost = totalCost / qty;
+
+            // 3. Precio Sugerido (Fórmula: Costo / (1 - Margen%))
+            let sellingPrice = 0;
+            const marginFactor = 1 - (margin / 100);
+            
+            if (marginFactor > 0 && marginFactor <= 1) {
+                sellingPrice = unitCost / marginFactor;
+            }
+
+            // --- LÓGICA NUEVA: Conversión visual a Bs ---
+            const rate = getActiveRate(); // Obtenemos la tasa del sistema
+            const unitCostBs = unitCost * rate;
+            const sellingPriceBs = sellingPrice * rate;
+
+            const sym = getSymbol(); // $ o €
+
+            // 4. Renderizar Resultados (Con HTML inyectado para estilos)
+            
+            // A. Costo Unitario: $0.00 (Bs 0.00)
+            // El Bs va en gris y pequeño
+            document.getElementById('displayUnitCost').innerHTML = 
+                `${sym}${formatCalcNumber(unitCost)} <span class="text-xs text-gray-400 font-normal ml-1">(Bs ${formatCalcNumber(unitCostBs)})</span>`;
+
+            // B. Precio Final: $0.00 / Bs 0.00
+            // El Bs va en Azul y tamaño mediano (text-lg) vs el Grande (text-3xl) del dólar
+            document.getElementById('displayFinalPrice').innerHTML = 
+                `${sym}${formatCalcNumber(sellingPrice)} <span class="text-lg text-blue-600 font-bold ml-1">/ Bs ${formatCalcNumber(sellingPriceBs)}</span>`;
+            
+            // Guardamos el resultado limpio (solo el número en divisa fuerte) para el botón "Usar"
+            document.getElementById('displayFinalPrice').dataset.value = sellingPrice.toFixed(2);
+        }
+
+        function formatCalcNumber(num) {
+            return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+        }
+
+        // 5. Aplicar al formulario principal
+        function applyCalculatedPrice() {
+            const price = document.getElementById('displayFinalPrice').dataset.value;
+            if (price && parseFloat(price) > 0) {
+                $('prodPrice').value = price;
+                
+                // Feedback visual en el input de precio
+                $('prodPrice').classList.add('bg-green-100', 'transition-colors');
+                setTimeout(() => $('prodPrice').classList.remove('bg-green-100'), 1000);
+                
+                closeCalculator();
+                
+                // Scroll suave al input de precio
+                $('prodPrice').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                $('prodPrice').focus();
+            } else {
+                alert("Calcula un precio válido primero.");
+            }
+        }
+
+        // 1. ACTIVAR (Igual que antes, pero llama al render al final)
+        function enableEncryption() {
+            const k1 = prompt("CREAR CLAVE MAESTRA\n\nEscribe una contraseña segura. Solo tú la sabrás.");
+            if(!k1) return;
+            const k2 = prompt("CONFIRMA LA CLAVE\n\nEscríbela de nuevo:");
+            if (k1 !== k2) return alert("Las claves no coinciden.");
+    
+            encryptionKey = k1;
+            localStorage.setItem('inv_enc_key', k1);
+            saveData(); 
+            renderEncryptionUI(); // Actualizar visualmente
+            alert("✅ ¡Protección Activada!\nTus datos se están encriptando y subiendo a la nube.");
+        }
+
+        // 2. CAMBIAR CLAVE (Flujo estricto de 4 pasos)
+        function changeEncryptionPassword() {
+            // Paso 1: Autenticación
+            const oldKey = prompt("🔒 SEGURIDAD\n\nPara hacer cambios, ingresa tu Clave Maestra ACTUAL:");
+            if (oldKey !== encryptionKey) return alert("❌ Clave incorrecta. Acceso denegado.");
+
+            // Paso 2: Nueva Clave
+            const newKey1 = prompt("NUEVA CLAVE\n\nIngresa la nueva contraseña:");
+            if (!newKey1) return;
+
+            // Paso 3: Confirmación Nueva Clave
+            const newKey2 = prompt("CONFIRMAR\n\nRepite la nueva contraseña:");
+            if (newKey1 !== newKey2) return alert("❌ Las nuevas claves no coinciden.");
+
+            // Paso 4: Confirmación Final
+            if (!confirm("¿Estás seguro de cambiar la contraseña?\n\nAsegúrate de anotarla. Si la olvidas, perderás el acceso.")) return;
+
+            // Ejecución
+            encryptionKey = newKey1;
+            localStorage.setItem('inv_enc_key', encryptionKey);
+            saveData(); // Re-encripta todo con la nueva clave inmediatamente
+            alert("✅ Clave cambiada exitosamente.");
+        }
+
+        // 3. DESACTIVAR (Flujo de "Arrepentimiento")
+        function disableEncryption() {
+            // Nivel 1: Advertencia simple
+            if (!confirm("¿Estás seguro de desactivar la Encriptación E2EE?\n\nTus datos en la nube volverán a ser legibles para el administrador del sistema (Soporte).")) return;
+
+            // Nivel 2: Advertencia grave
+            if (!confirm("⚠️ CONFIRMACIÓN FINAL ⚠️\n\nAl desactivar esto, se eliminará la capa de seguridad extra.\n¿Realmente deseas continuar?")) return;
+
+            // Nivel 3: Autenticación final (La barrera real)
+            const keyCheck = prompt("AUTORIZACIÓN REQUERIDA\n\nEscribe tu Clave Maestra para confirmar la desactivación:");
+    
+            if (keyCheck !== encryptionKey) return alert("❌ Clave incorrecta. No se ha desactivado nada.");
+
+            // Ejecución: Volver al modo estándar
+            encryptionKey = null;
+            localStorage.removeItem('inv_enc_key');
+    
+            // Al no haber encryptionKey, saveData() entrará en el 'else' y subirá 'rawData' plano.
+            saveData(); 
+    
+            renderEncryptionUI(); // Actualizar visualmente a morado
+            alert("🔓 Encriptación desactivada.\nTus datos se han convertido a formato estándar en la nube.");
+        }
+
+        // ==========================================
+        // 19. HISTORIAL Y LIMPIEZA DE FIADOS (v42)
+        // ==========================================
+        
+        function openCreditHistory() {
+            renderCreditHistory();
+            $('creditHistoryModal').classList.remove('hidden');
+        }
+
+        function closeCreditHistory() {
+            $('creditHistoryModal').classList.add('hidden');
+        }
+
+        function renderCreditHistory() {
+            const container = $('creditHistoryList');
+            container.innerHTML = '';
+
+            // 1. Filtramos SOLO los que están pagados (Deuda <= Pagado)
+            // Y que tengan fecha de pago (paidDate) o sean viejos (0 deuda)
+            const paidCredits = state.credits.filter(c => (c.totalDebt - c.paid) <= 0.01);
+
+            // 2. Ordenamos: El más reciente primero
+            paidCredits.sort((a, b) => {
+                const dateA = a.paidDate ? new Date(a.paidDate).getTime() : 0;
+                const dateB = b.paidDate ? new Date(b.paidDate).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            // 3. Tomamos solo los últimos 5 para mostrar
+            const historyToShow = paidCredits.slice(0, 5);
+
+            if (historyToShow.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 opacity-50">
+                        <i class="fa-solid fa-ghost text-4xl mb-2 text-gray-300"></i>
+                        <p class="text-xs text-gray-500">No hay historial reciente.</p>
+                    </div>`;
+                return;
+            }
+
+            historyToShow.forEach(c => {
+                // Resumen de items
+                let itemsSummary = "Varios productos";
+                if(c.items && c.items.length > 0) {
+                    itemsSummary = c.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+                }
+
+                // Fecha de pago
+                const datePay = c.paidDate ? new Date(c.paidDate).toLocaleDateString() : 'Fecha desc.';
+
+                container.innerHTML += `
+                    <div class="bg-white border border-gray-200 rounded-lg p-3 mb-2 shadow-sm relative group">
+                        <button onclick="permanentDeleteCredit('${c.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition p-1">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+
+                        <div class="flex justify-between items-start mb-1">
+                            <div>
+                                <h4 class="font-bold text-gray-700 text-sm">${c.customer}</h4>
+                                <span class="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Pagado</span>
+                            </div>
+                            <div class="text-right pr-6">
+                                <div class="font-bold text-gray-800 text-sm">${formatMoney(c.paid)}</div>
+                                <div class="text-[9px] text-gray-400">${datePay}</div>
+                            </div>
+                        </div>
+                        <p class="text-[10px] text-gray-500 mt-2 border-t pt-1 leading-tight">
+                            ${itemsSummary}
+                        </p>
+                    </div>
+                `;
+            });
+        }
+
+        function permanentDeleteCredit(id) {
+            if(confirm('¿Eliminar este registro del historial permanentemente?')) {
+                state.credits = state.credits.filter(c => c.id != id);
+                saveData();
+                renderCreditHistory();
+            }
+        }
+
+        // Función de Limpieza Automática (El recolector de basura)
+        function autoPruneCredits() {
+            // Buscamos los pagados
+            const paidCredits = state.credits.filter(c => (c.totalDebt - c.paid) <= 0.01);
+            
+            // Si hay 5 o menos, no hacemos nada
+            if (paidCredits.length <= 5) return;
+
+            // Si hay más de 5, necesitamos borrar los excedentes
+            // Ordenamos por fecha de pago (los más recientes primero)
+            paidCredits.sort((a, b) => {
+                const dateA = a.paidDate ? new Date(a.paidDate).getTime() : 0;
+                const dateB = b.paidDate ? new Date(b.paidDate).getTime() : 0;
+                return dateB - dateA;
+            });
+
+            // Los "salvados" son los primeros 5. Los "condenados" son el resto.
+            const creditsToKeepIds = paidCredits.slice(0, 5).map(c => c.id);
+            const creditsToDelete = paidCredits.slice(5); // Del 6 en adelante
+
+            if (creditsToDelete.length > 0) {
+                console.log(`🧹 Limpieza: Borrando ${creditsToDelete.length} fiados antiguos para ahorrar espacio.`);
+                
+                // Filtramos el estado principal: 
+                // Mantenemos si NO está pagado O si está en la lista de los 5 a salvar
+                state.credits = state.credits.filter(c => {
+                    const isPaid = (c.totalDebt - c.paid) <= 0.01;
+                    if (!isPaid) return true; // Mantener deudas activas
+                    return creditsToKeepIds.includes(c.id); // Mantener solo el Top 5 pagado
+                });
+                
+                saveData(); // Guardar cambios en disco
+            }
+        }
+
+        // ==========================================
+        // 20. MONITOR DE ALMACENAMIENTO (v42)
+        // ==========================================
+        function updateStorageUsage() {
+            // 1. Simulamos el payload que se envía a Firebase
+            // (Si usas encriptación, el peso podría variar ligeramente por el overhead de CryptoJS, pero esto es una buena estimación)
+            const payload = JSON.stringify({
+                products: state.products,
+                sales: state.sales,
+                credits: state.credits,
+                paymentMethods: state.paymentMethods,
+                security: state.security
+            });
+
+            // 2. Calculamos bytes (Aprox. caracteres * 1 byte, aunque UTF-8 varía, es suficiente para referencia)
+            const bytes = new Blob([payload]).size;
+            const limit = 1048576; // 1 MB en bytes (Límite Firestore por documento)
+            
+            // 3. Convertimos a KB para mostrar
+            const kb = (bytes / 1024).toFixed(2);
+            const percentage = Math.min(((bytes / limit) * 100), 100).toFixed(1);
+
+            // 4. Actualizamos UI
+            const bar = $('storageBar');
+            const text = $('storageText');
+            
+            bar.style.width = `${percentage}%`;
+            text.textContent = `${kb} KB / 1024 KB (${percentage}%)`;
+
+            // 5. Colores del Semáforo
+            bar.className = "h-2.5 rounded-full transition-all duration-1000 ";
+            
+            if (percentage < 50) {
+                bar.classList.add('bg-green-500'); // Zona Segura
+            } else if (percentage < 80) {
+                bar.classList.add('bg-yellow-500'); // Zona de Precaución
+            } else {
+                bar.classList.add('bg-red-600', 'animate-pulse'); // ¡PELIGRO!
+                alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
+            }
+        }
+
+        // ==========================================
+        // 21. DASHBOARD ESTADÍSTICO (v42)
+        // ==========================================
+        let salesChartInstance = null; // Variable para guardar el gráfico
+
+        function openDashboard() {
+            $('dashboardModal').classList.remove('hidden');
+            // Por defecto cargamos 7 días al abrir
+            updateChart('7d');
+        }
+
+        function closeDashboard() {
+            $('dashboardModal').classList.add('hidden');
+        }
+
+        function updateChart(range) {
+            // 1. Actualizar estilos de botones
+            ['7d', '30d', '12m'].forEach(r => {
+                const btn = $(`btnChart${r}`);
+                if(r === range) btn.className = "flex-1 py-1 text-xs font-bold rounded shadow bg-white text-indigo-600 transition";
+                else btn.className = "flex-1 py-1 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition";
+            });
+
+            // 2. Filtrar Datos
+            const now = new Date();
+            let labels = [];
+            let dataPoints = [];
+            let filteredSales = [];
+            
+            // Configuración según rango
+            if (range === '7d' || range === '30d') {
+                const days = range === '7d' ? 7 : 30;
+                for (let i = days - 1; i >= 0; i--) {
+                    const d = new Date();
+                    d.setDate(now.getDate() - i);
+                    const dateStr = d.toLocaleDateString(); // Clave para agrupar
+                    labels.push(dateStr.split('/')[0] + '/' + dateStr.split('/')[1]); // DD/MM visual
+                    
+                    // Sumar ventas de ese día
+                    const dayTotal = state.sales.filter(s => {
+                        const sDate = new Date(s.date);
+                        return sDate.toDateString() === d.toDateString() && s.type !== 'payment'; // Solo ventas reales
+                    }).reduce((sum, s) => sum + Number(s.total), 0);
+                    
+                    dataPoints.push(dayTotal);
+                }
+                
+                // Filtramos ventas globales para el producto estrella dentro del rango
+                const limitDate = new Date();
+                limitDate.setDate(now.getDate() - days);
+                filteredSales = state.sales.filter(s => new Date(s.date) >= limitDate && s.type !== 'payment');
+
+            } else if (range === '12m') {
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const monthName = d.toLocaleDateString('es-ES', { month: 'short' });
+                    labels.push(monthName);
+
+                    const monthTotal = state.sales.filter(s => {
+                        const sDate = new Date(s.date);
+                        return sDate.getMonth() === d.getMonth() && sDate.getFullYear() === d.getFullYear() && s.type !== 'payment';
+                    }).reduce((sum, s) => sum + Number(s.total), 0);
+
+                    dataPoints.push(monthTotal);
+                }
+                // Filtro anual para producto estrella
+                const limitDate = new Date();
+                limitDate.setFullYear(now.getFullYear() - 1);
+                filteredSales = state.sales.filter(s => new Date(s.date) >= limitDate && s.type !== 'payment');
+            }
+
+            // 3. Renderizar Gráfico
+            renderChartCanvas(labels, dataPoints);
+
+            // 4. Calcular Producto Estrella
+            calculateStarProduct(filteredSales);
+        }
+
+        function renderChartCanvas(labels, data) {
+            const ctx = document.getElementById('salesChartCanvas').getContext('2d');
+            const sym = getSymbol();
+
+            // Destruir gráfico anterior si existe para evitar bugs visuales
+            if (salesChartInstance) salesChartInstance.destroy();
+
+            salesChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `Ventas (${sym})`,
+                        data: data,
+                        borderColor: '#4f46e5', // Indigo-600
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.3, // Curvatura suave
+                        fill: true,
+                        pointRadius: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#4f46e5'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${sym} ` + context.parsed.y.toFixed(2);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f3f4f6' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function calculateStarProduct(salesList) {
+            const productMap = {};
+
+            // Conteo masivo de items
+            salesList.forEach(sale => {
+                if (sale.items) {
+                    sale.items.forEach(item => {
+                        // Ignorar Stubs (deudas viejas)
+                        if (item.isStub) return;
+
+                        if (!productMap[item.name]) {
+                            productMap[item.name] = { qty: 0, id: item.id };
+                        }
+                        productMap[item.name].qty += item.qty;
+                    });
+                }
+            });
+
+            // Encontrar el ganador
+            let winner = { name: 'Sin datos', qty: 0, img: null };
+            let maxQty = -1;
+
+            Object.entries(productMap).forEach(([name, data]) => {
+                if (data.qty > maxQty) {
+                    maxQty = data.qty;
+                    // Buscamos la imagen en el inventario actual
+                    const prodInStock = state.products.find(p => p.id == data.id);
+                    winner = { 
+                        name: name, 
+                        qty: data.qty, 
+                        img: prodInStock ? prodInStock.img : null 
+                    };
+                }
+            });
+
+            // Actualizar UI
+            $('starProductName').textContent = winner.qty > 0 ? winner.name : 'No hay ventas en este periodo';
+            $('starProductQty').textContent = winner.qty > 0 ? `${winner.qty} unidades vendidas` : '-';
+            
+            const imgDiv = $('starProductImg');
+            if (winner.img) {
+                imgDiv.innerHTML = `<img src="${winner.img}" class="w-full h-full object-cover">`;
+            } else {
+                imgDiv.innerHTML = `<i class="fa-solid fa-trophy"></i>`;
+            }
+        }
+
+        function downloadChartImage() {
+            const link = document.createElement('a');
+            link.download = `reporte_ventas_${new Date().toISOString().split('T')[0]}.png`;
+            // Chart.js canvas to Base64
+            link.href = document.getElementById('salesChartCanvas').toDataURL('image/png');
+            link.click();
+        }
+
+        // ==========================================
+        // 22. SISTEMA DE PRECIOS DINÁMICOS (v42)
+        // ==========================================
+
+        function setCreditMode(mode) {
+            state.creditMode = mode;
+            localStorage.setItem('inv_credit_mode', mode); // Guardado inmediato en disco
+            updateCreditConfigUI();
+            renderAll(); // Re-renderizar todo para ver los cambios de precio al instante
+        }
+
+        function updateCreditConfigUI() {
+            const btnDyn = $('btnCredDynamic');
+            const btnFix = $('btnCredFixed');
+            
+            if (state.creditMode === 'DYNAMIC') {
+                btnDyn.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-300";
+                btnFix.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600 hover:bg-gray-50";
+            } else {
+                btnDyn.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600 hover:bg-gray-50";
+                btnFix.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-gray-600 border-gray-600 text-white shadow";
+            }
+        }
+
+        // ESTA ES LA FUNCIÓN CLAVE: Calcula cuánto debe realmente
+        function calculateRealDebt(credit) {
+            // 1. Si ya está pagado (tiene fecha de cierre), NO TOCAR. Se respeta el histórico.
+            if (credit.paidDate) return credit.totalDebt;
+
+            // 2. Si el modo es FIJO, devolvemos lo que se guardó el día de la venta.
+            if (state.creditMode === 'FIXED') return credit.totalDebt;
+
+            // 3. MODO DINÁMICO: Recalcular item por item
+            let currentTotal = 0;
+            
+            credit.items.forEach(item => {
+                // Buscamos el producto en el inventario actual por ID
+                // Nota: Los "Stubs" (deudas viejas migradas) no tienen ID en inventario, 
+                // así que usarán 'item.price' (precio original) como fallback.
+                const productInStock = state.products.find(p => p.id == item.id);
+                
+                const activePrice = productInStock ? productInStock.price : item.price;
+                currentTotal += activePrice * item.qty;
+            });
+
+            // Sumamos recargos si existen
+            if (credit.surcharge) currentTotal += credit.surcharge;
+
+            return currentTotal;
+        }
+
+        // ==========================================
+        // 23. SISTEMA DE RECIBOS (v42)
+        // ==========================================
+        let tempReceiptData = null; // Variable volátil para pasar datos al modal
+
+        // --- MANEJO DE CONFIGURACIÓN ---
+        function toggleReceiptConfig() {
+            const panel = $('receiptConfigPanel');
+            panel.classList.toggle('hidden');
+            
+            // Cargar datos actuales
+            if (!panel.classList.contains('hidden')) {
+                $('cfgCompanyName').value = state.receiptConfig.companyName || '';
+                $('cfgFooter').value = state.receiptConfig.footer || '';
+                if (state.receiptConfig.logo) {
+                    $('receiptLogoPreview').src = state.receiptConfig.logo;
+                    $('receiptLogoPreview').classList.remove('hidden');
+                    $('receiptLogoIcon').classList.add('hidden');
+                }
+            }
+        }
+
+        function previewReceiptLogo(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                $('receiptLogoPreview').src = e.target.result;
+                $('receiptLogoPreview').classList.remove('hidden');
+                $('receiptLogoIcon').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeReceiptLogo() {
+            $('receiptLogoInput').value = '';
+            $('receiptLogoPreview').src = '';
+            $('receiptLogoPreview').classList.add('hidden');
+            $('receiptLogoIcon').classList.remove('hidden');
+        }
+
+        function saveReceiptConfig() {
+            state.receiptConfig.companyName = $('cfgCompanyName').value;
+            state.receiptConfig.footer = $('cfgFooter').value;
+            
+            const imgSrc = $('receiptLogoPreview').src;
+            if (imgSrc && !$('receiptLogoPreview').classList.contains('hidden')) {
+                state.receiptConfig.logo = imgSrc;
+            } else {
+                state.receiptConfig.logo = null;
+            }
+
+            localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
+            saveData();
+            toggleReceiptConfig();
+            updateReceiptPreview(); // Refrescar vista previa si está abierta
+            alert('Configuración guardada');
+        }
+
+        // --- APERTURA DE MODALES ---
+
+        // A. Desde el Modal de Éxito
+        function openReceiptFromSuccess() {
+            // 1. Guardamos una referencia LOCAL antes de que se borre la global
+            const dataToUse = tempReceiptData;
+
+            // Si por alguna razón está vacía, cancelamos
+            if (!dataToUse) return;
+
+            // 2. Ahora sí cerramos el modal de éxito (esto pondrá tempReceiptData = null)
+            closeSuccessModal();
+
+            // 3. Abrimos el recibo usando la COPIA LOCAL que guardamos en el paso 1
+            prepareReceiptModal(dataToUse);
+        }
+
+        function closeSuccessModal() {
+            $('successModal').classList.add('hidden');
+            tempReceiptData = null; // Limpiar memoria
+        }
+
+        // B. Desde Historial (Pasar objeto venta)
+        function openReceiptFromHistory(saleId) {
+            const sale = state.sales.find(s => s.id == saleId);
+            if (!sale) return;
+            prepareReceiptModal({
+                items: sale.items,
+                total: sale.total,
+                date: sale.date,
+                customer: sale.description ? sale.description.replace('Abono: ', '') : '',
+                type: sale.type,
+                isHistory: true
+            });
+        }
+
+        // C. Desde Fiados (Pasar objeto crédito)
+        function openReceiptFromCredit(creditId) {
+            const credit = state.credits.find(c => c.id == creditId);
+            if (!credit) return;
+            
+            // Calculamos deuda actual real
+            const realTotal = calculateRealDebt(credit);
+
+            prepareReceiptModal({
+                items: credit.items,
+                total: realTotal,
+                paid: credit.paid,
+                date: credit.date,
+                customer: credit.customer,
+                isCredit: true
+            });
+        }
+
+        // --- RENDERIZADO DEL TICKET ---
+        function prepareReceiptModal(data) {
+            tempReceiptData = data; // Guardamos contexto actual
+            
+            // 1. Rellenar Inputs
+            $('receiptCustomerName').value = data.customer || '';
+            
+            // 2. Renderizar visualmente
+            updateReceiptPreview();
+
+            // 3. Mostrar Modal
+            $('receiptModal').classList.remove('hidden');
+        }
+
+        function closeReceiptModal() {
+            $('receiptModal').classList.add('hidden');
+        }
+
+        function updateReceiptPreview() {
+            const data = tempReceiptData;
+            if (!data) return;
+
+            const conf = state.receiptConfig;
+            const sym = getSymbol();
+            const rate = getActiveRate(); // Usamos tasa global o específica si guardáramos la de la venta (para simplificar usamos actual)
+
+            // Leemos el valor del input en tiempo real
+            const customerInput = $('receiptCustomerName').value.trim();
+            const container = $('printCustomerContainer');
+            const display = $('printCustomerNameDisplay');
+
+            // Lógica: Si hay texto Y no es el placeholder genérico, lo mostramos
+            if (customerInput && customerInput.toLowerCase() !== 'cliente genérico') {
+                display.textContent = customerInput;
+                container.classList.remove('hidden');
+            } else {
+                // Si está vacío o es genérico, ocultamos la línea para que se vea "tal cual está"
+                container.classList.add('hidden');
+            }
+
+            // Header
+            $('printCompanyName').textContent = conf.companyName || "Mi Negocio";
+            $('printFooter').textContent = conf.footer || "Gracias por su compra";
+            
+            if (conf.logo) {
+                $('printLogo').src = conf.logo;
+                $('printLogo').classList.remove('hidden');
+            } else {
+                $('printLogo').classList.add('hidden');
+            }
+
+            const d = new Date(data.date);
+            $('printDate').textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+
+            // Items
+            const tbody = $('printItemsList');
+            tbody.innerHTML = '';
+            
+            if (data.items) {
+                data.items.forEach(item => {
+                    tbody.innerHTML += `
+                        <tr>
+                            <td class="py-1">
+                                <div class="font-bold">${item.name}</div>
+                                <div class="text-[10px] text-gray-500">${item.qty} x ${formatMoney(item.price)}</div>
+                            </td>
+                            <td class="text-right py-1 align-top font-mono">
+                                ${formatMoney(item.qty * item.price)}
+                            </td>
+                        </tr>
+                    `;
+                });
+            } else if (data.type === 'payment') {
+                // Caso especial: Recibo de un abono simple desde historial
+                tbody.innerHTML = `<tr><td class="py-1 font-bold">Abono a Deuda</td><td class="text-right py-1">${formatMoney(data.total)}</td></tr>`;
+            }
+
+            // Totales
+            const showBs = $('chkReceiptBs').checked;
+            $('printTotalMain').textContent = formatMoney(data.total);
+
+            if (showBs) {
+                $('printTotalBsRow').classList.remove('hidden');
+                $('printTotalBs').textContent = `Bs ${(data.total * rate).toFixed(2)}`;
+            } else {
+                $('printTotalBsRow').classList.add('hidden');
+            }
+
+            // Información de Crédito (Si aplica)
+            if (data.isCredit) {
+                $('printCreditInfo').classList.remove('hidden');
+                $('printPaid').textContent = formatMoney(data.paid);
+                $('printRemaining').textContent = formatMoney(data.total - data.paid);
+            } else {
+                $('printCreditInfo').classList.add('hidden');
+            }
+        }
+
+        // --- DESCARGA Y COMPARTIR ---
+        async function generateReceiptImage() {
+            const element = document.getElementById('receiptCanvas');
+            // Usamos scale: 2 para mejor calidad (retina)
+            const canvas = await html2canvas(element, { scale: 2, backgroundColor: '#ffffff' });
+            return canvas.toDataURL('image/png');
+        }
+
+        async function downloadReceipt(type) {
+            const btn = event.currentTarget;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+            try {
+                const imgData = await generateReceiptImage();
+                const fileName = `recibo_${Date.now()}`;
+
+                if (type === 'img') {
+                    const link = document.createElement('a');
+                    link.download = `${fileName}.png`;
+                    link.href = imgData;
+                    link.click();
+                } else {
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: [80, 150] // Tamaño ticket térmico aprox
+                    });
+                    
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    // Ajustar altura de imagen proporcionalmente
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save(`${fileName}.pdf`);
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Error generando recibo.');
+            } finally {
+                btn.innerHTML = originalContent;
+            }
+        }
+
+        async function shareReceipt() {
+            const btn = event.currentTarget;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
+
+            try {
+                const imgData = await generateReceiptImage();
+                
+                // --- DETECCIÓN DE DISPOSITIVO (LA CLAVE) ---
+                // Detectamos si es un móvil real. Si es PC, 'isMobile' será false.
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+                // 1. MÓVIL: Intentar API Nativa (Envía la imagen directo a la App de WhatsApp)
+                // Solo entramos aquí si es móvil Y el navegador soporta compartir
+                if (isMobile && navigator.share) {
+                    const blob = await (await fetch(imgData)).blob();
+                    const file = new File([blob], "recibo.png", { type: "image/png" });
+                    
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: 'Recibo de Compra',
+                            text: `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`
+                        });
+                        btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
+                        return; // ¡Éxito en móvil! Salimos aquí.
+                    }
+                }
+
+                // Paso A: Descargar la imagen primero
+                const link = document.createElement('a');
+                link.download = `recibo_para_enviar.png`;
+                link.href = imgData;
+                link.click();
+
+                // Paso B: Instruir al usuario (Bloqueante)
+                // El alert detiene la ejecución del código hasta que el usuario da "Aceptar".
+                // Esto garantiza que lea las instrucciones ANTES de que se abra la nueva pestaña.
+                alert('✅ La imagen del recibo se ha descargado en tu PC.\n\n👉 INSTRUCCIONES:\n1. Acepta este mensaje.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.');
+
+                // Paso C: Abrir WhatsApp Web (Solo ocurre después de cerrar la alerta)
+                const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
+                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+
+            } catch (e) {
+                console.error(e);
+                alert('Ocurrió un error al procesar la imagen.');
+            } finally {
+                btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
+            }
         }
 
     </script>

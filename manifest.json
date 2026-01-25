@@ -1,0 +1,21 @@
+{
+  "name": "EjeComercio",
+  "short_name": "EjeComercio",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#0F172A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ]
+}
