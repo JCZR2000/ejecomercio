@@ -826,7 +826,11 @@
                             <h2 id="printCompanyName" class="text-lg font-bold uppercase leading-tight">Mi Negocio</h2>
                             <p class="text-[10px] text-gray-500" id="printDate">DD/MM/AAAA HH:MM</p>
                         </div>
-    
+
+                        <div id="printCustomerContainer" class="hidden mb-2 pb-1 border-b border-dashed border-gray-300 text-left">
+                            <span class="text-[10px] text-gray-500 font-bold uppercase">Cliente:</span>
+                            <div id="printCustomerNameDisplay" class="text-sm font-bold text-gray-800 uppercase truncate"></div>
+                        </div>
                         <table class="w-full mb-4">
                             <thead>
                                 <tr class="border-b border-black">
@@ -4890,6 +4894,20 @@
             const conf = state.receiptConfig;
             const sym = getSymbol();
             const rate = getActiveRate(); // Usamos tasa global o específica si guardáramos la de la venta (para simplificar usamos actual)
+
+            // Leemos el valor del input en tiempo real
+            const customerInput = $('receiptCustomerName').value.trim();
+            const container = $('printCustomerContainer');
+            const display = $('printCustomerNameDisplay');
+
+            // Lógica: Si hay texto Y no es el placeholder genérico, lo mostramos
+            if (customerInput && customerInput.toLowerCase() !== 'cliente genérico') {
+                display.textContent = customerInput;
+                container.classList.remove('hidden');
+            } else {
+                // Si está vacío o es genérico, ocultamos la línea para que se vea "tal cual está"
+                container.classList.add('hidden');
+            }
 
             // Header
             $('printCompanyName').textContent = conf.companyName || "Mi Negocio";
