@@ -5051,7 +5051,7 @@
                 link.click();
 
                 // Paso B: Abrir WhatsApp Web con el texto pre-escrito
-                const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo (Adjuntar imagen descargada).`;
+                const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                 
                 // Aviso al usuario
