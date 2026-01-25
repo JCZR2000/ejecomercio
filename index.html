@@ -5020,8 +5020,13 @@
             try {
                 const imgData = await generateReceiptImage();
                 
-                // 1. Intentar API Nativa (Móviles modernos)
-                if (navigator.share) {
+                // --- DETECCIÓN DE DISPOSITIVO (LA CLAVE) ---
+                // Detectamos si es un móvil real. Si es PC, 'isMobile' será false.
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+                // 1. MÓVIL: Intentar API Nativa (Envía la imagen directo a la App de WhatsApp)
+                // Solo entramos aquí si es móvil Y el navegador soporta compartir
+                if (isMobile && navigator.share) {
                     const blob = await (await fetch(imgData)).blob();
                     const file = new File([blob], "recibo.png", { type: "image/png" });
                     
@@ -5032,26 +5037,29 @@
                             text: `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`
                         });
                         btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
-                        return;
+                        return; // ¡Éxito en móvil! Salimos aquí.
                     }
                 }
 
-                // 2. Fallback: WhatsApp Web (Solo texto con aviso)
-                // WhatsApp Web no permite enviar imágenes programáticamente por seguridad.
-                // Descargamos la imagen y abrimos WhatsApp para que el usuario la adjunte.
+                // 2. PC / ESCRITORIO: Fallback Manual (WhatsApp Web)
+                // Si llegamos aquí es porque estamos en PC o el móvil no soporta share de archivos.
+                
+                // Paso A: Descargar la imagen automáticamente (porque WA Web no deja recibir imágenes por URL)
                 const link = document.createElement('a');
                 link.download = `recibo_para_enviar.png`;
                 link.href = imgData;
                 link.click();
 
+                // Paso B: Abrir WhatsApp Web con el texto pre-escrito
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo (Adjuntar imagen descargada).`;
                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
                 
-                alert('La imagen se ha descargado. Por favor adjúntala en el chat de WhatsApp que se abrirá.');
+                // Aviso al usuario
+                alert('La imagen se ha descargado a tu PC.\n\nSe abrirá WhatsApp Web: Por favor arrastra o adjunta la imagen descargada en el chat.');
 
             } catch (e) {
                 console.error(e);
-                alert('Tu dispositivo no soporta compartir imágenes directas.');
+                alert('Ocurrió un error al procesar la imagen.');
             } finally {
                 btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
             }
