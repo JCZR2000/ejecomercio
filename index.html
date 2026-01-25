@@ -4815,9 +4815,17 @@
 
         // A. Desde el Modal de Éxito
         function openReceiptFromSuccess() {
-            if (!tempReceiptData) return;
+            // 1. Guardamos una referencia LOCAL antes de que se borre la global
+            const dataToUse = tempReceiptData;
+
+            // Si por alguna razón está vacía, cancelamos
+            if (!dataToUse) return;
+
+            // 2. Ahora sí cerramos el modal de éxito (esto pondrá tempReceiptData = null)
             closeSuccessModal();
-            prepareReceiptModal(tempReceiptData);
+
+            // 3. Abrimos el recibo usando la COPIA LOCAL que guardamos en el paso 1
+            prepareReceiptModal(dataToUse);
         }
 
         function closeSuccessModal() {
