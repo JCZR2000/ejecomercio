@@ -4464,6 +4464,7 @@
             const method = $('paymentMethodSelect').value;
             if (!method) return;
 
+            // 1. Guardar en el Estado
             if (method === 'TRANSFER') {
                 state.paymentMethods.TRANSFER = {
                     bank: $('inputTransBank').value,
@@ -4482,8 +4483,14 @@
                 state.paymentMethods.CUSTOM = { text: $('inputCustomText').value };
             }
 
+            // 2. Guardar en Disco Local
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-            alert('Datos de pago guardados.');
+
+            // 3. Sincronizar con la Nube
+            saveData();
+
+            // 4. Feedback
+            alert('Datos de pago guardados y sincronizados.');
             regenerateShareMessage(); // Actualizar mensaje con los nuevos datos guardados
         }
 
