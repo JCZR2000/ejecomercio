@@ -10,8 +10,6 @@
 
     <title>EjeComercio v43</title>
 
-    <x-dolarvzla-key> ff44345a26d5f9e4047e4667f253dfa29a394aa52fcd5b511fb63c620b819976 </x-dolarvzla-key> 
-
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -2853,12 +2851,20 @@
         }
 
         async function fetchAllRates() {
+            const apiKey = "ff44345a26d5f9e4047e4667f253dfa29a394aa52fcd5b511fb63c620b819976"; // Clave pública de solo lectura
             const btn = $('refreshRateBtn');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
             try {
                 // Hacemos una única petición a la API de DolarVzla
-                const res = await fetch('https://api.dolarvzla.com/public/exchange-rate');
+                const res = await fetch('https://api.dolarvzla.com/public/exchange-rate', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-dolarvzla-key': apiKey  // <--- AQUÍ ES DONDE SE ENVÍA LA LLAVE
+                    }
+                });
+
                 const data = await res.json();
 
                 if (data && data.current && data.current.usd) {
@@ -2867,6 +2873,7 @@
                 if (data && data.current && data.current.eur) {
                     state.bcvEur = parseFloat(data.current.eur);
                 }
+                
             } catch (e) {
                 console.error("Error sincronizando tasas:", e);
             }
