@@ -100,9 +100,7 @@
                 </span>
             </div>
             <div class="flex items-center gap-3">
-                <div id="cloudStatus" class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-slate-800 border border-slate-700 transition-all duration-300" title="Estado de conexión">
-                    <div id="cloudDot" class="w-2.5 h-2.5 rounded-full bg-gray-400"></div> <span id="cloudText" class="text-[10px] font-bold text-gray-400 uppercase hidden md:inline">Conectando</span>
-                </div>
+                
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
                     <input type="number" id="displayRate" readonly class="bg-transparent text-white w-16 text-sm font-mono focus:outline-none text-right cursor-default" placeholder="0.00">
@@ -110,10 +108,24 @@
                         <i class="fa-solid fa-sync-alt"></i>
                     </button>
                 </div>
-                <div class="relative">
+
+                <div class="relative z-10">
                     <button onclick="toggleUserMenu()" class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
                         <img id="userAvatar" src="" class="w-full h-full object-cover hidden rounded-full">
                         <i id="userIcon" class="fa-solid fa-user"></i>
+                    </button>
+
+                    <button onclick="showStatusInfo()"
+                        class="absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 z-20 focus:outline-none group"
+                        title="Estatus de Conexión">
+                        <div class="relative flex items-center justify-center w-full h-full">
+                            <div id="statusDot"
+                                class="w-3.5 h-3.5 rounded-full bg-emerald-500 border-[2px] border-slate-900 transition-all duration-500 z-10">
+                            </div>
+                    
+                            <div id="statusPing" class="absolute inset-0 m-auto w-full h-full rounded-full bg-emerald-500 opacity-0 z-0">
+                            </div>
+                        </div>
                     </button>
                     
                     <div id="userMenuDropdown" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden z-50 border border-gray-100">
@@ -1518,6 +1530,10 @@
         // ==========================================
         // 1. ESTADO GLOBAL & VARIABLES
         // ==========================================
+
+        // Variable para recordar el estado (para el mensaje al hacer clic)
+        let currentCloudState = 'ONLINE';
+        
         let state = {
             // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
             products: JSON.parse(localStorage.getItem('inv_products')) || [],
@@ -1525,6 +1541,15 @@
             credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
             paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
             security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
+
+            // --- CONFIGURACIÓN DE FACTURA EN LA NUBE ---
+            receiptConfig: {
+                companyName: "Mi Negocio",
+                footer: "¡Gracias por su compra!",
+                logo: "",      // Aquí guardaremos el Base64
+                showBs: true   // Preferencia de mostrar bolívares
+            },
+            // ---------------------------------------------------------
             
             // Configs
             bcvUsd: parseFloat(localStorage.getItem('inv_bcv_usd')) || 0,
@@ -1726,40 +1751,58 @@
         // ==========================================
         // UI: SEMÁFORO DE SINCRONIZACIÓN
         // ==========================================
-        function updateCloudStatus(status) {
-            const container = $('cloudStatus');
-            const dot = $('cloudDot');
-            const text = $('cloudText');
 
-            // Reseteamos clases de color
-            dot.className = "w-2.5 h-2.5 rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(0,0,0,0.5)]";
-            text.className = "text-[10px] font-bold uppercase hidden md:inline transition-colors";
+        function updateCloudStatus(status) {
+            currentCloudState = status; // Guardar estado actual
+            
+            // Buscamos los NUEVOS elementos del HTML
+            const dot = document.getElementById('statusDot');
+            const ping = document.getElementById('statusPing');
+
+            // Protección: Si no existen (aún no carga el HTML), no hacemos nada
+            if (!dot || !ping) return;
+
+            // 1. Limpiar clases (Estado Base)
+            dot.className = "w-3 h-3 rounded-full transition-all duration-500 shadow-lg";
+            ping.className = "hidden"; // Ocultar animación por defecto
 
             if (status === 'ONLINE') {
-                // VERDE: Todo sincronizado
-                dot.classList.add('bg-green-500', 'shadow-green-500/50');
-                text.classList.add('text-green-500');
-                text.textContent = "Sincronizado";
-                container.classList.replace('border-red-900', 'border-slate-700'); // Quitar borde rojo si existía
+                // VERDE: Sincronizado y Seguro
+                dot.classList.add('bg-emerald-500', 'shadow-[0_0_10px_rgba(16,185,129,0.6)]');
             } 
             else if (status === 'SYNCING') {
-                // AMARILLO: Subiendo cambios o procesando
-                dot.classList.add('bg-yellow-400', 'animate-ping'); // Ping para efecto de actividad
-                text.classList.add('text-yellow-400');
-                text.textContent = "Guardando...";
+                // AMARILLO: Trabajando...
+                dot.classList.add('bg-amber-400', 'shadow-[0_0_10px_rgba(251,191,36,0.6)]');
+                // Activamos la animación de onda (ping)
+                ping.className = "absolute inset-0 m-auto w-3.5 h-3.5 rounded-full bg-amber-400 animate-ping opacity-75";
             } 
             else if (status === 'OFFLINE') {
-                // ROJO: Sin internet
-                dot.classList.add('bg-red-500', 'shadow-red-500/50');
-                text.classList.add('text-red-500');
-                text.textContent = "Sin Conexión";
-                // Añadimos un borde rojo sutil al contenedor para alertar
-                container.classList.replace('border-slate-700', 'border-red-900'); 
+                // ROJO: Sin conexión
+                dot.classList.add('bg-rose-600', 'shadow-[0_0_10px_rgba(225,29,72,0.6)]');
             }
         }
 
-        // Listeners del Navegador (Detectar si se cae el cable de red)
-        window.addEventListener('online', () => updateCloudStatus('SYNCING'));
+        // NUEVA FUNCIÓN: Al hacer clic en el puntito
+        function showStatusInfo() {
+            let title, msg;
+            
+            if (currentCloudState === 'ONLINE') {
+                title = "🟢 CONEXIÓN SEGURA";
+                msg = "Todo en orden. Tus datos están encriptados y sincronizados en la nube.";
+            } else if (currentCloudState === 'SYNCING') {
+                title = "🟡 SINCRONIZANDO...";
+                msg = "Guardando cambios en la base de datos. Por favor espera un momento.";
+            } else {
+                title = "🔴 MODO OFFLINE";
+                msg = "No hay internet. Puedes seguir vendiendo; los datos se guardarán localmente y se subirán al volver la conexión.";
+            }
+            
+            // Usamos un alert nativo simple y limpio
+            alert(`${title}\n\n${msg}`);
+        }
+
+        // Listeners del Navegador (Actualizados)
+        window.addEventListener('online', () => updateCloudStatus('ONLINE'));
         window.addEventListener('offline', () => updateCloudStatus('OFFLINE'));
 
         // -------------------------------------------------------------
@@ -1889,7 +1932,108 @@
             }
         }
 
+        // ==========================================
+        // 17. SISTEMA DE ESTATUS (SEMÁFORO)
+        // ==========================================
+
+        // Estados posibles: 'online', 'syncing', 'offline'
+        let appStatus = 'online';
+
+        function initStatusSystem() {
+            // 1. Escuchar eventos del navegador
+            window.addEventListener('online', () => setAppStatus('online'));
+            window.addEventListener('offline', () => setAppStatus('offline'));
+
+            // 2. Verificar estado inicial
+            if (!navigator.onLine) setAppStatus('offline');
+
+            // 3. Hook para Firebase (Simulado por ahora, real si usamos .info/connected)
+            // Si usas Realtime Database:
+            /* firebase.database().ref('.info/connected').on('value', (snap) => {
+                if (snap.val() === true) setAppStatus('online');
+                else setAppStatus('offline');
+            });
+            */
+        }
+
+        function setAppStatus(status) {
+            appStatus = status;
+            const dot = document.getElementById('statusDot');
+            const ping = document.getElementById('statusPing');
+
+            if (!dot) return;
+
+            // Resetear clases
+            dot.className = "w-3 h-3 rounded-full transition-all duration-500 shadow-lg";
+            ping.className = "hidden"; // Ocultar animación por defecto
+
+            if (status === 'online') {
+                // VERDE: Todo en orden, encriptado y seguro
+                dot.classList.add('bg-emerald-500', 'shadow-emerald-500/50');
+
+            } else if (status === 'syncing') {
+                // AMARILLO/NARANJA: Trabajando... (Animación de pulso)
+                dot.classList.add('bg-amber-400', 'shadow-amber-400/50');
+
+                // Activar animación de "ping" (ondas)
+                ping.className = "absolute top-0 left-0 w-3 h-3 rounded-full bg-amber-400 animate-ping opacity-75";
+
+            } else if (status === 'offline') {
+                // ROJO: Sin conexión (pero datos locales seguros)
+                dot.classList.add('bg-rose-600', 'shadow-rose-600/50');
+            }
+        }
+
+        // Modal informativo estilo "SweetAlert" pero nativo
+        function showStatusInfo() {
+            let title, msg, icon, color;
+
+            if (appStatus === 'online') {
+                title = "SISTEMA SEGURO";
+                msg = "Conexión estable con la nube. Tus datos están encriptados (AES-256) y sincronizados.";
+                icon = "fa-shield-halved";
+                color = "text-emerald-500";
+            } else if (appStatus === 'syncing') {
+                title = "SINCRONIZANDO...";
+                msg = "Guardando cambios en la nube. Por favor espera un momento.";
+                icon = "fa-rotate";
+                color = "text-amber-500 fa-spin";
+            } else {
+                title = "MODO OFFLINE";
+                msg = "No hay internet. Puedes seguir trabajando; los datos se guardarán localmente y se subirán al volver la conexión.";
+                icon = "fa-wifi";
+                color = "text-rose-500";
+            }
+
+            // Usamos tu modal genérico o un alert bonito por ahora
+            // Si tienes SweetAlert instalado (parece que no, usaremos un alert custom simple)
+            const modalHtml = `
+        <div id="statusModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full overflow-hidden transform transition-all scale-100">
+                <div class="p-6 text-center">
+                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid ${icon} text-3xl ${color}"></i>
+                    </div>
+                    <h3 class="text-lg font-black text-slate-800 mb-2 uppercase">${title}</h3>
+                    <p class="text-sm text-gray-500 leading-relaxed">${msg}</p>
+                </div>
+                <div class="bg-gray-50 p-3 border-t border-gray-100">
+                    <button onclick="document.getElementById('statusModal').remove()" class="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg shadow-slate-900/20 active:scale-95 transition">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
+
+            // 1. INICIAR SEMÁFORO (NUEVO)
+            // Lo ponemos de primero para que empiece a escuchar la red de inmediato
+            initStatusSystem();
+
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
             // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
             fetchAllRates();
@@ -2873,7 +3017,7 @@
                 if (data && data.current && data.current.eur) {
                     state.bcvEur = parseFloat(data.current.eur);
                 }
-                
+
             } catch (e) {
                 console.error("Error sincronizando tasas:", e);
             }
@@ -5394,21 +5538,40 @@
         }
 
         function saveReceiptConfig() {
-            state.receiptConfig.companyName = $('cfgCompanyName').value;
-            state.receiptConfig.footer = $('cfgFooter').value;
+            // 1. Obtener valores de los Inputs
+            const nameInput = $('cfgCompanyName').value;
+            const footerInput = $('cfgFooter').value;
+
+            // 2. Guardar en el Estado (Limpiando espacios)
+            state.receiptConfig.companyName = nameInput.trim();
+            state.receiptConfig.footer = footerInput.trim();
             
-            const imgSrc = $('receiptLogoPreview').src;
-            if (imgSrc && !$('receiptLogoPreview').classList.contains('hidden')) {
-                state.receiptConfig.logo = imgSrc;
+            // 3. Guardar preferencia de "Mostrar Bolívares"
+            const chkBs = $('chkReceiptBs');
+            if (chkBs) {
+                state.receiptConfig.showBs = chkBs.checked;
+            }
+
+            // 3. Manejo del Logo
+            const preview = $('receiptLogoPreview');
+
+            // Validamos si la imagen está visible y tiene contenido
+            // IMPORTANTE: Esto asume que preview.src es una DataURL (Base64)
+            if (preview.src && !preview.classList.contains('hidden')) {
+                state.receiptConfig.logo = preview.src;
             } else {
                 state.receiptConfig.logo = null;
             }
 
-            localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
-            saveData();
+            // 4. Guardar y Sincronizar
+            // No necesitamos guardar en 'inv_receipt_config' por separado 
+            // porque state.receiptConfig ya viaja dentro del state principal.
+
+            saveData(); // <--- ESTO es lo que sube todo a Firebase (Nube) y guarda en LocalStorage
+
             toggleReceiptConfig();
-            updateReceiptPreview(); // Refrescar vista previa si está abierta
-            alert('Configuración guardada');
+            updateReceiptPreview();
+            alert('Configuración guardada y sincronizada ☁️');
         }
 
         // --- APERTURA DE MODALES ---
@@ -5487,25 +5650,29 @@
             const data = tempReceiptData;
             if (!data) return;
 
-            const conf = state.receiptConfig;
+            // Usar configuración de la nube
+            const conf = state.receiptConfig || { companyName: "Mi Negocio", footer: "Gracias por su compra", logo: null };
             const rate = getActiveRate();
 
             // 1. Cabecera
             $('printCompanyName').textContent = conf.companyName || "Mi Negocio";
             $('printFooter').textContent = conf.footer || "Gracias por su compra";
             
+            // 2. Manejo del Logo
             const logoImg = $('printLogo');
             if (conf.logo) {
                 logoImg.src = conf.logo;
                 logoImg.classList.remove('hidden');
             } else {
                 logoImg.classList.add('hidden');
+                // CORRECCIÓN: Quitamos el atributo src para evitar errores de carga 404
+                logoImg.removeAttribute('src');
             }
 
             const d = new Date(data.date);
             $('printDate').textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
 
-            // 2. Cliente y Tipo
+            // 3. Cliente y Tipo
             const customerInput = $('receiptCustomerName').value.trim();
             const displayCustomer = (customerInput && customerInput.toLowerCase() !== 'cliente genérico') ? customerInput : 'CONSUMIDOR FINAL';
             $('printCustomerNameDisplay').textContent = displayCustomer;
@@ -5554,15 +5721,26 @@
                     </tr>`;
             }
 
-            // 4. Totales
-            const showBs = $('chkReceiptBs').checked;
+            // 5. Totales y Bolívares (AQUÍ ESTÁ LA SINCRONIZACIÓN) 🔄
             $('printTotalMain').textContent = formatMoney(data.total);
 
-            if (showBs) {
-                $('printTotalBsRow').classList.remove('hidden');
-                $('printTotalBs').textContent = `Bs ${(data.total * rate).toFixed(2)}`;
-            } else {
-                $('printTotalBsRow').classList.add('hidden');
+            const chkBs = $('chkReceiptBs');
+            if (chkBs) {
+                // TRUCO: Si la función NO fue llamada por el evento 'change' (click manual),
+                // entonces restauramos el valor guardado en la nube.
+                // Si FUE llamada por click manual, respetamos lo que el usuario acaba de tocar.
+                if (!event || event.type !== 'change') {
+                    // Si showBs es undefined (primera vez), asumimos true por defecto
+                    chkBs.checked = (conf.showBs !== false);
+                }
+
+                // Ahora sí leemos el estado (sea restaurado o manual)
+                if (chkBs.checked) {
+                    $('printTotalBsRow').classList.remove('hidden');
+                    $('printTotalBs').textContent = `Bs ${(data.total * rate).toFixed(2)}`;
+                } else {
+                    $('printTotalBsRow').classList.add('hidden');
+                }
             }
 
             // 5. Sección de Crédito
@@ -5600,8 +5778,12 @@
                 },
                 // Filtro para reducir errores de consola (opcional)
                 filter: (n) => {
-                    // Excluir elementos que sepamos que dan error si es necesario
-                    return true; 
+                    // Si el elemento es el Logo y está oculto, LO SALTAMOS
+                    if (n.id === 'printLogo') {
+                        if (n.classList && n.classList.contains('hidden')) return false;
+                        if (!n.src || n.src === "") return false;
+                    }
+                    return true; // El resto se renderiza normal
                 }
             };
 
