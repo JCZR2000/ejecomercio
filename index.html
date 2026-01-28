@@ -2260,6 +2260,7 @@
             localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
             localStorage.setItem('inv_bcv_usd', state.bcvUsd);
             localStorage.setItem('inv_bcv_eur', state.bcvEur);
+            localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
     
             // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
             if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
@@ -2290,6 +2291,7 @@
                     credits: state.credits,
                     paymentMethods: state.paymentMethods,
                     security: state.security,
+                    receiptConfig: state.receiptConfig,
                     customRate: state.customRate,
                     rateMode: state.rateMode,
                     fiadosRateMode: state.fiadosRateMode,
