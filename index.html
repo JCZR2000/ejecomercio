@@ -66,22 +66,93 @@
 
 <body class="bg-gray-100 text-gray-800 font-sans min-h-screen pb-12">
 
-    <div id="loginOverlay" class="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-4 transition-all duration-500">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full text-center">
-            <div class="w-20 h-20 bg-yellow-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                <i class="fa-solid fa-cloud text-4xl text-slate-900"></i>
+    <div id="loginOverlay"
+        class="fixed inset-0 z-[200] bg-slate-900 flex flex-col items-center justify-center p-4 transition-all duration-500 backdrop-blur-md">
+        <div
+            class="bg-white/95 backdrop-blur-xl p-8 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.3)] max-w-sm w-full text-center border border-white/20 relative overflow-hidden">
+    
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+    
+            <div
+                class="w-24 h-24 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ring-4 ring-white">
+                <i class="fa-solid fa-cloud text-5xl text-indigo-600"></i>
             </div>
-            <h1 class="text-2xl font-bold text-slate-800 mb-2">EjeComercio Cloud</h1>
-            <p class="text-gray-500 text-sm mb-8">Tus datos sincronizados en todos tus dispositivos a tiempo real.</p>
-            
-            <button onclick="loginWithGoogle()" class="w-full bg-white border border-gray-300 text-gray-700 font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-3 hover:bg-gray-50 transition shadow-sm">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-6 h-6">
+    
+            <h1 class="text-3xl font-black text-slate-800 mb-2 tracking-tight">EjeComercio <span
+                    class="text-indigo-600">Cloud</span></h1>
+            <p class="text-slate-500 text-sm mb-8 font-medium leading-relaxed">Tu negocio sincronizado en todos tus
+                dispositivos, seguro y en tiempo real.</p>
+    
+            <button onclick="loginWithGoogle()"
+                class="group w-full bg-slate-900 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-3 hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:scale-95 active:translate-y-0">
+                <div class="bg-white p-1 rounded-full w-6 h-6 flex items-center justify-center">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" class="w-4 h-4">
+                </div>
                 <span>Continuar con Google</span>
+                <i
+                    class="fa-solid fa-arrow-right opacity-0 group-hover:opacity-100 transition-opacity -ml-2 group-hover:ml-0"></i>
             </button>
-
-            <p id="loginStatus" class="mt-4 text-xs text-blue-500 hidden animate-pulse">Conectando al inventario...</p>
+    
+            <p id="loginStatus"
+                class="mt-6 text-xs font-bold text-indigo-500 hidden animate-pulse flex items-center justify-center gap-2">
+                <i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...
+            </p>
         </div>
-        <p class="text-slate-500 text-xs mt-8">Versión 43.0</p>
+        <p class="text-slate-600 text-xs mt-8 font-mono opacity-50">Versión 43.0 • Secure Access</p>
+    </div>
+
+    <div id="securityModal"
+        class="fixed inset-0 z-[210] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        <div
+            class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 animate-bounce-in">
+    
+            <div class="bg-slate-50 p-6 pb-4 text-center border-b border-slate-100">
+                <div id="secModalIconBg"
+                    class="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm rotate-3 transition-transform">
+                    <i id="secModalIcon" class="fa-solid fa-shield-halved text-3xl text-purple-600"></i>
+                </div>
+                <h3 id="secModalTitle" class="text-xl font-black text-slate-800 uppercase tracking-tight">AUTORIZACIÓN</h3>
+                <p id="secModalDesc" class="text-xs text-slate-500 mt-1 font-medium px-4">Ingresa tu Clave Maestra para
+                    continuar</p>
+            </div>
+    
+            <div class="p-6 pt-4">
+                <div class="relative mb-4">
+                    <i class="fa-solid fa-key absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="password" id="secModalInput"
+                        class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-lg font-bold rounded-xl py-3 pl-10 pr-4 outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all placeholder-slate-300 text-center tracking-widest"
+                        placeholder="••••••">
+                </div>
+    
+                <div class="flex gap-3">
+                    <button id="secModalCancel" onclick="closeSecurityModal()"
+                        class="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition active:scale-95 text-sm">
+                        Cancelar
+                    </button>
+                    <button id="secModalConfirm"
+                        class="flex-1 py-3 rounded-xl bg-purple-600 text-white font-bold shadow-lg shadow-purple-200 hover:bg-purple-700 transition active:scale-95 text-sm flex items-center justify-center gap-2">
+                        <span>Confirmar</span> <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dialogModal"
+        class="fixed inset-0 z-[220] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        <div
+            class="bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all scale-100 animate-bounce-in text-center p-6">
+    
+            <div id="dialogIconBg" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <i id="dialogIcon" class="text-3xl"></i>
+            </div>
+    
+            <h3 id="dialogTitle" class="text-xl font-black text-slate-800 mb-2"></h3>
+            <p id="dialogMsg" class="text-sm text-gray-500 mb-6 leading-relaxed"></p>
+    
+            <div class="flex gap-3" id="dialogButtons">
+            </div>
+        </div>
     </div>
 
     <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50">
@@ -1836,71 +1907,55 @@
                         // Intentamos desencriptar con la llave que tengamos en memoria
                         finalData = decryptPayload(cloudData.encryptedData);
 
-                        // Si falla (porque no hay clave o es incorrecta), pedimos la clave
+                        // 2. Si falla (no hay clave o es incorrecta), mostramos el MODAL
                         if (!finalData) {
-                            let validKey = false;
-                            // Bucle de seguridad: No dejamos pasar hasta tener la clave o que el usuario cancele
-                            while (!validKey) {
-                                const userInput = prompt("🔒 DATOS PROTEGIDOS DETECTADOS\n\nIngresa tu Clave Maestra para descargar y leer tus datos:");
-                        
-                                if (userInput === null) { 
-                                    // Usuario canceló: Cortamos ejecución para proteger la app
-                                    alert("Sincronización detenida. No se pueden mostrar los datos sin la clave.");
-                                    updateCloudStatus('OFFLINE');
-                                    return; 
-                                }
 
-                                encryptionKey = userInput; // Probamos la clave temporalmente
-                                finalData = decryptPayload(cloudData.encryptedData);
+                            // Función que se ejecutará cuando el usuario ponga la clave en el modal
+                            const handleKeyInput = (userInput) => {
+                                encryptionKey = userInput;
+                                const success = decryptPayload(cloudData.encryptedData);
 
-                                if (finalData) {
-                                    validKey = true;
-                                    // ÉXITO: Guardamos la clave para no volver a molestar
-                                    localStorage.setItem('inv_enc_key', encryptionKey); 
+                                if (success) {
+                                    // ÉXITO
+                                    finalData = success;
+                                    localStorage.setItem('inv_enc_key', encryptionKey);
+                                    closeSecurityModal();
+
+                                    // REINICIAMOS EL PROCESO DE CARGA con los datos ya desencriptados
+                                    // (Llamada recursiva simulada o continuación lógica)
+                                    finishLoadingData(finalData, doc);
                                 } else {
-                                    alert("❌ Clave incorrecta. Intenta de nuevo.");
+                                    // FALLO
+                                    alert("❌ Clave incorrecta.");
+                                    document.getElementById('secModalInput').value = '';
+                                    document.getElementById('secModalInput').focus();
+                                    // No cerramos el modal, lo dejamos intentar de nuevo
                                 }
-                            }
+                            };
+
+                            // Lanzamos el modal (No cancelable porque es necesario para ver datos)
+                            askForMasterKey(
+                                "DATOS PROTEGIDOS",
+                                "Esta base de datos está encriptada. Ingresa tu Clave Maestra:",
+                                false, // No se puede cancelar
+                                handleKeyInput
+                            );
+
+                            // Detenemos la ejecución aquí. El 'handleKeyInput' retomará el trabajo.
+                            return;
+                        } else {
+                            console.log("🔓 Datos desencriptados automáticamente.");
                         }
-                        console.log("🔓 Datos desencriptados correctamente desde la nube.");
 
                     } 
+
                     // CASO B: Datos NORMALES (Texto plano / Usuario Default)
                     else {
                         finalData = cloudData;
                     }
 
-                    // -------------------------------------------------
-                    // FASE DE ACTUALIZACIÓN DE ESTADO 💾
-                    // -------------------------------------------------
-
-                    // Fusionamos los datos (ya sean desencriptados o planos) con el estado
-                    if (finalData) {
-                        state = { ...state, ...finalData };
-                        state.isCloudSynced = true; // Quitamos el seguro ✅
-
-                        // 2. OPTIMIZACIÓN DE RENDERIZADO (Tu lógica original intacta)
-                        // Solo guardamos en disco y repintamos si el dato viene CONFIRMADO del servidor.
-                        if (!doc.metadata.hasPendingWrites) {
-                            // Guardado manual en LocalStorage (Vital para evitar bucles con saveData)
-                            localStorage.setItem('inv_products', JSON.stringify(state.products));
-                            localStorage.setItem('inv_sales', JSON.stringify(state.sales));
-                            localStorage.setItem('inv_credits', JSON.stringify(state.credits));
-                            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-                            localStorage.setItem('inv_security', JSON.stringify(state.security));
-                            localStorage.setItem('inv_custom_rate', state.customRate);
-                            localStorage.setItem('inv_rate_mode', state.rateMode);
-                            localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
-                            localStorage.setItem('inv_bcv_usd', state.bcvUsd);
-                            localStorage.setItem('inv_bcv_eur', state.bcvEur);
-                    
-                            // Si tenemos clave, refrescamos también eso
-                            if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
-                    
-                            renderAll();
-                            console.log("☁️ Sincronizado y guardado en disco local.");
-                        }
-                    }
+                    // Si llegamos aquí es porque ya tenemos finalData (automático o plano)
+                    finishLoadingData(finalData, doc);
 
                 } else {
                     // CASO C: Usuario Nuevo en Nube -> Subir Local
@@ -1913,6 +1968,34 @@
                 console.error("Error Sync:", error);
                 updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
+        }
+
+        // Función auxiliar para continuar la carga (Extraída para reutilizarla)
+        function finishLoadingData(finalData, doc) {
+             if (finalData) {
+                state = { ...state, ...finalData };
+                state.isCloudSynced = true; 
+
+                if (!doc.metadata.hasPendingWrites) {
+                    localStorage.setItem('inv_products', JSON.stringify(state.products));
+                    localStorage.setItem('inv_sales', JSON.stringify(state.sales));
+                    localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+                    localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                    localStorage.setItem('inv_security', JSON.stringify(state.security));
+                    localStorage.setItem('inv_custom_rate', state.customRate);
+                    localStorage.setItem('inv_rate_mode', state.rateMode);
+                    localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
+                    localStorage.setItem('inv_bcv_usd', state.bcvUsd);
+                    localStorage.setItem('inv_bcv_eur', state.bcvEur);
+                    localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
+            
+                    if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
+            
+                    renderAll();
+                    renderEncryptionUI(); // Actualizar UI de candado
+                    console.log("☁️ Sincronizado y listo.");
+                }
+            }
         }
 
         function toggleCartModal(forceOpen = null) {
@@ -5055,66 +5138,106 @@
             }
         }
 
+        // ==========================================
+        // 18. ENCRIPTACIÓN DE DATOS E2EE (v43)
+        // ==========================================
+
         // 1. ACTIVAR (Igual que antes, pero llama al render al final)
         function enableEncryption() {
-            const k1 = prompt("CREAR CLAVE MAESTRA\n\nEscribe una contraseña segura. Solo tú la sabrás.");
-            if(!k1) return;
-            const k2 = prompt("CONFIRMA LA CLAVE\n\nEscríbela de nuevo:");
-            if (k1 !== k2) return alert("Las claves no coinciden.");
-    
-            encryptionKey = k1;
-            localStorage.setItem('inv_enc_key', k1);
-            saveData(); 
-            renderEncryptionUI(); // Actualizar visualmente
-            alert("✅ ¡Protección Activada!\nTus datos se están encriptando y subiendo a la nube.");
+            askForMasterKey("CREAR CLAVE MAESTRA", "Escribe una contraseña segura. Solo tú la sabrás.", true, (k1) => {
+                closeSecurityModal();
+                
+                // Confirmación
+                setTimeout(() => {
+                    askForMasterKey("CONFIRMAR CLAVE", "Escríbela de nuevo para verificar:", true, (k2) => {
+                        if (k1 !== k2) {
+                            closeSecurityModal();
+                            return customAlert("Error", "Las claves no coinciden.", "error");
+                        }
+                        
+                        encryptionKey = k1;
+                        localStorage.setItem('inv_enc_key', k1);
+                        saveData(); 
+                        renderEncryptionUI();
+                        closeSecurityModal();
+                        customAlert("¡Protección Activada!", "Tus datos se están encriptando y subiendo a la nube.", "success");
+                    });
+                }, 300);
+            });
         }
 
         // 2. CAMBIAR CLAVE (Flujo estricto de 4 pasos)
         function changeEncryptionPassword() {
-            // Paso 1: Autenticación
-            const oldKey = prompt("🔒 SEGURIDAD\n\nPara hacer cambios, ingresa tu Clave Maestra ACTUAL:");
-            if (oldKey !== encryptionKey) return alert("❌ Clave incorrecta. Acceso denegado.");
+            // PASO 1: Pedir la actual
+            askForMasterKey("SEGURIDAD", "Para hacer cambios, ingresa tu Clave ACTUAL:", true, (oldKey) => {
+                if (oldKey !== encryptionKey) {
+                    // No cerramos el modal, mostramos error ahí mismo o alerta
+                    return customAlert("Error", "Clave incorrecta. Acceso denegado.", "error");
+                }
+                closeSecurityModal();
 
-            // Paso 2: Nueva Clave
-            const newKey1 = prompt("NUEVA CLAVE\n\nIngresa la nueva contraseña:");
-            if (!newKey1) return;
+                // PASO 2: Pedir la nueva
+                setTimeout(() => {
+                    askForMasterKey("NUEVA CLAVE", "Ingresa la nueva contraseña:", true, (newKey1) => {
+                        closeSecurityModal();
 
-            // Paso 3: Confirmación Nueva Clave
-            const newKey2 = prompt("CONFIRMAR\n\nRepite la nueva contraseña:");
-            if (newKey1 !== newKey2) return alert("❌ Las nuevas claves no coinciden.");
+                        // PASO 3: Confirmar la nueva
+                        setTimeout(() => {
+                            askForMasterKey("CONFIRMAR NUEVA", "Repite la nueva contraseña:", true, (newKey2) => {
+                                if (newKey1 !== newKey2) {
+                                    closeSecurityModal();
+                                    return customAlert("Error", "Las nuevas claves no coinciden.", "error");
+                                }
 
-            // Paso 4: Confirmación Final
-            if (!confirm("¿Estás seguro de cambiar la contraseña?\n\nAsegúrate de anotarla. Si la olvidas, perderás el acceso.")) return;
-
-            // Ejecución
-            encryptionKey = newKey1;
-            localStorage.setItem('inv_enc_key', encryptionKey);
-            saveData(); // Re-encripta todo con la nueva clave inmediatamente
-            alert("✅ Clave cambiada exitosamente.");
+                                // ÉXITO
+                                encryptionKey = newKey1;
+                                localStorage.setItem('inv_enc_key', encryptionKey);
+                                saveData(); // Re-encripta todo
+                                closeSecurityModal();
+                                customAlert("Éxito", "Clave cambiada exitosamente.", "success");
+                            });
+                        }, 300);
+                    });
+                }, 300);
+            });
         }
 
         // 3. DESACTIVAR (Flujo de "Arrepentimiento")
         function disableEncryption() {
-            // Nivel 1: Advertencia simple
-            if (!confirm("¿Estás seguro de desactivar la Encriptación E2EE?\n\nTus datos en la nube volverán a ser legibles para el administrador del sistema (Soporte).")) return;
+            // NIVEL 1: Advertencia Inicial
+            customConfirm(
+                "¿Desactivar Seguridad?", 
+                "Tus datos en la nube estarán seguro pero volverán a ser legibles. ¿Deseas continuar?", 
+                "warning",
+                () => {
+                    // NIVEL 2: Confirmación Final (Doble seguridad restaurada)
+                    setTimeout(() => {
+                        customConfirm(
+                            "⚠️ ¿REALMENTE SEGURO?", 
+                            "Esta acción eliminará la capa de protección extra.\nSi continúas, tus datos dejarán de estar encriptados.", 
+                            "error", // Rojo para advertir peligro
+                            () => {
+                                // NIVEL 3: Autenticación final
+                                setTimeout(() => {
+                                    askForMasterKey("AUTORIZACIÓN REQUERIDA", "Escribe tu Clave Maestra para confirmar:", true, (keyCheck) => {
+                                        if (keyCheck !== encryptionKey) {
+                                            return customAlert("Error", "Clave incorrecta. No se ha desactivado nada.", "error");
+                                        }
 
-            // Nivel 2: Advertencia grave
-            if (!confirm("⚠️ CONFIRMACIÓN FINAL ⚠️\n\nAl desactivar esto, se eliminará la capa de seguridad extra.\n¿Realmente deseas continuar?")) return;
-
-            // Nivel 3: Autenticación final (La barrera real)
-            const keyCheck = prompt("AUTORIZACIÓN REQUERIDA\n\nEscribe tu Clave Maestra para confirmar la desactivación:");
-    
-            if (keyCheck !== encryptionKey) return alert("❌ Clave incorrecta. No se ha desactivado nada.");
-
-            // Ejecución: Volver al modo estándar
-            encryptionKey = null;
-            localStorage.removeItem('inv_enc_key');
-    
-            // Al no haber encryptionKey, saveData() entrará en el 'else' y subirá 'rawData' plano.
-            saveData(); 
-    
-            renderEncryptionUI(); // Actualizar visualmente a morado
-            alert("🔓 Encriptación desactivada.\nTus datos se han convertido a formato estándar en la nube.");
+                                        // EJECUCIÓN
+                                        encryptionKey = null;
+                                        localStorage.removeItem('inv_enc_key');
+                                        saveData(); 
+                                        renderEncryptionUI();
+                                        closeSecurityModal();
+                                        customAlert("Encriptación Desactivada", "Tus datos se han convertido a formato estándar en la nube.", "success");
+                                    });
+                                }, 300);
+                            }
+                        );
+                    }, 300);
+                }
+            );
         }
 
         // ==========================================
@@ -6003,6 +6126,141 @@
             renderCart();
             // Feedback vibración (móvil)
             if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        // ==========================================
+        // CONTROLADOR DEL MODAL DE SEGURIDAD (Material You)
+        // ==========================================
+        let securityCallback = null; // Función a ejecutar al confirmar
+
+        function askForMasterKey(title, description, isDismissible, callback) {
+            // 1. Configurar textos
+            document.getElementById('secModalTitle').textContent = title;
+            document.getElementById('secModalDesc').textContent = description;
+            
+            // 2. Limpiar input
+            const input = document.getElementById('secModalInput');
+            input.value = '';
+            
+            // 3. Configurar botón Cancelar
+            const btnCancel = document.getElementById('secModalCancel');
+            if (!isDismissible) {
+                btnCancel.classList.add('hidden'); // Si es obligatorio (Login), no se puede cancelar
+            } else {
+                btnCancel.classList.remove('hidden');
+            }
+
+            // 4. Guardar la acción futura
+            securityCallback = callback;
+
+            // 5. Mostrar Modal
+            document.getElementById('securityModal').classList.remove('hidden');
+            input.focus();
+        }
+
+        function closeSecurityModal() {
+            document.getElementById('securityModal').classList.add('hidden');
+            securityCallback = null;
+        }
+
+        // Evento del botón Confirmar
+        document.getElementById('secModalConfirm').onclick = () => {
+            const key = document.getElementById('secModalInput').value;
+            if (!key) return; // No aceptar vacío
+            
+            if (securityCallback) {
+                // Ejecutamos la función que estaba esperando la clave
+                securityCallback(key);
+            }
+        };
+
+        // Permitir "Enter" para confirmar
+        document.getElementById('secModalInput').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') document.getElementById('secModalConfirm').click();
+        });
+
+        // ==========================================
+        // SISTEMA DE DIÁLOGOS (Reemplazo de Alert/Confirm)
+        // ==========================================
+        
+        // 1. Alerta Simple (Éxito o Error)
+        function customAlert(title, msg, type = 'success', callback = null) {
+            const modal = $('dialogModal');
+            const iconBg = $('dialogIconBg');
+            const icon = $('dialogIcon');
+            const btnContainer = $('dialogButtons');
+
+            $('dialogTitle').textContent = title;
+            $('dialogMsg').textContent = msg;
+
+            // Configuración Visual
+            if (type === 'success') {
+                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-green-100";
+                icon.className = "fa-solid fa-check text-3xl text-green-600";
+            } else if (type === 'error') {
+                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-red-100";
+                icon.className = "fa-solid fa-xmark text-3xl text-red-600";
+            } else {
+                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-blue-100";
+                icon.className = "fa-solid fa-info text-3xl text-blue-600";
+            }
+
+            // Botón Aceptar
+            btnContainer.innerHTML = `
+                <button onclick="closeDialog()" class="w-full py-3 rounded-xl bg-slate-800 text-white font-bold shadow-lg hover:bg-slate-900 transition text-sm">
+                    Entendido
+                </button>
+            `;
+
+            // Guardamos callback para ejecutar al cerrar (si existe)
+            window.dialogCallback = callback;
+            
+            modal.classList.remove('hidden');
+        }
+
+        // 2. Confirmación (Si / No)
+        function customConfirm(title, msg, type = 'warning', onConfirm) {
+            const modal = $('dialogModal');
+            const iconBg = $('dialogIconBg');
+            const icon = $('dialogIcon');
+            const btnContainer = $('dialogButtons');
+
+            $('dialogTitle').textContent = title;
+            $('dialogMsg').textContent = msg;
+
+            // Estilo de Advertencia
+            iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-yellow-100";
+            icon.className = "fa-solid fa-triangle-exclamation text-3xl text-yellow-600";
+
+            // Botones Cancelar / Confirmar
+            btnContainer.innerHTML = '';
+            
+            const btnCancel = document.createElement('button');
+            btnCancel.className = "flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition text-sm";
+            btnCancel.textContent = "Cancelar";
+            btnCancel.onclick = closeDialog;
+
+            const btnOk = document.createElement('button');
+            btnOk.className = "flex-1 py-3 rounded-xl bg-slate-800 text-white font-bold shadow-lg hover:bg-slate-900 transition text-sm";
+            btnOk.textContent = "Confirmar";
+            btnOk.onclick = () => {
+                closeDialog();
+                if (onConfirm) onConfirm();
+            };
+
+            btnContainer.appendChild(btnCancel);
+            btnContainer.appendChild(btnOk);
+            
+            window.dialogCallback = null;
+            modal.classList.remove('hidden');
+        }
+
+        function closeDialog() {
+            $('dialogModal').classList.add('hidden');
+            if (window.dialogCallback) {
+                window.dialogCallback();
+                window.dialogCallback = null;
+            }
         }
 
     </script>
