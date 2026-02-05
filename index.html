@@ -3080,31 +3080,36 @@
         }
 
         async function fetchAllRates() {
-            const apiKey = "bf47e4cc10d68b673f3ef52ec5e62dbfe158f5849cb3c5e7b287bdde2eccd87c"; // Clave pública de solo lectura
             const btn = $('refreshRateBtn');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
             try {
-                // Hacemos una única petición a la API de DolarVzla
-                const res = await fetch('https://api.dolarvzla.com/public/exchange-rate', {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'x-dolarvzla-key': apiKey  // <--- AQUÍ ES DONDE SE ENVÍA LA LLAVE
-                    }
-                });
+                // 1. URL de tu API en GitHub
+                // Agregamos un timestamp (?t=...) para evitar que el navegador use una versión cacheada vieja
+                const cacheBuster = `?t=${new Date().getTime()}`;
+                const url = 'https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/tasas_cambio.json' + cacheBuster;
+
+                const res = await fetch(url);
+
+                if (!res.ok) throw new Error(`Error HTTP: ${res.status}`);
 
                 const data = await res.json();
 
-                if (data && data.current && data.current.usd) {
-                    state.bcvUsd = parseFloat(data.current.usd);
-                }
-                if (data && data.current && data.current.eur) {
-                    state.bcvEur = parseFloat(data.current.eur);
+                // 2. Asignación de tasas (Mapeo con tu nuevo JSON)
+                if (data.dolar) {
+                    state.bcvUsd = parseFloat(data.dolar);
                 }
 
+                if (data.euro) {
+                    state.bcvEur = parseFloat(data.euro);
+                }
+
+                // Nota: 'data.usdt' está disponible aquí para cuando implementes la función futura.
+                console.log(`Tasas actualizadas (Fecha API: ${data.human_date})`);
+
             } catch (e) {
-                console.error("Error sincronizando tasas:", e);
+                console.error("Error sincronizando tasas con ComercioPrecioAPI:", e);
+                // Si falla (ej. sin internet), no borramos las tasas viejas, mantenemos las locales.
             }
 
             saveData();
