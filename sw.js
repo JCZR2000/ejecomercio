@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v43'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v43.1'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v43...');
+  console.log('[Service Worker] Instalando v43.1...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -28,7 +28,7 @@ self.addEventListener('activate', (e) => {
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
         if (key !== CACHE_NAME) {
-          console.log('[Service Worker] Borrando caché vieja:', key);
+          console.log('[Service Worker] Borrando caché antigua:', key);
           return caches.delete(key);
         }
       }));
@@ -41,6 +41,11 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   // Ignorar peticiones que no sean http/https (ej. chrome-extension://)
   if (!e.request.url.startsWith('http')) return;
+
+  // B. FILTRO DE MÉTODO (¡LA SOLUCIÓN!): 
+  // Si no es GET (ej: POST de Firebase), no hacemos nada y dejamos que pase directo.
+  // La Cache API NO soporta guardar peticiones POST.
+  if (e.request.method !== 'GET') return;
 
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
