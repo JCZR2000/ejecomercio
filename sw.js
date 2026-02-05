@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v43.2'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v43.3'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v43.2...');
+  console.log('[Service Worker] Instalando v43.3...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
