@@ -1691,6 +1691,10 @@
 
         let pendingAction = null; // Para acciones que requieren autenticación
 
+        // BANDERA DE CONTROL PARA TASAS
+        // Evita bucles infinitos y asegura que la tasa se pida DESPUÉS de sincronizar
+        let hasInitialRatesUpdate = false;
+
         // --- E2EE (ENCRIPTACIÓN) ---
         let encryptionKey = localStorage.getItem('inv_enc_key') || null;
 
@@ -1792,6 +1796,13 @@
             } else {
                 console.log("💤 Auth: Desconectado");
                 updateCloudStatus('OFFLINE');
+
+                // Si no hay usuario (modo offline), cargamos las tasas de una vez.
+                // Aquí NO hay riesgo de conflicto porque no hay nube con qué chocar.
+                if (!hasInitialRatesUpdate) {
+                    hasInitialRatesUpdate = true;
+                    fetchAllRates();
+                }
                 
                 // Si no hay datos y no hay usuario, mostramos login.
                 // Si hay datos, dejamos al usuario trabajar offline.
@@ -2131,6 +2142,14 @@
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
                     console.log("☁️ Sincronizado y listo.");
+
+                    // Solo actualizamos tasas si es la primera vez y ya terminamos de cargar datos
+                    if (!hasInitialRatesUpdate) {
+                        hasInitialRatesUpdate = true; // Marcamos para no repetir y evitar bucles
+                        console.log("💱 Datos seguros. Buscando tasas actualizadas...");
+                        // Pequeño delay para no saturar la carga inicial
+                        setTimeout(() => fetchAllRates(), 500);
+                    }
                 }
             }
         }
@@ -2256,7 +2275,7 @@
 
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
             // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
-            fetchAllRates();
+            // fetchAllRates(); [Función movida a initDataSync después de sincronizar]
             renderAll();
 
             // 2. KICKSTART v43: Forzar la interfaz correcta al abrir
