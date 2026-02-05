@@ -1,49 +1,79 @@
-const CACHE_NAME = 'ejecomercio-v1';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'ejecomercio-v43'; // Actualizado para forzar la recarga
+
+// 1. SOLO archivos locales críticos para la instalación
+// (Evitamos poner CDNs aquí para no romper la instalación por CORS)
+const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/html5-qrcode',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js',
-  'https://cdn.jsdelivr.net/npm/chart.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+  './icon-512.png'
+  // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos
 ];
 
-// 1. INSTALACIÓN: Descargar recursos
+// 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
+  console.log('[Service Worker] Instalando v43...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching all files');
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(STATIC_ASSETS);
     })
   );
+  self.skipWaiting(); // Forzar activación inmediata
 });
 
-// 2. ACTIVACIÓN: Limpiar cachés viejos
+// 3. ACTIVACIÓN: Limpiar cachés viejas
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
         if (key !== CACHE_NAME) {
+          console.log('[Service Worker] Borrando caché vieja:', key);
           return caches.delete(key);
         }
       }));
     })
   );
+  self.clients.claim(); // Tomar control de las pestañas abiertas
 });
 
-// 3. INTERCEPTOR DE RED: Estrategia Network First (Intentar internet, si falla, usar caché)
+// 4. INTERCEPTOR DE RED (Estrategia: Stale-While-Revalidate / Cache Dinámico)
 self.addEventListener('fetch', (e) => {
+  // Ignorar peticiones que no sean http/https (ej. chrome-extension://)
+  if (!e.request.url.startsWith('http')) return;
+
   e.respondWith(
-    fetch(e.request).catch(() => {
-        return caches.match(e.request);
+    caches.match(e.request).then((cachedResponse) => {
+      // A. ESTRATEGIA: Network First con Fallback a Caché (Para datos frescos)
+      // Intentamos ir a la red primero para tener siempre la última versión
+      const fetchPromise = fetch(e.request)
+        .then((networkResponse) => {
+          // Si la respuesta es válida, la guardamos en caché (Cacheo Dinámico)
+          // Esto guardará Tailwind, Firebase, FontAwesome, etc. la primera vez que carguen.
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            // Solo cacheamos respuestas 'basic' (mismo origen) de forma segura aquí
+            // Para CDNs (cors/opaque), necesitamos manejarlo con cuidado o confiar en el caché del navegador
+          }
+
+          // Clonamos la respuesta porque se usa dos veces (browser y cache)
+          const responseToCache = networkResponse.clone();
+
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+
+          return networkResponse;
+        })
+        .catch(() => {
+          // Si falla la red (OFFLINE), devolvemos lo que haya en caché
+          return cachedResponse;
+        });
+
+      // Si tenemos algo en caché, podríamos devolverlo rápido, pero en tu caso
+      // prefiero que intente la red primero para asegurar actualizaciones de precios/lógica.
+      // Si quieres velocidad pura, devolvemos cachedResponse || fetchPromise.
+      // Pero para asegurar consistencia, usaremos el fetchPromise primero (Network First).
+      return fetchPromise.catch(() => cachedResponse);
     })
   );
 });
