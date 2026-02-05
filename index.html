@@ -1163,7 +1163,7 @@
                     </button>
                 </div>
 
-                <div class="table-container max-h-[500px] overflow-y-auto bg-white">
+                <div class="table-container max-h-[65vh] md:h-[calc(100vh-230px)] overflow-y-auto bg-white transition-all duration-300">
                     <table class="w-full text-left border-collapse">
                         <thead class="sticky top-0 bg-gray-100 shadow-sm z-10 text-xs uppercase text-gray-600">
                             <tr>
@@ -1263,7 +1263,7 @@
                     </button>
                 </div>
             
-                <div id="creditsList" class="space-y-3 pb-4"></div>
+                <div id="creditsList" class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-24 items-start"></div>
                 <div id="noCreditsMsg" class="hidden flex flex-col items-center justify-center py-12 text-gray-300">
                     <i class="fa-solid fa-clipboard-check text-4xl mb-2"></i>
                     <p class="text-sm font-bold">No hay deudas pendientes</p>
@@ -1606,6 +1606,10 @@
         let currentCloudState = 'ONLINE';
         
         let state = {
+
+            // Control de Versiones para Sincronización
+            lastUpdated: localStorage.getItem('inv_last_updated') || new Date(0).toISOString(),
+
             // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
             products: JSON.parse(localStorage.getItem('inv_products')) || [],
             sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
@@ -1893,8 +1897,38 @@
                     updateCloudStatus('ONLINE');  // Verde
                 }
 
+                // -------------------------------------------------
+                // 2. AUTO-ECO: PROTECCIÓN DE BUCLE
+                // -------------------------------------------------
+                // Si el cambio viene de mí mismo (tiene escrituras pendientes),
+                // actualizo la UI (arriba) pero NO proceso los datos.
+                if (doc.metadata.hasPendingWrites) {
+                    console.log("IGNORE: Eco de escritura local detectado.");
+                    return; // <--- AQUÍ CORTAMOS EL FLUJO
+                }
+
                 if (doc.exists) {
                     const cloudData = doc.data();
+
+                    // --- LÓGICA DE PROTECCIÓN DE DATOS (TIMESTAMP CHECK) ---
+                    const cloudTime = new Date(cloudData.lastUpdated || 0).getTime();
+                    const localTime = new Date(state.lastUpdated || 0).getTime();
+
+                    const timeDiff = cloudTime - localTime;
+
+                    // Si la nube es más vieja o igual que lo local, Y NO es una carga inicial vacía, ignoramos.
+                    // (Excepción: Si local está vacío, siempre aceptamos la nube).
+                    const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
+
+                    // Si mi data local es IGUAL o MÁS NUEVA que la nube, y no estoy vacío...
+                    if (localTime >= cloudTime && !isLocalEmpty) {
+                        console.log(`🛡️ DATA SAFE: Local es actual (Dif: ${timeDiff}ms). No se descarga.`);
+                        return; // ¡AQUÍ DETENEMOS LA SOBRESCRITURA!
+                    }
+
+                    console.log(`☁️ SYNC: Nube más reciente (Dif: ${timeDiff}ms). Actualizando...`);
+                    // -------------------------------------------------------
+
                     let finalData = null;
 
                     // -------------------------------------------------
@@ -1974,6 +2008,16 @@
         function finishLoadingData(finalData, doc) {
              if (finalData) {
                 state = { ...state, ...finalData };
+
+                // --- 🛡️ SINCRONIZACIÓN FORZADA DE RELOJ ---
+                // Si la nube tiene una fecha, la adoptamos como nuestra VERDAD ABSOLUTA.
+                // Esto evita que "milisegundos" de diferencia causen otra descarga.
+                if (doc.data().lastUpdated) {
+                    state.lastUpdated = doc.data().lastUpdated;
+                    localStorage.setItem('inv_last_updated', state.lastUpdated);
+                }
+                // ------------------------------------------
+                
                 state.isCloudSynced = true; 
 
                 if (!doc.metadata.hasPendingWrites) {
@@ -1993,6 +2037,9 @@
             
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
+                    console.log("🔄 Actualizando tasas...");
+                    fetchAllRates();
+
                     console.log("☁️ Sincronizado y listo.");
                 }
             }
@@ -2119,7 +2166,6 @@
 
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
             // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
-            fetchAllRates();
             renderAll();
 
             // 2. KICKSTART v43: Forzar la interfaz correcta al abrir
@@ -2130,9 +2176,12 @@
                 // Forzamos el cambio a la pestaña 'home' (Inventario)
                 switchTab('home');
 
+                console.log("💱 Iniciando servicio de tasas (Independiente)...");
+                fetchAllRates();
+
                 // Forzamos un repintado de todos los datos
                 renderAll();
-            }, 100);
+            }, 1000);
         });
 
         // ==========================================
@@ -2332,6 +2381,11 @@
         // GUARDADO BLINDADO (Con Anti-Wipe + E2EE)
         // ---------------------------------------------------------
         function saveData() {
+
+            // 0. ACTUALIZAR TIMESTAMP (CRÍTICO PARA SINCRONIZACIÓN)
+            state.lastUpdated = new Date().toISOString();
+            localStorage.setItem('inv_last_updated', state.lastUpdated);
+
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
@@ -2394,7 +2448,7 @@
                     dataToUpload = {
                         encryptedData: encryptedString,
                         isEncrypted: true,
-                        lastUpdated: new Date().toISOString()
+                        lastUpdated: state.lastUpdated
                     };
                 } else {
                     // MODO CLÁSICO: Subimos los datos planos (como lo haces hoy)
@@ -3080,7 +3134,7 @@
         }
 
         async function fetchAllRates() {
-            const apiKey = "ff44345a26d5f9e4047e4667f253dfa29a394aa52fcd5b511fb63c620b819976"; // Clave pública de solo lectura
+            const apiKey = "bf47e4cc10d68b673f3ef52ec5e62dbfe158f5849cb3c5e7b287bdde2eccd87c"; // Clave pública de solo lectura
             const btn = $('refreshRateBtn');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
 
@@ -3824,7 +3878,7 @@
 
                 const card = document.createElement('div');
                 // IMPORTANTE: Agregué 'relative' aquí para poder posicionar la X
-                card.className = "bg-white border-l-4 border-red-500 rounded shadow p-3 text-sm mb-3 hover:shadow-md transition-shadow relative group"; 
+                card.className = "bg-white border-l-4 border-red-500 rounded shadow p-3 text-sm hover:shadow-md transition-shadow relative group h-full"; 
                 
                 card.innerHTML = `
                     <button onclick="requestDeleteCredit('${c.id}')" class="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition p-1" title="Eliminar Fiado">
