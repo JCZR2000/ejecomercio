@@ -646,6 +646,51 @@
         </div>
     </div>
 
+    <div id="conflictModal" class="fixed inset-0 z-[300] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-100 animate-bounce-in relative">
+            
+            <div class="bg-gradient-to-r from-orange-500 to-red-600 p-6 text-white text-center">
+                <div class="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-md shadow-inner">
+                    <i class="fa-solid fa-cloud-bolt text-3xl"></i>
+                </div>
+                <h3 class="text-2xl font-black uppercase tracking-tight">Conflicto de Datos</h3>
+                <p class="text-sm font-medium opacity-90 mt-1">Detectamos diferencias entre tu dispositivo y la nube.</p>
+            </div>
+
+            <div class="p-6">
+                <p class="text-sm text-gray-600 mb-6 text-center leading-relaxed">
+                    ¿Qué versión quieres conservar? <br>
+                    <span class="text-xs text-red-500 font-bold">⚠️ Esta acción sobrescribirá permanentemente la otra versión.</span>
+                </p>
+
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <button onclick="resolveConflict('CLOUD')" class="group relative flex flex-col items-center p-4 border-2 border-slate-100 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all">
+                        <div class="mb-2 text-blue-600 bg-blue-100 w-10 h-10 rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-cloud-arrow-down"></i>
+                        </div>
+                        <span class="text-xs font-black text-slate-700 uppercase mb-1">Usar Nube</span>
+                        <span id="confCloudDate" class="text-[10px] text-slate-500 font-mono">Cargando...</span>
+                        <span class="absolute top-2 right-2 text-[9px] bg-blue-600 text-white px-1.5 rounded hidden group-hover:block">Recomendado</span>
+                    </button>
+
+                    <button onclick="resolveConflict('LOCAL')" class="group relative flex flex-col items-center p-4 border-2 border-slate-100 rounded-2xl hover:border-orange-500 hover:bg-orange-50 transition-all">
+                        <div class="mb-2 text-orange-600 bg-orange-100 w-10 h-10 rounded-full flex items-center justify-center">
+                            <i class="fa-solid fa-mobile-screen"></i>
+                        </div>
+                        <span class="text-xs font-black text-slate-700 uppercase mb-1">Usar Local</span>
+                        <span id="confLocalDate" class="text-[10px] text-slate-500 font-mono">Cargando...</span>
+                    </button>
+                </div>
+
+                <div class="text-center">
+                    <button onclick="resolveConflict('CLOUD')" class="text-xs text-blue-600 font-bold hover:underline">
+                        Ver detalle de diferencias (Próximamente)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="deleteCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all p-5 text-center">
             <div class="mb-3">
@@ -1880,8 +1925,15 @@
         // LÓGICA DE SINCRONIZACIÓN (NUBE <-> LOCAL) [Con soporte E2EE]
         // -------------------------------------------------------------
         
+        // Variables para el control de conflictos
+        let pendingCloudSnapshot = null;
+        let isFirstSyncCheck = true;
+
         function initDataSync(user) {
             const docRef = db.collection('users').doc(user.uid);
+
+            // Reiniciamos bandera al conectar una nueva sesión
+            isFirstSyncCheck = true;
 
             // Escuchar cambios INCLUYENDO METADATA (Para saber si está pendiente de escribir)
             unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
@@ -1895,7 +1947,7 @@
 
                 if (doc.exists) {
                     const cloudData = doc.data();
-                    let finalData = null;
+                    let finalCloudData = null; // Datos candidatos a ser cargados
 
                     // -------------------------------------------------
                     // FASE DE DESENCRIPTACIÓN 🔓
@@ -1905,10 +1957,10 @@
                     if (cloudData.isEncrypted && cloudData.encryptedData) {
                 
                         // Intentamos desencriptar con la llave que tengamos en memoria
-                        finalData = decryptPayload(cloudData.encryptedData);
+                        finalCloudData = decryptPayload(cloudData.encryptedData);
 
                         // 2. Si falla (no hay clave o es incorrecta), mostramos el MODAL
-                        if (!finalData) {
+                        if (!finalCloudData) {
 
                             // Función que se ejecutará cuando el usuario ponga la clave en el modal
                             const handleKeyInput = (userInput) => {
@@ -1917,13 +1969,11 @@
 
                                 if (success) {
                                     // ÉXITO
-                                    finalData = success;
                                     localStorage.setItem('inv_enc_key', encryptionKey);
                                     closeSecurityModal();
 
-                                    // REINICIAMOS EL PROCESO DE CARGA con los datos ya desencriptados
-                                    // (Llamada recursiva simulada o continuación lógica)
-                                    finishLoadingData(finalData, doc);
+                                    // REENRUTAMIENTO: En vez de cargar directo, pasamos al validador
+                                    processSyncData(success, doc);
                                 } else {
                                     // FALLO
                                     alert("❌ Clave incorrecta.");
@@ -1951,11 +2001,16 @@
 
                     // CASO B: Datos NORMALES (Texto plano / Usuario Default)
                     else {
-                        finalData = cloudData;
+                        finalCloudData = cloudData;
                     }
 
-                    // Si llegamos aquí es porque ya tenemos finalData (automático o plano)
-                    finishLoadingData(finalData, doc);
+                    // -------------------------------------------------
+                    // FASE DE VALIDACIÓN (El nuevo intermediario)
+                    // -------------------------------------------------
+                    if (finalCloudData) {
+                        // En lugar de llamar a finishLoadingData directo, llamamos a processSyncData
+                        processSyncData(finalCloudData, doc);
+                    }
 
                 } else {
                     // CASO C: Usuario Nuevo en Nube -> Subir Local
@@ -1968,6 +2023,82 @@
                 console.error("Error Sync:", error);
                 updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
+        }
+
+        // --- NUEVA FUNCIÓN: Intermediario para detectar conflictos ---
+        function processSyncData(cloudData, doc) {
+            // Si NO es la primera verificación (es una actualización en tiempo real),
+            // confiamos en que el conflicto ya se resolvió y cargamos directo.
+            if (!isFirstSyncCheck) {
+                finishLoadingData(cloudData, doc);
+                return;
+            }
+
+            // --- LÓGICA DE DETECCIÓN DE CONFLICTO ---
+            const localLastUpdate = state.lastUpdated ? new Date(state.lastUpdated).getTime() : 0;
+            const cloudLastUpdate = cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0;
+            
+            // Tolerancia de 2 segundos (2000ms) para evitar falsos positivos por latencia
+            const diff = Math.abs(localLastUpdate - cloudLastUpdate);
+            const isDifferent = diff > 2000; 
+
+            // Si local está vacío (instalación limpia), no hay conflicto, queremos los datos de la nube.
+            const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
+
+            if (isDifferent && !isLocalEmpty) {
+                // ¡ALERTA! Hay datos en ambos lados y son diferentes.
+                console.warn("⚠️ CONFLICTO DETECTADO: Pausando sincronización automática.");
+                
+                // 1. Guardamos la nube en "cuarentena" (memoria temporal)
+                pendingCloudSnapshot = { data: cloudData, doc: doc };
+                
+                // 2. Preparamos la UI del Modal
+                const fmtLocal = localLastUpdate ? new Date(localLastUpdate).toLocaleString() : 'Sin fecha';
+                const fmtCloud = cloudLastUpdate ? new Date(cloudLastUpdate).toLocaleString() : 'Sin fecha';
+                
+                document.getElementById('confLocalDate').textContent = fmtLocal;
+                document.getElementById('confCloudDate').textContent = fmtCloud;
+
+                // 3. Mostramos Modal y detenemos carga
+                document.getElementById('conflictModal').classList.remove('hidden');
+                
+            } else {
+                // Si son iguales o local está vacío, procedemos normal
+                finishLoadingData(cloudData, doc);
+            }
+            
+            // Marcamos que ya pasamos la validación inicial
+            isFirstSyncCheck = false;
+        }
+
+        // --- FUNCIÓN DEL MODAL: Resuelve qué versión gana ---
+        function resolveConflict(choice) {
+            const modal = document.getElementById('conflictModal');
+            
+            if (choice === 'CLOUD') {
+                if (pendingCloudSnapshot) {
+                    console.log("☁️ Usuario eligió NUBE. Sobrescribiendo datos locales...");
+                    
+                    // Cargamos los datos que teníamos en "cuarentena"
+                    finishLoadingData(pendingCloudSnapshot.data, pendingCloudSnapshot.doc);
+                    
+                    // Forzamos la fecha local para que coincida y no vuelva a saltar el modal
+                    localStorage.setItem('inv_last_updated', pendingCloudSnapshot.data.lastUpdated); 
+                }
+            } else if (choice === 'LOCAL') {
+                console.log("📱 Usuario eligió LOCAL. Forzando subida a nube...");
+                
+                // Actualizamos fecha local para que sea "la más reciente" oficialmente
+                state.lastUpdated = new Date().toISOString();
+                
+                // Habilitamos subida y empujamos
+                state.isCloudSynced = true; 
+                saveData(); 
+            }
+
+            // Limpieza
+            pendingCloudSnapshot = null;
+            modal.classList.add('hidden');
         }
 
         // Función auxiliar para continuar la carga (Extraída para reutilizarla)
@@ -2332,6 +2463,9 @@
         // GUARDADO BLINDADO (Con Anti-Wipe + E2EE)
         // ---------------------------------------------------------
         function saveData() {
+            // Esto asegura que la memoria local sepa que acabamos de modificar datos
+            state.lastUpdated = new Date().toISOString();
+
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
