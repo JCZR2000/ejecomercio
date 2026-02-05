@@ -1606,10 +1606,6 @@
         let currentCloudState = 'ONLINE';
         
         let state = {
-
-            // Control de Versiones para Sincronización
-            lastUpdated: localStorage.getItem('inv_last_updated') || new Date(0).toISOString(),
-
             // Cargamos del disco INMEDIATAMENTE. Si no hay nada, array vacío.
             products: JSON.parse(localStorage.getItem('inv_products')) || [],
             sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
@@ -1897,38 +1893,8 @@
                     updateCloudStatus('ONLINE');  // Verde
                 }
 
-                // -------------------------------------------------
-                // 2. AUTO-ECO: PROTECCIÓN DE BUCLE
-                // -------------------------------------------------
-                // Si el cambio viene de mí mismo (tiene escrituras pendientes),
-                // actualizo la UI (arriba) pero NO proceso los datos.
-                if (doc.metadata.hasPendingWrites) {
-                    console.log("IGNORE: Eco de escritura local detectado.");
-                    return; // <--- AQUÍ CORTAMOS EL FLUJO
-                }
-
                 if (doc.exists) {
                     const cloudData = doc.data();
-
-                    // --- LÓGICA DE PROTECCIÓN DE DATOS (TIMESTAMP CHECK) ---
-                    const cloudTime = new Date(cloudData.lastUpdated || 0).getTime();
-                    const localTime = new Date(state.lastUpdated || 0).getTime();
-
-                    const timeDiff = cloudTime - localTime;
-
-                    // Si la nube es más vieja o igual que lo local, Y NO es una carga inicial vacía, ignoramos.
-                    // (Excepción: Si local está vacío, siempre aceptamos la nube).
-                    const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
-
-                    // Si mi data local es IGUAL o MÁS NUEVA que la nube, y no estoy vacío...
-                    if (localTime >= cloudTime && !isLocalEmpty) {
-                        console.log(`🛡️ DATA SAFE: Local es actual (Dif: ${timeDiff}ms). No se descarga.`);
-                        return; // ¡AQUÍ DETENEMOS LA SOBRESCRITURA!
-                    }
-
-                    console.log(`☁️ SYNC: Nube más reciente (Dif: ${timeDiff}ms). Actualizando...`);
-                    // -------------------------------------------------------
-
                     let finalData = null;
 
                     // -------------------------------------------------
@@ -2008,16 +1974,6 @@
         function finishLoadingData(finalData, doc) {
              if (finalData) {
                 state = { ...state, ...finalData };
-
-                // --- 🛡️ SINCRONIZACIÓN FORZADA DE RELOJ ---
-                // Si la nube tiene una fecha, la adoptamos como nuestra VERDAD ABSOLUTA.
-                // Esto evita que "milisegundos" de diferencia causen otra descarga.
-                if (doc.data().lastUpdated) {
-                    state.lastUpdated = doc.data().lastUpdated;
-                    localStorage.setItem('inv_last_updated', state.lastUpdated);
-                }
-                // ------------------------------------------
-                
                 state.isCloudSynced = true; 
 
                 if (!doc.metadata.hasPendingWrites) {
@@ -2037,9 +1993,6 @@
             
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
-                    console.log("🔄 Actualizando tasas...");
-                    fetchAllRates();
-
                     console.log("☁️ Sincronizado y listo.");
                 }
             }
@@ -2166,6 +2119,7 @@
 
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
             // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
+            fetchAllRates();
             renderAll();
 
             // 2. KICKSTART v43: Forzar la interfaz correcta al abrir
@@ -2176,12 +2130,9 @@
                 // Forzamos el cambio a la pestaña 'home' (Inventario)
                 switchTab('home');
 
-                console.log("💱 Iniciando servicio de tasas (Independiente)...");
-                fetchAllRates();
-
                 // Forzamos un repintado de todos los datos
                 renderAll();
-            }, 1000);
+            }, 100);
         });
 
         // ==========================================
@@ -2381,11 +2332,6 @@
         // GUARDADO BLINDADO (Con Anti-Wipe + E2EE)
         // ---------------------------------------------------------
         function saveData() {
-
-            // 0. ACTUALIZAR TIMESTAMP (CRÍTICO PARA SINCRONIZACIÓN)
-            state.lastUpdated = new Date().toISOString();
-            localStorage.setItem('inv_last_updated', state.lastUpdated);
-
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
@@ -2448,7 +2394,7 @@
                     dataToUpload = {
                         encryptedData: encryptedString,
                         isEncrypted: true,
-                        lastUpdated: state.lastUpdated
+                        lastUpdated: new Date().toISOString()
                     };
                 } else {
                     // MODO CLÁSICO: Subimos los datos planos (como lo haces hoy)
