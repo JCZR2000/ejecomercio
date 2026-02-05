@@ -683,10 +683,51 @@
                 </div>
 
                 <div class="text-center">
-                    <button onclick="resolveConflict('CLOUD')" class="text-xs text-blue-600 font-bold hover:underline">
-                        Ver detalle de diferencias (Próximamente)
+                    <button onclick="showConflictDetails()" class="text-xs text-blue-600 font-bold hover:underline hover:text-blue-800 transition p-2">
+                        <i class="fa-solid fa-list-check mr-1"></i> Ver detalle de diferencias
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="diffModal"
+        class="fixed inset-0 z-[310] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
+    
+            <div class="bg-slate-100 p-4 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-scale-balanced"></i> Comparación de Versiones
+                </h3>
+                <button onclick="closeDiffModal()" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+            </div>
+    
+            <div class="p-0 overflow-y-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b">
+                        <tr>
+                            <th class="px-4 py-3 font-bold w-1/3">Dato</th>
+                            <th class="px-4 py-3 font-bold text-center w-1/3 text-orange-600 bg-orange-50">
+                                <i class="fa-solid fa-mobile-screen mr-1"></i> Local
+                            </th>
+                            <th class="px-4 py-3 font-bold text-center w-1/3 text-blue-600 bg-blue-50">
+                                <i class="fa-solid fa-cloud mr-1"></i> Nube
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="diffTableBody">
+                    </tbody>
+                </table>
+            </div>
+    
+            <div class="p-4 bg-slate-50 border-t border-slate-200 text-center">
+                <button onclick="closeDiffModal()"
+                    class="px-6 py-2 bg-slate-800 text-white rounded-lg font-bold hover:bg-slate-900 transition">
+                    Volver a la selección
+                </button>
             </div>
         </div>
     </div>
@@ -2118,6 +2159,89 @@
             // Limpieza
             pendingCloudSnapshot = null;
             modal.classList.add('hidden');
+        }
+
+        // ==========================================
+        // LÓGICA DEL VISOR DE DIFERENCIAS (DIFF)
+        // ==========================================
+
+        function showConflictDetails() {
+            if (!pendingCloudSnapshot || !pendingCloudSnapshot.data) return;
+
+            const cloud = pendingCloudSnapshot.data;
+            const local = state; // 'state' es la variable global con tus datos locales
+
+            const tbody = document.getElementById('diffTableBody');
+            tbody.innerHTML = '';
+
+            // Función auxiliar para crear filas
+            const createRow = (label, localVal, cloudVal, isDate = false, isCurrency = false) => {
+                let displayLocal = localVal;
+                let displayCloud = cloudVal;
+                let highlightClass = '';
+
+                // Formateo de Fechas
+                if (isDate) {
+                    const fmt = (d) => d ? new Date(d).toLocaleString() : '---';
+                    displayLocal = fmt(localVal);
+                    displayCloud = fmt(cloudVal);
+                    
+                    // Resaltar la más reciente en verde
+                    const tLocal = localVal ? new Date(localVal).getTime() : 0;
+                    const tCloud = cloudVal ? new Date(cloudVal).getTime() : 0;
+                    if (tLocal > tCloud) displayLocal = `<span class="text-green-600 font-bold">${displayLocal} <i class="fa-solid fa-caret-up"></i></span>`;
+                    else if (tCloud > tLocal) displayCloud = `<span class="text-green-600 font-bold">${displayCloud} <i class="fa-solid fa-caret-up"></i></span>`;
+                }
+
+                // Diferenciar valores visualmente
+                const isDifferent = localVal != cloudVal; // Comparación simple
+                const valStyle = isDifferent ? 'font-bold' : 'text-slate-500';
+                
+                // Icono de diferencia
+                const diffIcon = isDifferent ? '<i class="fa-solid fa-circle-exclamation text-amber-500 ml-2" title="Diferente"></i>' : '';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3 font-medium text-slate-700 border-r border-slate-100">
+                            ${label} ${diffIcon}
+                        </td>
+                        <td class="px-4 py-3 text-center border-r border-slate-100 bg-orange-50/30 ${valStyle}">
+                            ${displayLocal}
+                        </td>
+                        <td class="px-4 py-3 text-center bg-blue-50/30 ${valStyle}">
+                            ${displayCloud}
+                        </td>
+                    </tr>
+                `;
+            };
+
+            // 1. FECHA DE MODIFICACIÓN (Lo más importante)
+            tbody.innerHTML += createRow("Última Guardado", local.lastUpdated, cloud.lastUpdated, true);
+
+            // 2. TASA DEL DÓLAR (Causa común de conflictos)
+            tbody.innerHTML += createRow("Tasa Dólar (BCV)", local.bcvUsd, cloud.bcvUsd);
+
+            // 3. CANTIDAD DE PRODUCTOS
+            const localProdLen = local.products ? local.products.length : 0;
+            const cloudProdLen = cloud.products ? cloud.products.length : 0;
+            tbody.innerHTML += createRow("Total Productos", localProdLen, cloudProdLen);
+
+            // 4. VENTAS REGISTRADAS (Historial)
+            const localSalesLen = local.sales ? local.sales.length : 0;
+            const cloudSalesLen = cloud.sales ? cloud.sales.length : 0;
+            tbody.innerHTML += createRow("Ventas (Historial)", localSalesLen, cloudSalesLen);
+
+            // 5. CLIENTES FIADOS
+            const localCreditsLen = local.credits ? local.credits.length : 0;
+            const cloudCreditsLen = cloud.credits ? cloud.credits.length : 0;
+            tbody.innerHTML += createRow("Cuentas por Cobrar", localCreditsLen, cloudCreditsLen);
+
+            // Mostrar el modal
+            document.getElementById('diffModal').classList.remove('hidden');
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diffModal').classList.add('hidden');
         }
 
         // Función auxiliar para continuar la carga (Extraída para reutilizarla)
