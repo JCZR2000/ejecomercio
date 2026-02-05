@@ -1658,6 +1658,8 @@
             paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
             security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
 
+            lastUpdated: localStorage.getItem('inv_last_updated') || null,
+
             // --- CONFIGURACIÓN DE FACTURA EN LA NUBE ---
             receiptConfig: {
                 companyName: "Mi Negocio",
@@ -2490,6 +2492,9 @@
         function saveData() {
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
+
+            // Guardar timestamp en el disco para que no se pierda al recargar
+            localStorage.setItem('inv_last_updated', state.lastUpdated);
 
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
             localStorage.setItem('inv_products', JSON.stringify(state.products));
