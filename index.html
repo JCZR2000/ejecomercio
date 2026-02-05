@@ -2084,6 +2084,12 @@
                     
                     // Forzamos la fecha local para que coincida y no vuelva a saltar el modal
                     localStorage.setItem('inv_last_updated', pendingCloudSnapshot.data.lastUpdated); 
+
+                    // la tasa del dólar probablemente sea vieja. ¡Actualicémosla de nuevo!
+                    setTimeout(() => {
+                        console.log("🔄 Reactualizando tasas tras conflicto...");
+                        fetchAllRates();
+                    }, 500);
                 }
             } else if (choice === 'LOCAL') {
                 console.log("📱 Usuario eligió LOCAL. Forzando subida a nube...");
