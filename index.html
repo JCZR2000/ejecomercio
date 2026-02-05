@@ -1734,6 +1734,10 @@
 
         let pendingAction = null; // Para acciones que requieren autenticación
 
+        // [NUEVO] Variable Maestra de Subida Real
+        // Esta será nuestra única fuente de verdad. Si es true, PROHIBIDO SALIR.
+        let isUploadingToCloud = false;
+
         // BANDERA DE CONTROL PARA TASAS
         // Evita bucles infinitos y asegura que la tasa se pida DESPUÉS de sincronizar
         let hasInitialRatesUpdate = false;
@@ -1993,17 +1997,13 @@
             unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
 
                 // 1. CONTROL DEL SEMÁFORO (UI)
-                if (doc.metadata.hasPendingWrites) {
+                if (doc.metadata.hasPendingWrites || isUploadingToCloud) {
                     updateCloudStatus('SYNCING'); // Amarillo
                 } else {
-                    // TRUCO: No ponemos Verde de inmediato. Esperamos 2 segundos.
-                    // Esto obliga al "Candado de Salida" a seguir activo mientras los datos terminan de viajar.
-                    setTimeout(() => {
-                        // Verificamos de nuevo por si el usuario hizo OTRO cambio en estos 2 segundos
-                        if (!doc.metadata.hasPendingWrites) {
-                            updateCloudStatus('ONLINE');  // Ahora sí, Verde seguro
-                        }
-                    }, 2500); // 2.5 segundos de "colchón"
+                    // Solo ponemos verde si nuestra variable manual también dice que terminamos
+                    if (!isUploadingToCloud) {
+                        updateCloudStatus('ONLINE');
+                    }
                 }
 
                 if (doc.exists) {
@@ -2709,6 +2709,8 @@
                     };
                 }
 
+                // 1. ACTIVAMOS EL BLOQUEO MANUAL
+                isUploadingToCloud = true;
                 updateCloudStatus('SYNCING'); 
         
                 // NOTA TÉCNICA: Usamos .set() sin merge:true intencionalmente
@@ -2716,21 +2718,24 @@
 
                 writePromise
                     .then(() => {
-                        // CORRECCIÓN: Esto confirma que se guardó en INDEXEDDB (Local).
-                        // El dato ya está seguro en tu dispositivo y en cola para salir.
-                        console.log("💾 Guardado en Disco Local (Cola de Sincronización)");
+                        console.log("💾 Guardado en Disco Local (Esperando confirmación de nube...)");
 
-                        // [NUEVO] PING DE ARRASTRE 🚀
-                        // Hacemos una petición ligera para mantener la radio del móvil encendida
-                        // y forzar la salida de los paquetes de Firebase.
-                        fetch('https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/tasas_cambio.json?ping=' + Date.now())
-                            .then(() => console.log("📡 Ping de red completado"))
-                            .catch(() => { }); // Ignoramos errores, es solo para mantener tráfico
+                        // 3. LA SOLUCIÓN NUCLEAR: Esperar confirmación REAL del servidor
+                        // Esta promesa solo se resuelve cuando Google dice "Lo tengo".
+                        return db.waitForPendingWrites();
+                    })
+                    .then(() => {
+                        // 4. ¡AHORA SÍ ES SEGURO!
+                        console.log("☁️ ¡CONFIRMADO POR GOOGLE! Datos seguros en el servidor.");
+                        isUploadingToCloud = false; // Liberamos el candado
+
+                        // Forzamos Verde (por si el listener se quedó dormido)
+                        updateCloudStatus('ONLINE');
                     })
                     .catch(err => {
-                        console.error("Error guardado local:", err);
-                        // No ponemos 'OFFLINE' aquí porque es un error de escritura local, no de red.
-                        alert("⚠️ Error crítico al guardar en disco local.");
+                        console.error("Error crítico:", err);
+                        // Si falla, mantenemos el bloqueo o avisamos
+                        // (Nota: Offline waitForPendingWrites se queda esperando, lo cual es correcto)
                     });
             }
         }
