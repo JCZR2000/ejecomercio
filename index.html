@@ -1996,7 +1996,14 @@
                 if (doc.metadata.hasPendingWrites) {
                     updateCloudStatus('SYNCING'); // Amarillo
                 } else {
-                    updateCloudStatus('ONLINE');  // Verde
+                    // TRUCO: No ponemos Verde de inmediato. Esperamos 2 segundos.
+                    // Esto obliga al "Candado de Salida" a seguir activo mientras los datos terminan de viajar.
+                    setTimeout(() => {
+                        // Verificamos de nuevo por si el usuario hizo OTRO cambio en estos 2 segundos
+                        if (!doc.metadata.hasPendingWrites) {
+                            updateCloudStatus('ONLINE');  // Ahora sí, Verde seguro
+                        }
+                    }, 2500); // 2.5 segundos de "colchón"
                 }
 
                 if (doc.exists) {
@@ -2326,6 +2333,7 @@
                     // El mensaje estándar moderno es genérico, pero esto dispara la alerta del navegador
                     e.preventDefault();
                     e.returnValue = 'Hay datos sincronizándose con la nube. ¿Seguro que quieres salir?';
+                    return e.returnValue;
                 }
             });
         }
@@ -2708,15 +2716,21 @@
 
                 writePromise
                     .then(() => {
-                        // Solo cuando entramos aquí, el SERVIDOR ha dicho "Recibido".
-                        console.log("✅ Servidor: Datos persistidos correctamente.");
-                        // Nota: No cambiamos a ONLINE aquí porque el onSnapshot se encarga,
-                        // pero esto asegura que la promesa se completó.
+                        // CORRECCIÓN: Esto confirma que se guardó en INDEXEDDB (Local).
+                        // El dato ya está seguro en tu dispositivo y en cola para salir.
+                        console.log("💾 Guardado en Disco Local (Cola de Sincronización)");
+
+                        // [NUEVO] PING DE ARRASTRE 🚀
+                        // Hacemos una petición ligera para mantener la radio del móvil encendida
+                        // y forzar la salida de los paquetes de Firebase.
+                        fetch('https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/tasas_cambio.json?ping=' + Date.now())
+                            .then(() => console.log("📡 Ping de red completado"))
+                            .catch(() => { }); // Ignoramos errores, es solo para mantener tráfico
                     })
                     .catch(err => {
-                        console.error("Error nube:", err);
-                        updateCloudStatus('OFFLINE');
-                        alert("⚠️ Error al subir datos. Revisa tu conexión.");
+                        console.error("Error guardado local:", err);
+                        // No ponemos 'OFFLINE' aquí porque es un error de escritura local, no de red.
+                        alert("⚠️ Error crítico al guardar en disco local.");
                     });
             }
         }
