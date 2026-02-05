@@ -2319,6 +2319,15 @@
                 else setAppStatus('offline');
             });
             */
+
+            // Si el usuario intenta cerrar la pestaña mientras estamos en 'SYNCING', el navegador lo detendrá.
+            window.addEventListener('beforeunload', (e) => {
+                if (currentCloudState === 'SYNCING') {
+                    // El mensaje estándar moderno es genérico, pero esto dispara la alerta del navegador
+                    e.preventDefault();
+                    e.returnValue = 'Hay datos sincronizándose con la nube. ¿Seguro que quieres salir?';
+                }
+            });
         }
 
         function setAppStatus(status) {
@@ -2694,13 +2703,20 @@
 
                 updateCloudStatus('SYNCING'); 
         
-                // NOTA TÉCNICA: Usamos .set() sin merge:true intencionalmente en el modo encriptado
-                // para limpiar la estructura del documento si cambia de "Plano" a "Encriptado".
-                // Pero como dataToUpload tiene TODOS los campos necesarios, es seguro.
-                db.collection('users').doc(user.uid).set(dataToUpload)
+                // NOTA TÉCNICA: Usamos .set() sin merge:true intencionalmente
+                const writePromise = db.collection('users').doc(user.uid).set(dataToUpload);
+
+                writePromise
+                    .then(() => {
+                        // Solo cuando entramos aquí, el SERVIDOR ha dicho "Recibido".
+                        console.log("✅ Servidor: Datos persistidos correctamente.");
+                        // Nota: No cambiamos a ONLINE aquí porque el onSnapshot se encarga,
+                        // pero esto asegura que la promesa se completó.
+                    })
                     .catch(err => {
                         console.error("Error nube:", err);
                         updateCloudStatus('OFFLINE');
+                        alert("⚠️ Error al subir datos. Revisa tu conexión.");
                     });
             }
         }
