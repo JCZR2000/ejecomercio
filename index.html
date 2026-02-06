@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v43.6</title>
+    <title>EjeComercio v43.4</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -98,7 +98,7 @@
                 <i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...
             </p>
         </div>
-        <p class="text-slate-600 text-xs mt-8 font-mono opacity-50">Versión 43.6 • Secure Access</p>
+        <p class="text-slate-600 text-xs mt-8 font-mono opacity-50">Versión 43.4 • Secure Access</p>
     </div>
 
     <div id="securityModal"
@@ -161,7 +161,7 @@
                 <h1 class="text-lg md:text-2xl font-bold text-yellow-500 flex items-center gap-2 truncate">
                     <i class="fa-solid fa-file-invoice-dollar"></i> 
                     <span class="hidden md:inline">EjeComercio</span> 
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v43.6</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v43.4</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -1682,18 +1682,8 @@
         const db = firebase.firestore();
         let unsubscribe = null; // Para control de sincronización
 
-        // ==============================================================
-        // CONFIGURACIÓN DE RED ROBUSTA (CORREGIDA v43.7)
-        // ==============================================================
-        db.settings({
-            experimentalForceLongPolling: true,        // Forzar Long Polling (HTTP)
-            experimentalAutoDetectLongPolling: false,  // <--- AGREGAR ESTA LÍNEA OBLIGATORIA
-            merge: true,
-            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
-        });
-
         // Habilitar Persistencia Offline
-        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+        db.enablePersistence().catch(err => {
             if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
             else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
         });
@@ -2848,17 +2838,6 @@
                         // Como waitForPendingWrites ya pasó, es seguro decir que estamos Online.
                         // Esto arregla el problema de la luz amarilla pegada.
                         updateCloudStatus('ONLINE');
-
-                        // ============================================================
-                        // 🚀 PING DE ARRASTRE (NETWORK KEEP-ALIVE)
-                        // ============================================================
-                        // Hacemos una petición HTTP real externa. Esto obliga al navegador
-                        // a mantener el canal de datos abierto, empujando los paquetes de Firebase.
-                        console.log("📡 Ejecutando Ping de Arrastre...");
-                        fetch('https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/tasas_cambio.json?ping=' + Date.now())
-                            .then(() => console.log("✅ Ping completado. Canal de datos fluido."))
-                            .catch(e => console.log("Ping fallido (no importa)", e));
-                        // ============================================================
 
                     })
                     .catch(err => {
@@ -6721,55 +6700,49 @@
         }
 
         // ==========================================
-        // 25. REINICIO DE RED (NUCLEAR MEJORADO v2)
+        // 25. REINICIO DE RED (SOLUCIÓN NUCLEAR)
         // ==========================================
         function forceNetworkReconnect() {
             const btn = document.getElementById('cloudSyncBtn');
+            // Guardamos el icono original para restaurarlo luego
             const originalIcon = '<i class="fa-solid fa-cloud-arrow-up"></i>';
             
-            console.log("🔌 (1/4) Apagando radio de Firebase...");
-            updateCloudStatus('OFFLINE'); 
+            console.log("🔌 Reiniciando conexión con Google...");
             
-            // UI Feedback
+            // 1. Feedback Visual: Se pone Rojo y muestra un enchufe
+            // Esto le dice al usuario "Estoy haciendo algo drástico, espera"
+            updateCloudStatus('OFFLINE'); 
             btn.innerHTML = '<i class="fa-solid fa-plug-circle-xmark fa-fade"></i>';
             btn.classList.replace('bg-indigo-600', 'bg-red-600');
             btn.classList.replace('border-indigo-400', 'border-red-400');
-            btn.disabled = true;
+            btn.disabled = true; // Evitar doble clic compulsivo
 
-            // Paso 1: Cortar conexión
+            // 2. Apagamos la radio de Firebase (Corte de señal)
             db.disableNetwork().then(() => {
                 
-                // Esperamos 1 segundo para asegurar el corte total
+                // Esperamos 1.5 segundos para asegurar que el corte limpie la tubería
                 setTimeout(() => {
                     
-                    console.log("⚡ (2/4) Encendiendo radio de Firebase...");
-                    // Paso 2: Reconectar
+                    // 3. La encendemos de nuevo (Reconexión Limpia)
                     db.enableNetwork().then(() => {
+                        console.log("⚡ Conexión restablecida. Ejecutando guardado...");
                         
-                        console.log("⏳ (3/4) Esperando estabilización de red...");
+                        // 4. Restaurar botón a su estado normal (Azul)
+                        btn.innerHTML = originalIcon;
+                        btn.classList.replace('bg-red-600', 'bg-indigo-600');
+                        btn.classList.replace('border-red-400', 'border-indigo-400');
+                        btn.disabled = false;
                         
-                        // IMPORTANTE: Esperamos 2.5 segundos EXTRA para que el socket handshake termine
-                        setTimeout(() => {
-                            console.log("🚀 (4/4) ¡Ejecutando guardado forzado!");
-                            
-                            // Restaurar botón
-                            btn.innerHTML = originalIcon;
-                            btn.classList.replace('bg-red-600', 'bg-indigo-600');
-                            btn.classList.replace('border-red-400', 'border-indigo-400');
-                            btn.disabled = false;
-                            
-                            // Paso 3: Guardar (ahora sí con la red lista)
-                            saveData(); 
-                            
-                        }, 2500); // <-- TIEMPO AUMENTADO PARA DAR ESTABILIDAD
+                        // 5. ¡GOLPE FINAL! Guardamos de inmediato aprovechando la conexión fresca
+                        saveData(); 
                         
                     });
                     
-                }, 1000); 
+                }, 1500); 
                 
             }).catch(err => {
                 console.error("Error reiniciando red:", err);
-                alert("Error al reiniciar la red. Recarga la página.");
+                alert("Error al reiniciar la red. Por favor recarga la página.");
                 btn.innerHTML = originalIcon;
                 btn.classList.replace('bg-red-600', 'bg-indigo-600');
                 btn.disabled = false;
