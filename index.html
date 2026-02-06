@@ -1683,12 +1683,13 @@
         let unsubscribe = null; // Para control de sincronización
 
         // ==============================================================
-        // CONFIGURACIÓN DE RED ROBUSTA (SOLUCIÓN ZOMBIE SOCKET)
+        // CONFIGURACIÓN DE RED ROBUSTA (CORREGIDA v43.7)
         // ==============================================================
         db.settings({
-            experimentalForceLongPolling: true, // <--- ESTO EVITA EL CONGELAMIENTO
+            experimentalForceLongPolling: true,        // Forzar Long Polling (HTTP)
+            experimentalAutoDetectLongPolling: false,  // <--- AGREGAR ESTA LÍNEA OBLIGATORIA
             merge: true,
-            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED // Evita borrado agresivo local
+            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED
         });
 
         // Habilitar Persistencia Offline
