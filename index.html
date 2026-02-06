@@ -1999,15 +1999,25 @@
             // Escuchar cambios INCLUYENDO METADATA (Para saber si está pendiente de escribir)
             unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
 
-                // 1. CONTROL DEL SEMÁFORO (UI)
+                // ----------------------------------------------------
+                // NUEVA LÓGICA DE SEMÁFORO ESTRICTO (EL JUEZ - CORREGIDO) 🛡️
+                // ----------------------------------------------------
+
+                // 1. ¿Está escribiendo o subiendo? -> AMARILLO
                 if (doc.metadata.hasPendingWrites || isUploadingToCloud) {
-                    updateCloudStatus('SYNCING'); // Amarillo
-                } else {
-                    // Solo ponemos verde si nuestra variable manual también dice que terminamos
-                    if (!isUploadingToCloud) {
-                        updateCloudStatus('ONLINE');
-                    }
+                    updateCloudStatus('SYNCING');
                 }
+                // 2. ¿Ya terminó pero los datos vienen de la caché local? -> AMARILLO
+                // (Esto es lo que te falta en tu código anterior)
+                else if (doc.metadata.fromCache) {
+                    console.log("⏳ Datos en caché local. Esperando confirmación de servidor...");
+                    updateCloudStatus('SYNCING');
+                }
+                // 3. ¿Viene del servidor Y no hay pendientes? -> VERDE (¡SOLO AQUÍ!)
+                else {
+                    updateCloudStatus('ONLINE');
+                }
+                // ----------------------------------------------------
 
                 if (doc.exists) {
                     const cloudData = doc.data();
@@ -2089,48 +2099,97 @@
             });
         }
 
-        // --- NUEVA FUNCIÓN: Intermediario para detectar conflictos ---
-        // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO v44) ---
         // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO INTELIGENTE) ---
         function processSyncData(cloudData, doc) {
             
             // 1. ESCUDO: Si acabamos de resolver un conflicto, ignoramos todo por unos segundos.
             if (conflictCooldown) {
                 console.log("🛡️ Ignorando chequeo de conflicto (Cooldown activo)...");
-                // Aún así cargamos los datos si vienen de la nube para mantenernos al día
-                // PERO solo si elegimos 'USAR NUBE'. Si elegimos local, esto se ignorará.
-                // Por seguridad, en cooldown, mejor no tocamos nada hasta que se estabilice.
                 return; 
             }
 
             // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
 
-            // --- LÓGICA DE DETECCIÓN ---
-            const localLastUpdate = state.lastUpdated ? new Date(state.lastUpdated).getTime() : 0;
-            const cloudLastUpdate = cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0;
+            // --- ANÁLISIS DE DATOS (NUEVA LÓGICA) ---
             
-            // 3. COMPARACIÓN CON TOLERANCIA DE 1 SEGUNDO
-            // Usar '===' es demasiado frágil. Si difieren por 500ms, sigue siendo la misma versión para nosotros.
-            const diff = Math.abs(localLastUpdate - cloudLastUpdate);
-            const areTimestampsEffectivelyEqual = diff < 1000; // Menos de 1 segundo = Iguales
+            // A. Extraemos métricas clave LOCALES
+            const localMetrics = {
+                sales: state.sales ? state.sales.length : 0,
+                products: state.products ? state.products.length : 0,
+                credits: state.credits ? state.credits.length : 0,
+                time: state.lastUpdated ? new Date(state.lastUpdated).getTime() : 0
+            };
+
+            // B. Extraemos métricas clave NUBE
+            const cloudMetrics = {
+                sales: cloudData.sales ? cloudData.sales.length : 0,
+                products: cloudData.products ? cloudData.products.length : 0,
+                credits: cloudData.credits ? cloudData.credits.length : 0,
+                time: cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0
+            };
+
+            // C. COMPARACIÓN INTELIGENTE
+            // Verificamos si el CONTENIDO real es idéntico
+            const isDataIdentical = 
+                localMetrics.sales === cloudMetrics.sales &&
+                localMetrics.products === cloudMetrics.products &&
+                localMetrics.credits === cloudMetrics.credits;
+
+            // D. CRITERIO DE TIEMPO (Secundario)
+            // Si los datos son iguales, usamos tolerancia de 2 segundos para la fecha.
+            // Si los datos son diferentes, la fecha no importa, es conflicto igual.
+            const diff = Math.abs(localMetrics.time - cloudMetrics.time);
+            const isTimeDifferent = diff > 2000;
 
             // Excepción: Instalación limpia
             const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
 
-            if (!areTimestampsEffectivelyEqual && !isLocalEmpty) {
-                console.warn(`⚠️ CONFLICTO REAL: Diferencia de ${diff}ms detectada.`);
+            // CONDICIÓN FINAL: Si los datos cambian O (son iguales pero la fecha varía mucho)
+            if ((!isDataIdentical || isTimeDifferent) && !isLocalEmpty) {
+                console.warn(`⚠️ CONFLICTO DE DATOS: Diferencia detectada (Datos: ${!isDataIdentical}, Tiempo: ${diff}ms)`);
                 
                 pendingCloudSnapshot = { data: cloudData, doc: doc };
                 
-                // UI del Modal
-                document.getElementById('confLocalDate').textContent = localLastUpdate ? new Date(localLastUpdate).toLocaleString() : '---';
-                document.getElementById('confCloudDate').textContent = cloudLastUpdate ? new Date(cloudLastUpdate).toLocaleString() : '---';
+                // --- UI INTELIGENTE DEL MODAL ---
+                
+                // 1. Formatear Fechas
+                const fmtLocal = localMetrics.time ? new Date(localMetrics.time).toLocaleString() : '---';
+                const fmtCloud = cloudMetrics.time ? new Date(cloudMetrics.time).toLocaleString() : '---';
+
+                // 2. Determinar "Ganador" sugerido basado en VENTAS (Lo más crítico)
+                let localBadge = "";
+                let cloudBadge = "";
+
+                // Lógica de sugerencia visual
+                if (localMetrics.sales > cloudMetrics.sales) {
+                    localBadge = `<span class="block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
+                } else if (cloudMetrics.sales > localMetrics.sales) {
+                    cloudBadge = `<span class="block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
+                }
+
+                // 3. Inyectar HTML enriquecido en el Modal
+                // Usamos innerHTML para mostrar fecha + métricas + badge
+                document.getElementById('confLocalDate').innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <span class="font-bold text-slate-700">${fmtLocal}</span>
+                        <span class="text-xs text-slate-500 mt-1">🛒 Ventas: ${localMetrics.sales} | 📦 Prod: ${localMetrics.products}</span>
+                        ${localBadge}
+                    </div>
+                `;
+                
+                document.getElementById('confCloudDate').innerHTML = `
+                    <div class="flex flex-col items-center">
+                        <span class="font-bold text-slate-700">${fmtCloud}</span>
+                        <span class="text-xs text-slate-500 mt-1">🛒 Ventas: ${cloudMetrics.sales} | 📦 Prod: ${cloudMetrics.products}</span>
+                        ${cloudBadge}
+                    </div>
+                `;
 
                 document.getElementById('conflictModal').classList.remove('hidden');
                 
             } else {
-                // Si son iguales (o casi iguales), procedemos.
+                // Si todo es idéntico (o casi idéntico en tiempo), procedemos.
                 finishLoadingData(cloudData, doc);
             }
             
@@ -2741,16 +2800,14 @@
                     })
                     .then(() => {
                         // 4. ¡AHORA SÍ ES SEGURO!
-                        console.log("☁️ ¡CONFIRMADO POR GOOGLE! Datos seguros en el servidor.");
+                        console.log("☁️ Subida completada a nivel de red.");
                         isUploadingToCloud = false; // Liberamos el candado
 
-                        // Forzamos Verde (por si el listener se quedó dormido)
-                        updateCloudStatus('ONLINE');
                     })
                     .catch(err => {
                         console.error("Error crítico:", err);
-                        // Si falla, mantenemos el bloqueo o avisamos
-                        // (Nota: Offline waitForPendingWrites se queda esperando, lo cual es correcto)
+                        isUploadingToCloud = false; // Liberar candado si falla
+                        alert("⚠️ Error al subir datos. Revisa tu conexión.");
                     });
             }
         }
