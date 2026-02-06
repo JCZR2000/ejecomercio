@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v43.5'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v43.6'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -13,7 +13,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v43.5...');
+  console.log('[Service Worker] Instalando v43.6...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -38,47 +38,37 @@ self.addEventListener('activate', (e) => {
 });
 
 // 4. INTERCEPTOR DE RED (Estrategia: Stale-While-Revalidate / Cache Dinámico)
+// 4. INTERCEPTOR DE RED
 self.addEventListener('fetch', (e) => {
-  // Ignorar peticiones que no sean http/https (ej. chrome-extension://)
-  if (!e.request.url.startsWith('http')) return;
+  // A. EXCLUSIÓN DE FIREBASE (CRÍTICO)
+  // Dejamos pasar todo lo que vaya a los servidores de Google sin tocarlo.
+  const url = new URL(e.request.url);
+  if (url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('firebaseio.com')) {
+    return; // El SW ignora esto y deja que la red fluya directo.
+  }
 
-  // B. FILTRO DE MÉTODO (¡LA SOLUCIÓN!): 
-  // Si no es GET (ej: POST de Firebase), no hacemos nada y dejamos que pase directo.
-  // La Cache API NO soporta guardar peticiones POST.
+  // B. FILTRO DE PROTOCOLO Y MÉTODO
+  if (!e.request.url.startsWith('http')) return;
   if (e.request.method !== 'GET') return;
 
+  // C. ESTRATEGIA DE CACHÉ (Network First)
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      // A. ESTRATEGIA: Network First con Fallback a Caché (Para datos frescos)
-      // Intentamos ir a la red primero para tener siempre la última versión
-      const fetchPromise = fetch(e.request)
-        .then((networkResponse) => {
-          // Si la respuesta es válida, la guardamos en caché (Cacheo Dinámico)
-          // Esto guardará Tailwind, Firebase, FontAwesome, etc. la primera vez que carguen.
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            // Solo cacheamos respuestas 'basic' (mismo origen) de forma segura aquí
-            // Para CDNs (cors/opaque), necesitamos manejarlo con cuidado o confiar en el caché del navegador
-          }
-
-          // Clonamos la respuesta porque se usa dos veces (browser y cache)
+    fetch(e.request)
+      .then((networkResponse) => {
+        // Clonar y guardar solo si es válida y básica
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
-
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(e.request, responseToCache);
           });
-
-          return networkResponse;
-        })
-        .catch(() => {
-          // Si falla la red (OFFLINE), devolvemos lo que haya en caché
-          return cachedResponse;
-        });
-
-      // Si tenemos algo en caché, podríamos devolverlo rápido, pero en tu caso
-      // prefiero que intente la red primero para asegurar actualizaciones de precios/lógica.
-      // Si quieres velocidad pura, devolvemos cachedResponse || fetchPromise.
-      // Pero para asegurar consistencia, usaremos el fetchPromise primero (Network First).
-      return fetchPromise.catch(() => cachedResponse);
-    })
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // Si falla la red, devolvemos caché
+        return caches.match(e.request);
+      })
   );
 });

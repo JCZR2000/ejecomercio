@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v43.4</title>
+    <title>EjeComercio v43.6</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -98,7 +98,7 @@
                 <i class="fa-solid fa-circle-notch fa-spin"></i> Conectando...
             </p>
         </div>
-        <p class="text-slate-600 text-xs mt-8 font-mono opacity-50">Versión 43.4 • Secure Access</p>
+        <p class="text-slate-600 text-xs mt-8 font-mono opacity-50">Versión 43.6 • Secure Access</p>
     </div>
 
     <div id="securityModal"
@@ -161,7 +161,7 @@
                 <h1 class="text-lg md:text-2xl font-bold text-yellow-500 flex items-center gap-2 truncate">
                     <i class="fa-solid fa-file-invoice-dollar"></i> 
                     <span class="hidden md:inline">EjeComercio</span> 
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v43.4</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v43.6</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -1682,8 +1682,17 @@
         const db = firebase.firestore();
         let unsubscribe = null; // Para control de sincronización
 
+        // ==============================================================
+        // CONFIGURACIÓN DE RED ROBUSTA (SOLUCIÓN ZOMBIE SOCKET)
+        // ==============================================================
+        db.settings({
+            experimentalForceLongPolling: true, // <--- ESTO EVITA EL CONGELAMIENTO
+            merge: true,
+            cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED // Evita borrado agresivo local
+        });
+
         // Habilitar Persistencia Offline
-        db.enablePersistence().catch(err => {
+        db.enablePersistence({ synchronizeTabs: true }).catch(err => {
             if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
             else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
         });
