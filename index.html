@@ -2111,9 +2111,9 @@
         function processSyncData(cloudData, doc) {
             
             // 1. ESCUDO: Si acabamos de resolver un conflicto, ignoramos todo por unos segundos.
-            if (conflictCooldown) {
+            if (typeof conflictCooldown !== 'undefined' && conflictCooldown) {
                 console.log("🛡️ Ignorando chequeo de conflicto (Cooldown activo)...");
-                return; 
+                return;
             }
 
             // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
@@ -2147,49 +2147,70 @@
                 time: cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0
             };
 
-            // C. COMPARACIÓN INTELIGENTE
-            // Verificamos si el CONTENIDO real es idéntico (Usando Stock Total)
+            // --- B. LÓGICA DE TIEMPOS Y TOLERANCIA ---
+            const diff = Math.abs(localMetrics.time - cloudMetrics.time);
+            const TOLERANCE_MS = 2000; // 2 Segundos de margen
+
+            // --- C. NUEVA LÓGICA DE ACTUALIZACIÓN "RELAJADA" (CASO MULTI-DISPOSITIVO) 🔄 ---
+            // Si la nube es CLARAMENTE más reciente que yo (superando tolerancia),
+            // asumo que otro dispositivo guardó y yo debo actualizarme sin preguntar.
+            if (!isFirstSyncCheck && cloudMetrics.time > (localMetrics.time + TOLERANCE_MS)) {
+                console.log("🔄 Actualización remota detectada. Sincronizando UI...");
+                finishLoadingData(cloudData, doc);
+                return;
+            }
+
+            // --- D. DETECCIÓN DE CONFLICTO ---
+
+            // Verificamos si el CONTENIDO es idéntico
             const isDataIdentical =
                 localMetrics.sales === cloudMetrics.sales &&
                 localMetrics.totalStock === cloudMetrics.totalStock &&
                 localMetrics.credits === cloudMetrics.credits;
 
-            // D. CRITERIO DE TIEMPO
-            const diff = Math.abs(localMetrics.time - cloudMetrics.time);
-            const isTimeDifferent = diff > 2000;
+            // Solo hay conflicto de tiempo si supera la tolerancia
+            const isTimeDifferent = diff > TOLERANCE_MS;
 
-            // Excepción: Instalación limpia
+            // Excepción: Instalación limpia (Si local está vacío, la nube siempre gana)
             const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
 
-            // CONDICIÓN FINAL
+            // --- E. DECISIÓN FINAL ---
             if ((!isDataIdentical || isTimeDifferent) && !isLocalEmpty) {
-                console.warn(`⚠️ CONFLICTO: Datos diferentes (Stock Local: ${localMetrics.totalStock} vs Nube: ${cloudMetrics.totalStock})`);
+
+                // CASO ESPECIAL: Si la nube es más reciente (o igual), confiamos en ella 
+                // para evitar molestar al usuario, A MENOS que haya más ventas locales (trabajo sin subir).
+                if (cloudMetrics.time >= localMetrics.time && cloudMetrics.sales >= localMetrics.sales) {
+                    finishLoadingData(cloudData, doc);
+                    return;
+                }
+
+                // SI LLEGAMOS AQUÍ: El Local es más reciente O tiene datos que la nube no tiene.
+                // ¡MOSTRAMOS EL MODAL CON TODA LA INFO!
+                console.warn(`⚠️ CONFLICTO REAL: Local tiene prioridad o datos únicos.`);
 
                 pendingCloudSnapshot = { data: cloudData, doc: doc };
 
-                // --- UI INTELIGENTE DEL MODAL ---
-
+                // --- UI DEL MODAL (TU LÓGICA VISUAL ORIGINAL) ---
                 const fmtLocal = localMetrics.time ? new Date(localMetrics.time).toLocaleString() : '---';
                 const fmtCloud = cloudMetrics.time ? new Date(cloudMetrics.time).toLocaleString() : '---';
 
-                // Lógica de recomendación (Ganador)
                 let localBadge = "";
                 let cloudBadge = "";
 
-                // Criterio 1: Más Ventas ganan
+                // Badges de Ventas
                 if (localMetrics.sales > cloudMetrics.sales) {
                     localBadge = `<span class="block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
                 } else if (cloudMetrics.sales > localMetrics.sales) {
                     cloudBadge = `<span class="block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
                 }
-                // Criterio 2: Si ventas son iguales, MENOS stock gana (indica venta reciente)
+                // Badges de Stock (si ventas iguales)
                 else if (localMetrics.totalStock < cloudMetrics.totalStock) {
                     localBadge = `<span class="block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (Stock Actual)</span>`;
                 } else if (cloudMetrics.totalStock < localMetrics.totalStock) {
                     cloudBadge = `<span class="block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (Stock Actual)</span>`;
                 }
 
-                // Inyectar HTML enriquecido (Mostrando Stock Total en lugar de conteo de productos)
+                // Inyección HTML
                 document.getElementById('confLocalDate').innerHTML = `
                     <div class="flex flex-col items-center">
                         <span class="font-bold text-slate-700">${fmtLocal}</span>
@@ -2211,7 +2232,7 @@
                 document.getElementById('conflictModal').classList.remove('hidden');
 
             } else {
-                // Si todo es idéntico, procedemos.
+                // Si todo es idéntico o es instalación limpia
                 finishLoadingData(cloudData, doc);
             }
 
