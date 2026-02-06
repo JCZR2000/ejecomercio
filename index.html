@@ -2115,8 +2115,8 @@
             const calculateTotalStock = (productsArray) => {
                 if (!productsArray || !Array.isArray(productsArray)) return 0;
                 return productsArray.reduce((total, prod) => {
-                    // Convertimos a número por seguridad y sumamos
-                    return total + (parseFloat(prod.stock) || 0);
+                    // CORRECCIÓN: Usamos .qty en lugar de .stock
+                    return total + (parseFloat(prod.qty) || 0);
                 }, 0);
             };
 
@@ -2269,12 +2269,19 @@
             const tbody = document.getElementById('diffTableBody');
             tbody.innerHTML = '';
 
+            // --- FUNCIÓN AUXILIAR INTERNA (Copia de seguridad) ---
+            const calculateTotalStock = (productsArray) => {
+                if (!productsArray || !Array.isArray(productsArray)) return 0;
+                return productsArray.reduce((total, prod) => {
+                    return total + (parseFloat(prod.qty) || 0); // Usamos .qty correctamente
+                }, 0);
+            };
+
             // Función auxiliar para crear filas
             const createRow = (label, localVal, cloudVal, isDate = false, isCurrency = false) => {
                 let displayLocal = localVal;
                 let displayCloud = cloudVal;
-                let highlightClass = '';
-
+            
                 // Formateo de Fechas
                 if (isDate) {
                     const fmt = (d) => d ? new Date(d).toLocaleString() : '---';
@@ -2316,17 +2323,22 @@
             // 2. TASA DEL DÓLAR (Causa común de conflictos)
             tbody.innerHTML += createRow("Tasa Dólar (BCV)", local.bcvUsd, cloud.bcvUsd);
 
-            // 3. CANTIDAD DE PRODUCTOS
+            // 3. STOCK TOTAL REAL (La nueva métrica importante)
+            const localStock = calculateTotalStock(local.products);
+            const cloudStock = calculateTotalStock(cloud.products);
+            tbody.innerHTML += createRow("Inventario (Unidades)", localStock, cloudStock);
+
+            // 4. CANTIDAD DE PRODUCTOS (Tipos diferentes)
             const localProdLen = local.products ? local.products.length : 0;
             const cloudProdLen = cloud.products ? cloud.products.length : 0;
             tbody.innerHTML += createRow("Total Productos", localProdLen, cloudProdLen);
 
-            // 4. VENTAS REGISTRADAS (Historial)
+            // 5. VENTAS REGISTRADAS (Historial)
             const localSalesLen = local.sales ? local.sales.length : 0;
             const cloudSalesLen = cloud.sales ? cloud.sales.length : 0;
             tbody.innerHTML += createRow("Ventas (Historial)", localSalesLen, cloudSalesLen);
 
-            // 5. CLIENTES FIADOS
+            // 6. CLIENTES FIADOS
             const localCreditsLen = local.credits ? local.credits.length : 0;
             const cloudCreditsLen = cloud.credits ? cloud.credits.length : 0;
             tbody.innerHTML += createRow("Cuentas por Cobrar", localCreditsLen, cloudCreditsLen);
