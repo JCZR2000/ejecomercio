@@ -2087,30 +2087,31 @@
         }
 
         // --- NUEVA FUNCIÓN: Intermediario para detectar conflictos ---
+        // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO v44) ---
         function processSyncData(cloudData, doc) {
-            // Si NO es la primera verificación (es una actualización en tiempo real),
-            // confiamos en que el conflicto ya se resolvió y cargamos directo.
-            if (!isFirstSyncCheck) {
-                finishLoadingData(cloudData, doc);
-                return;
+            
+            // CAMBIO 1: En modo estricto, también verificamos actualizaciones en tiempo real.
+            // Solo ignoramos si la actualización viene de NOSOTROS MISMOS (Pending Writes).
+            if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) {
+                return; // Es mi propio eco, no hago nada.
             }
 
             // --- LÓGICA DE DETECCIÓN DE CONFLICTO ---
             const localLastUpdate = state.lastUpdated ? new Date(state.lastUpdated).getTime() : 0;
             const cloudLastUpdate = cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0;
             
-            // Tolerancia de 2 segundos (2000ms) para evitar falsos positivos por latencia
-            const diff = Math.abs(localLastUpdate - cloudLastUpdate);
-            const isDifferent = diff > 2000; 
+            // CAMBIO 2: ELIMINAMOS LA TOLERANCIA. 
+            // La comparación debe ser EXACTA. Si difiere 1ms, es conflicto.
+            const areTimestampsEqual = localLastUpdate === cloudLastUpdate;
 
             // Si local está vacío (instalación limpia), no hay conflicto, queremos los datos de la nube.
             const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
 
-            if (isDifferent && !isLocalEmpty) {
-                // ¡ALERTA! Hay datos en ambos lados y son diferentes.
-                console.warn("⚠️ CONFLICTO DETECTADO: Pausando sincronización automática.");
+            if (!areTimestampsEqual && !isLocalEmpty) {
+                // ¡ALERTA! Hay diferencia (por mínima que sea).
+                console.warn("⚠️ CONFLICTO ESTRICTO: Diferencia de versiones detectada.");
                 
-                // 1. Guardamos la nube en "cuarentena" (memoria temporal)
+                // 1. Guardamos la nube en "cuarentena"
                 pendingCloudSnapshot = { data: cloudData, doc: doc };
                 
                 // 2. Preparamos la UI del Modal
@@ -2120,11 +2121,11 @@
                 document.getElementById('confLocalDate').textContent = fmtLocal;
                 document.getElementById('confCloudDate').textContent = fmtCloud;
 
-                // 3. Mostramos Modal y detenemos carga
+                // 3. Mostramos Modal
                 document.getElementById('conflictModal').classList.remove('hidden');
                 
             } else {
-                // Si son iguales o local está vacío, procedemos normal
+                // Si son EXACTAMENTE iguales o local está vacío, procedemos.
                 finishLoadingData(cloudData, doc);
             }
             
