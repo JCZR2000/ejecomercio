@@ -1683,10 +1683,10 @@
         let unsubscribe = null; // Para control de sincronización
 
         // Habilitar Persistencia Offline
-        db.enablePersistence().catch(err => {
-            if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
-            else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
-        });
+        //db.enablePersistence().catch(err => {
+        //    if (err.code == 'failed-precondition') console.log("Persistencia: Múltiples pestañas abiertas.");
+        //    else if (err.code == 'unimplemented') console.log("Navegador no soporta persistencia.");
+        //});
 
         const $ = (id) => document.getElementById(id);
 
@@ -2002,27 +2002,29 @@
             // Reiniciamos bandera al conectar una nueva sesión
             isFirstSyncCheck = true;
 
-            // Escuchar cambios INCLUYENDO METADATA (Para saber si está pendiente de escribir)
+            // Escuchar cambios INCLUYENDO METADATA
             unsubscribe = docRef.onSnapshot({ includeMetadataChanges: true }, doc => {
 
                 // ----------------------------------------------------
-                // NUEVA LÓGICA DE SEMÁFORO ESTRICTO (EL JUEZ - CORREGIDO) 🛡️
+                // NUEVA LÓGICA DE SEMÁFORO ESTRICTO (EL JUEZ) 🛡️
                 // ----------------------------------------------------
 
-                // 1. ¿Está escribiendo o subiendo? -> AMARILLO
+                // Estado de depuración (Opcional, para ver en consola qué pasa)
+                console.log(`Estado Nube: Pending=${doc.metadata.hasPendingWrites}, Cache=${doc.metadata.fromCache}, UploadLock=${isUploadingToCloud}`);
+
+                // 1. CONDICIÓN DE BLOQUEO: Si hay algo pendiente, es AMARILLO.
                 if (doc.metadata.hasPendingWrites || isUploadingToCloud) {
                     updateCloudStatus('SYNCING');
                 }
-                // 2. ¿Ya terminó pero los datos vienen de la caché local? -> AMARILLO
-                // (Esto es lo que te falta en tu código anterior)
+                // 2. Si viene de caché (aún no confirmado por servidor), es AMARILLO.
                 else if (doc.metadata.fromCache) {
-                    console.log("⏳ Datos en caché local. Esperando confirmación de servidor...");
                     updateCloudStatus('SYNCING');
                 }
-                // 3. ¿Viene del servidor Y no hay pendientes? -> VERDE (¡SOLO AQUÍ!)
+                // 3. SOLO si todo está limpio, es VERDE.
                 else {
                     updateCloudStatus('ONLINE');
                 }
+
                 // ----------------------------------------------------
 
                 if (doc.exists) {
@@ -2815,6 +2817,9 @@
                     };
                 }
 
+                // --- CAMBIO CLAVE: LIMPIEZA DE DATOS ---
+                dataToUpload = sanitizePayload(dataToUpload);
+
                 // 1. ACTIVAMOS EL BLOQUEO MANUAL
                 isUploadingToCloud = true;
                 updateCloudStatus('SYNCING'); 
@@ -2824,29 +2829,32 @@
 
                 writePromise
                     .then(() => {
-                        console.log("💾 Guardado en Disco Local (Esperando confirmación de nube...)");
+                        console.log("💾☁️ Guardado en la nube (Confirmación)");
 
                         // 3. LA SOLUCIÓN NUCLEAR: Esperar confirmación REAL del servidor
                         // Esta promesa solo se resuelve cuando Google dice "Lo tengo".
-                        return db.waitForPendingWrites();
-                    })
-                    .then(() => {
-                        // 4. ¡AHORA SÍ ES SEGURO!
-                        console.log("☁️ Subida completada a nivel de red.");
-                        isUploadingToCloud = false; // Liberamos el candado
+                        isUploadingToCloud = false;
 
-                        // Como waitForPendingWrites ya pasó, es seguro decir que estamos Online.
-                        // Esto arregla el problema de la luz amarilla pegada.
+                        // AHORA SÍ es seguro poner verde manual, porque sin persistencia,
+                        // el .then() solo ocurre si el servidor aceptó los datos.
                         updateCloudStatus('ONLINE');
-
                     })
+
                     .catch(err => {
                         console.error("Error crítico:", err);
-                        isUploadingToCloud = false; // Liberar candado si falla
+                        isUploadingToCloud = false; // Liberar candado si falla.
+                        updateCloudStatus('OFFLINE'); // Avisar visualmente que falló
                         alert("⚠️ Error al subir datos. Revisa tu conexión.");
                     });
             }
         }
+
+        // Función para limpiar valores 'undefined' que rompen Firestore
+        function sanitizePayload(obj) {
+            return JSON.parse(JSON.stringify(obj, (key, value) => {
+                return value === undefined ? null : value;
+            }));
+        }   
 
         // ==========================================
         // 5. SISTEMA DE SEGURIDAD
