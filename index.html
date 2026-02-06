@@ -2839,6 +2839,17 @@
                         // Esto arregla el problema de la luz amarilla pegada.
                         updateCloudStatus('ONLINE');
 
+                        // ============================================================
+                        // 🚀 PING DE ARRASTRE (NETWORK KEEP-ALIVE)
+                        // ============================================================
+                        // Hacemos una petición HTTP real externa. Esto obliga al navegador
+                        // a mantener el canal de datos abierto, empujando los paquetes de Firebase.
+                        console.log("📡 Ejecutando Ping de Arrastre...");
+                        fetch('https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/tasas_cambio.json?ping=' + Date.now())
+                            .then(() => console.log("✅ Ping completado. Canal de datos fluido."))
+                            .catch(e => console.log("Ping fallido (no importa)", e));
+                        // ============================================================
+
                     })
                     .catch(err => {
                         console.error("Error crítico:", err);
@@ -6700,49 +6711,55 @@
         }
 
         // ==========================================
-        // 25. REINICIO DE RED (SOLUCIÓN NUCLEAR)
+        // 25. REINICIO DE RED (NUCLEAR MEJORADO v2)
         // ==========================================
         function forceNetworkReconnect() {
             const btn = document.getElementById('cloudSyncBtn');
-            // Guardamos el icono original para restaurarlo luego
             const originalIcon = '<i class="fa-solid fa-cloud-arrow-up"></i>';
             
-            console.log("🔌 Reiniciando conexión con Google...");
-            
-            // 1. Feedback Visual: Se pone Rojo y muestra un enchufe
-            // Esto le dice al usuario "Estoy haciendo algo drástico, espera"
+            console.log("🔌 (1/4) Apagando radio de Firebase...");
             updateCloudStatus('OFFLINE'); 
+            
+            // UI Feedback
             btn.innerHTML = '<i class="fa-solid fa-plug-circle-xmark fa-fade"></i>';
             btn.classList.replace('bg-indigo-600', 'bg-red-600');
             btn.classList.replace('border-indigo-400', 'border-red-400');
-            btn.disabled = true; // Evitar doble clic compulsivo
+            btn.disabled = true;
 
-            // 2. Apagamos la radio de Firebase (Corte de señal)
+            // Paso 1: Cortar conexión
             db.disableNetwork().then(() => {
                 
-                // Esperamos 1.5 segundos para asegurar que el corte limpie la tubería
+                // Esperamos 1 segundo para asegurar el corte total
                 setTimeout(() => {
                     
-                    // 3. La encendemos de nuevo (Reconexión Limpia)
+                    console.log("⚡ (2/4) Encendiendo radio de Firebase...");
+                    // Paso 2: Reconectar
                     db.enableNetwork().then(() => {
-                        console.log("⚡ Conexión restablecida. Ejecutando guardado...");
                         
-                        // 4. Restaurar botón a su estado normal (Azul)
-                        btn.innerHTML = originalIcon;
-                        btn.classList.replace('bg-red-600', 'bg-indigo-600');
-                        btn.classList.replace('border-red-400', 'border-indigo-400');
-                        btn.disabled = false;
+                        console.log("⏳ (3/4) Esperando estabilización de red...");
                         
-                        // 5. ¡GOLPE FINAL! Guardamos de inmediato aprovechando la conexión fresca
-                        saveData(); 
+                        // IMPORTANTE: Esperamos 2.5 segundos EXTRA para que el socket handshake termine
+                        setTimeout(() => {
+                            console.log("🚀 (4/4) ¡Ejecutando guardado forzado!");
+                            
+                            // Restaurar botón
+                            btn.innerHTML = originalIcon;
+                            btn.classList.replace('bg-red-600', 'bg-indigo-600');
+                            btn.classList.replace('border-red-400', 'border-indigo-400');
+                            btn.disabled = false;
+                            
+                            // Paso 3: Guardar (ahora sí con la red lista)
+                            saveData(); 
+                            
+                        }, 2500); // <-- TIEMPO AUMENTADO PARA DAR ESTABILIDAD
                         
                     });
                     
-                }, 1500); 
+                }, 1000); 
                 
             }).catch(err => {
                 console.error("Error reiniciando red:", err);
-                alert("Error al reiniciar la red. Por favor recarga la página.");
+                alert("Error al reiniciar la red. Recarga la página.");
                 btn.innerHTML = originalIcon;
                 btn.classList.replace('bg-red-600', 'bg-indigo-600');
                 btn.disabled = false;
