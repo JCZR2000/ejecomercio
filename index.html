@@ -171,6 +171,12 @@
                 </span>
             </div>
             <div class="flex items-center gap-3">
+
+                <button id="cloudSyncBtn" onclick="forceNetworkReconnect()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg border border-indigo-400 transition active:scale-90"
+                    title="Forzar Sincronización (Reiniciar Conexión)">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                </button>
                 
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
@@ -6691,6 +6697,56 @@
                 window.dialogCallback();
                 window.dialogCallback = null;
             }
+        }
+
+        // ==========================================
+        // 25. REINICIO DE RED (SOLUCIÓN NUCLEAR)
+        // ==========================================
+        function forceNetworkReconnect() {
+            const btn = document.getElementById('cloudSyncBtn');
+            // Guardamos el icono original para restaurarlo luego
+            const originalIcon = '<i class="fa-solid fa-cloud-arrow-up"></i>';
+            
+            console.log("🔌 Reiniciando conexión con Google...");
+            
+            // 1. Feedback Visual: Se pone Rojo y muestra un enchufe
+            // Esto le dice al usuario "Estoy haciendo algo drástico, espera"
+            updateCloudStatus('OFFLINE'); 
+            btn.innerHTML = '<i class="fa-solid fa-plug-circle-xmark fa-fade"></i>';
+            btn.classList.replace('bg-indigo-600', 'bg-red-600');
+            btn.classList.replace('border-indigo-400', 'border-red-400');
+            btn.disabled = true; // Evitar doble clic compulsivo
+
+            // 2. Apagamos la radio de Firebase (Corte de señal)
+            db.disableNetwork().then(() => {
+                
+                // Esperamos 1.5 segundos para asegurar que el corte limpie la tubería
+                setTimeout(() => {
+                    
+                    // 3. La encendemos de nuevo (Reconexión Limpia)
+                    db.enableNetwork().then(() => {
+                        console.log("⚡ Conexión restablecida. Ejecutando guardado...");
+                        
+                        // 4. Restaurar botón a su estado normal (Azul)
+                        btn.innerHTML = originalIcon;
+                        btn.classList.replace('bg-red-600', 'bg-indigo-600');
+                        btn.classList.replace('border-red-400', 'border-indigo-400');
+                        btn.disabled = false;
+                        
+                        // 5. ¡GOLPE FINAL! Guardamos de inmediato aprovechando la conexión fresca
+                        saveData(); 
+                        
+                    });
+                    
+                }, 1500); 
+                
+            }).catch(err => {
+                console.error("Error reiniciando red:", err);
+                alert("Error al reiniciar la red. Por favor recarga la página.");
+                btn.innerHTML = originalIcon;
+                btn.classList.replace('bg-red-600', 'bg-indigo-600');
+                btn.disabled = false;
+            });
         }
 
     </script>
