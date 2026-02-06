@@ -171,12 +171,6 @@
                 </span>
             </div>
             <div class="flex items-center gap-3">
-
-                <button id="cloudSyncBtn" onclick="forceNetworkReconnect()"
-                    class="bg-indigo-600 hover:bg-indigo-500 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg border border-indigo-400 transition active:scale-90"
-                    title="Forzar Sincronización (Reiniciar Conexión)">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                </button>
                 
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
@@ -213,6 +207,15 @@
                         
                         <button onclick="toggleMenu('config'); toggleUserMenu()" class="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-2 transition">
                             <i class="fa-solid fa-gear text-gray-400"></i> Configuración
+                        </button>
+                        
+                        <div class="border-t border-gray-100 my-1"></div>
+
+                        <button onclick="forceNetworkReconnect()"
+                            class="w-full text-left px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-50 flex items-center gap-2 transition-colors group"
+                            title="Usar solo si tienes problemas de conexión">
+                            <i class="fa-solid fa-cloud-arrow-up group-hover:-translate-y-0.5 transition-transform"></i>
+                            Forzar Sincronización
                         </button>
                         
                         <div class="border-t border-gray-100 my-1"></div>
