@@ -1742,6 +1742,9 @@
         // Evita bucles infinitos y asegura que la tasa se pida DESPUÉS de sincronizar
         let hasInitialRatesUpdate = false;
 
+        // [NUEVO] Variable para ignorar conflictos temporalmente tras resolver uno
+        let conflictCooldown = false;
+
         // --- E2EE (ENCRIPTACIÓN) ---
         let encryptionKey = localStorage.getItem('inv_enc_key') || null;
 
@@ -2088,54 +2091,63 @@
 
         // --- NUEVA FUNCIÓN: Intermediario para detectar conflictos ---
         // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO v44) ---
+        // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO INTELIGENTE) ---
         function processSyncData(cloudData, doc) {
             
-            // CAMBIO 1: En modo estricto, también verificamos actualizaciones en tiempo real.
-            // Solo ignoramos si la actualización viene de NOSOTROS MISMOS (Pending Writes).
-            if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) {
-                return; // Es mi propio eco, no hago nada.
+            // 1. ESCUDO: Si acabamos de resolver un conflicto, ignoramos todo por unos segundos.
+            if (conflictCooldown) {
+                console.log("🛡️ Ignorando chequeo de conflicto (Cooldown activo)...");
+                // Aún así cargamos los datos si vienen de la nube para mantenernos al día
+                // PERO solo si elegimos 'USAR NUBE'. Si elegimos local, esto se ignorará.
+                // Por seguridad, en cooldown, mejor no tocamos nada hasta que se estabilice.
+                return; 
             }
 
-            // --- LÓGICA DE DETECCIÓN DE CONFLICTO ---
+            // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
+            if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
+
+            // --- LÓGICA DE DETECCIÓN ---
             const localLastUpdate = state.lastUpdated ? new Date(state.lastUpdated).getTime() : 0;
             const cloudLastUpdate = cloudData.lastUpdated ? new Date(cloudData.lastUpdated).getTime() : 0;
             
-            // CAMBIO 2: ELIMINAMOS LA TOLERANCIA. 
-            // La comparación debe ser EXACTA. Si difiere 1ms, es conflicto.
-            const areTimestampsEqual = localLastUpdate === cloudLastUpdate;
+            // 3. COMPARACIÓN CON TOLERANCIA DE 1 SEGUNDO
+            // Usar '===' es demasiado frágil. Si difieren por 500ms, sigue siendo la misma versión para nosotros.
+            const diff = Math.abs(localLastUpdate - cloudLastUpdate);
+            const areTimestampsEffectivelyEqual = diff < 1000; // Menos de 1 segundo = Iguales
 
-            // Si local está vacío (instalación limpia), no hay conflicto, queremos los datos de la nube.
+            // Excepción: Instalación limpia
             const isLocalEmpty = state.products.length === 0 && state.sales.length === 0;
 
-            if (!areTimestampsEqual && !isLocalEmpty) {
-                // ¡ALERTA! Hay diferencia (por mínima que sea).
-                console.warn("⚠️ CONFLICTO ESTRICTO: Diferencia de versiones detectada.");
+            if (!areTimestampsEffectivelyEqual && !isLocalEmpty) {
+                console.warn(`⚠️ CONFLICTO REAL: Diferencia de ${diff}ms detectada.`);
                 
-                // 1. Guardamos la nube en "cuarentena"
                 pendingCloudSnapshot = { data: cloudData, doc: doc };
                 
-                // 2. Preparamos la UI del Modal
-                const fmtLocal = localLastUpdate ? new Date(localLastUpdate).toLocaleString() : 'Sin fecha';
-                const fmtCloud = cloudLastUpdate ? new Date(cloudLastUpdate).toLocaleString() : 'Sin fecha';
-                
-                document.getElementById('confLocalDate').textContent = fmtLocal;
-                document.getElementById('confCloudDate').textContent = fmtCloud;
+                // UI del Modal
+                document.getElementById('confLocalDate').textContent = localLastUpdate ? new Date(localLastUpdate).toLocaleString() : '---';
+                document.getElementById('confCloudDate').textContent = cloudLastUpdate ? new Date(cloudLastUpdate).toLocaleString() : '---';
 
-                // 3. Mostramos Modal
                 document.getElementById('conflictModal').classList.remove('hidden');
                 
             } else {
-                // Si son EXACTAMENTE iguales o local está vacío, procedemos.
+                // Si son iguales (o casi iguales), procedemos.
                 finishLoadingData(cloudData, doc);
             }
             
-            // Marcamos que ya pasamos la validación inicial
             isFirstSyncCheck = false;
         }
 
         // --- FUNCIÓN DEL MODAL: Resuelve qué versión gana ---
         function resolveConflict(choice) {
             const modal = document.getElementById('conflictModal');
+
+            // 1. ACTIVAR ESCUDO (COOLDOWN) 🛡️
+            // Durante 3 segundos, ignoraremos cualquier "eco" o rebote de la red.
+            conflictCooldown = true;
+            setTimeout(() => {
+                conflictCooldown = false;
+                console.log("🛡️ Cooldown finalizado. Vigilancia reactivada.");
+            }, 3000);
             
             if (choice === 'CLOUD') {
                 if (pendingCloudSnapshot) {
@@ -2146,6 +2158,7 @@
                     
                     // Forzamos la fecha local para que coincida y no vuelva a saltar el modal
                     localStorage.setItem('inv_last_updated', pendingCloudSnapshot.data.lastUpdated); 
+                    state.lastUpdated = pendingCloudSnapshot.data.lastUpdated;
 
                     // La tasa del dólar probablemente sea vieja. ¡Actualicémosla de nuevo!
                     setTimeout(() => {
@@ -2158,6 +2171,7 @@
                 
                 // Actualizamos fecha local para que sea "la más reciente" oficialmente
                 state.lastUpdated = new Date().toISOString();
+                localStorage.setItem('inv_last_updated', state.lastUpdated);
                 
                 // Habilitamos subida y empujamos
                 state.isCloudSynced = true; 
