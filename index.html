@@ -21,6 +21,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -244,6 +245,15 @@
                             title="Usar solo si tienes problemas de conexión">
                             <i class="fa-solid fa-cloud-arrow-up group-hover:-translate-y-0.5 transition-transform"></i>
                             Forzar Sincronización
+                        </button>
+                        
+                        <div class="border-t border-gray-100 my-1"></div>
+
+                        <button onclick="exportInventoryPDF()"
+                            class="w-full text-left px-4 py-2 text-sm text-emerald-600 hover:bg-emerald-50 flex items-center gap-2 transition-colors group"
+                            title="Descarga un PDF de tu inventario actual">
+                            <i class="fa-solid fa-file-pdf group-hover:-translate-y-0.5 transition-transform"></i>
+                            Exportar Inventario (PDF)
                         </button>
                         
                         <div class="border-t border-gray-100 my-1"></div>
@@ -6807,6 +6817,107 @@
                 btn.classList.replace('bg-red-600', 'bg-indigo-600');
                 btn.disabled = false;
             });
+        }
+
+        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF ---
+        function exportInventoryPDF() {
+            // 1. Verificamos que la librería haya cargado
+            if (!window.jspdf || !window.jspdf.jsPDF) {
+                alert("Las librerías de PDF aún se están cargando o estás offline en tu primera visita. Intenta en unos segundos.");
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF(); // Por defecto crea un documento A4
+
+            // 2. Configuración de Fecha y Título
+            const today = new Date();
+            const dateString = today.toLocaleDateString('es-VE');
+            const timeString = today.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+            const fileName = `Inventario_EjeComercio_${dateString.replace(/\//g, '-')}.pdf`;
+
+            // Título del Documento
+            doc.setFontSize(22);
+            doc.setTextColor(15, 23, 42); // slate-900
+            doc.text("Reporte de Inventario - EjeComercio", 14, 20);
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100);
+            doc.text(`Generado el: ${dateString} a las ${timeString}`, 14, 28);
+
+            // 3. Preparar la Data
+            const allProducts = state.products || [];
+            
+            // Filtramos y aseguramos que qty sea un número
+            const outOfStock = allProducts.filter(p => (parseFloat(p.qty) || 0) <= 0);
+            const inStock = allProducts.filter(p => (parseFloat(p.qty) || 0) > 0);
+
+            let currentY = 40; // Posición vertical del "pincel"
+
+            // --- SECCIÓN 1: AGOTADOS (Prioridad Crítica) ---
+            if (outOfStock.length > 0) {
+                doc.setFontSize(14);
+                doc.setTextColor(220, 38, 38); // red-600
+                doc.text(`⚠️ Agotados / Necesitan Restock (${outOfStock.length} items)`, 14, currentY);
+                
+                doc.autoTable({
+                    startY: currentY + 4,
+                    head: [['Código/Nombre', 'Categoría']],
+                    // Mapeamos los datos de la fila
+                    body: outOfStock.map(p => [p.name, p.category || 'Sin categoría']),
+                    theme: 'grid',
+                    headStyles: { fillColor: [220, 38, 38] }, // Cabecera Roja
+                    styles: { fontSize: 10 },
+                    margin: { top: 10 }
+                });
+                
+                // Actualizamos la posición Y para la siguiente tabla
+                currentY = doc.lastAutoTable.finalY + 15;
+            } else {
+                doc.setFontSize(12);
+                doc.setTextColor(22, 163, 74); // green-600
+                doc.text("✅ ¡Excelente! No tienes productos agotados.", 14, currentY);
+                currentY += 15;
+            }
+
+            // --- SECCIÓN 2: INVENTARIO DISPONIBLE (Ordenado para reponer pronto) ---
+            if (inStock.length > 0) {
+                
+                // Agregamos nueva página si no hay mucho espacio
+                if (currentY > 230) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+
+                doc.setFontSize(14);
+                doc.setTextColor(37, 99, 235); // blue-600
+                doc.text(`📦 Inventario Actual (${inStock.length} items disponibles)`, 14, currentY);
+                
+                // ORDENAMIENTO: De menor cantidad a mayor cantidad (los críticos arriba)
+                const sortedInStock = [...inStock].sort((a, b) => parseFloat(a.qty) - parseFloat(b.qty));
+
+                doc.autoTable({
+                    startY: currentY + 4,
+                    head: [['Producto', 'Categoría', 'Cant.', 'Precio ($)']],
+                    body: sortedInStock.map(p => [
+                        p.name, 
+                        p.category || 'Sin categoría', 
+                        p.qty, 
+                        `$${parseFloat(p.price).toFixed(2)}`
+                    ]),
+                    theme: 'grid',
+                    headStyles: { fillColor: [37, 99, 235] }, // Cabecera Azul
+                    styles: { fontSize: 10 },
+                    columnStyles: { 
+                        2: { halign: 'center' }, // Centrar la cantidad
+                        3: { halign: 'right' }   // Alinear precio a la derecha
+                    },
+                    margin: { top: 10 }
+                });
+            }
+
+            // 4. Descargar el archivo
+            doc.save(fileName);
         }
 
     </script>
