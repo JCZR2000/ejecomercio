@@ -6819,122 +6819,103 @@
             });
         }
 
-        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (VERSIÓN BRANDING DEFINITIVA) ---
+        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (DISEÑO Y ALINEACIÓN CORREGIDOS) ---
         function exportInventoryPDF() {
             if (!window.jspdf || !window.jspdf.jsPDF) {
                 alert("Las librerías de PDF aún se están cargando o estás offline. Intenta en unos segundos.");
                 return;
             }
 
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            const pageWidth = doc.internal.pageSize.width;
-            const pageHeight = doc.internal.pageSize.height;
-
-            const today = new Date();
-            const dateString = today.toLocaleDateString('es-VE');
-            const timeString = today.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
-            const fileName = `Inventario_EjeComercio_${dateString.replace(/\//g, '-')}.pdf`;
-
-            // ==========================================
-            // 🎨 1. ENCABEZADO CORPORATIVO CON LOGO Y TEXTO ALINEADO (USANDO CANVAS)
-            // ==========================================
-            
-            // Dibuja un rectángulo oscuro en la parte superior (Fondo Slate-900)
-            doc.setFillColor(15, 23, 42); 
-            doc.rect(0, 0, pageWidth, 40, 'F'); // 'F' significa Fill (Rellenar)
-
-            // Convertimos el SVG a una URL segura
+            // 1. Preparar el Logo SVG (Solo el ícono)
+            // CAMBIO: Todos los rellenos internos ahora son NEGROS (#000000)
             const svgString = `
             <svg width="512" height="512" viewBox="0 0 910.38 908.17" xmlns="http://www.w3.org/2000/svg">
                  <path fill="#ffffff" d="M182.32.5l545.55-.5c88.77,6.27,162.78,71.56,177.8,159.59,7.77,190.45,4.02,382.46,1.99,573.21-10.65,88.06-75.99,156.71-162.87,172.79-187.3,5.12-375.39.81-562.98,2.2C72.63,897.73-4.91,803.39.24,694.95l1.65-396.79c.27-66.44-9.62-139.8,23.97-200.21C57.45,41.13,117.5,4.99,182.32.5ZM440.07,238.24v44.35c0,6.19,11.95,9.91,16.57,4.38l126.7-85.46c5.81-5.38,5.77-13.26-.77-17.95-41.7-24.87-82.61-60.66-124.55-84.13-5.56-3.11-16.25-7.01-17.95,2.29-1.46,8,2.42,46.02-1.62,48.81-181.63,9.37-316.95,181.54-281.34,361.11,15.16,76.46,61.96,148.63,127.14,190.82,19.17-22.92,47.47-40.51,74.07-53.81l-37.33-24.37c-62.97-50.33-94.14-132.72-78.67-212.48,18.27-94.17,100.75-170.07,197.75-173.56ZM469.64,669.55v-44.35c0-3.98-12.81-8.88-16.95-4.76l-128.33,87.3c-3.7,3.2-2.93,8.51-2.21,12.78l138.22,91.24c4.26-.33,8.39-3.13,9.24-7.47,1.42-7.25-1.66-46.1.03-47.8,117.07-3.28,224.54-83.24,266.94-191.32,47.19-120.31,11.81-257.26-85.24-340.79-4.01-3.46-20.09-16.99-23.53-18.32-1.88-.73-3.23-1.48-5.13-.1-16.71,25.53-46.3,38.02-71.29,54.01,94.02,48.66,138.96,155.22,109.59,257.43-18.03,62.73-67.21,116.39-128.26,139.56-8.68,3.3-59.2,18.43-63.07,12.58ZM540.07,514.76h-137.39c-4.08,0-9.63-13.9,5.62-16.99,39.3-7.95,89.36-4.73,129.88-10.99,15.77-1.59,18.33-23.6,22.39-36.74,5.2-16.82,17.7-52.08,19.66-67.41,3.12-24.37-28.56-15.52-41.81-15.62-17.03-.13-33.52-.09-50.44,0-37.57.22-75.46.83-112.8-1.79-11.32-32.43-13.84-40.4-50.86-36.65-15.24,1.54-13.39,17.8.07,19.23,5.41.57,22.63-2,25.26,3.02l38.29,131.95c.15,1.68-6.87,7.11-8.31,10.67-7.43,18.38,1.19,37.71,21.31,40.44,42.88-3.65,93.79,4.86,135.69.04,15.14-1.74,14.16-16.9,3.44-19.17ZM408.3,546.47c-21.41,4.34-16.16,40.07,6.39,37.84,24.22-2.4,22.94-43.79-6.39-37.84ZM516.09,546.44c-19.6,4.49-16.91,40.44,7.55,37.13,26.36-3.58,20.27-43.5-7.55-37.13Z"/>
-                 <path fill="#facc15" d="M440.07,238.24c-97,3.49-179.48,79.39-197.75,173.56-15.47,79.76,15.7,162.15,78.67,212.48l37.33,24.37c-26.6,13.3-54.9,30.88-74.07,53.81-65.18-42.19-111.97-114.36-127.14-190.82-35.61-179.57,99.7-351.74,281.34-361.11,4.05-2.79.16-40.81,1.62-48.81,1.7-9.3,12.39-5.4,17.95-2.29,41.95,23.47,82.86,59.26,124.55,84.13,6.54,4.69,6.57,12.57.77,17.95l-126.7,85.46c-4.62,5.53-16.57,1.81-16.57-4.38v-44.35Z"/>
-                 <path fill="#facc15" d="M469.64,669.55c3.87,5.85,54.39-9.29,63.07-12.58,61.06-23.18,110.24-76.83,128.26-139.56,29.37-102.21-15.57-208.77-109.59-257.43,24.99-16,54.58-28.49,71.29-54.01,1.9-1.38,3.25-.63,5.13.1,3.43,1.33,19.51,14.87,23.53,18.32,97.04,83.54,132.43,220.49,85.24,340.79-42.39,108.08-149.86,188.04-266.94,191.32-1.68,1.7,1.39,40.55-.03,47.8-.85,4.34-4.98,7.15-9.24,7.47l-138.22-91.24c-.72-4.27-1.49-9.59,2.21-12.78l128.33-87.3c4.14-4.12,16.95.78,16.95,4.76v44.35Z"/>
-                 <path fill="#facc15" d="M540.07,514.76c10.72,2.27,11.7,17.43-3.44,19.17-41.9,4.82-92.81-3.68-135.69-.04-20.12-2.73-28.74-22.06-21.31-40.44,1.44-3.57,8.46-8.99,8.31-10.67l-38.29-131.95c-2.63-5.02-19.85-2.45-25.26-3.02-13.46-1.43-15.32-17.69-.07-19.23,37.02-3.75,39.54,4.22,50.86,36.65,37.34,2.62,75.23,2.01,112.8,1.79,16.92-.1,33.42-.14,50.44,0,13.25.1,44.93-8.75,41.81,15.62-1.97,15.33-14.47,50.59-19.66,67.41-4.06,13.14-6.62,35.15-22.39,36.74-40.51,6.26-90.58,3.04-129.88,10.99-15.25,3.09-9.7,16.99-5.62,16.99h137.39ZM474.24,456.76l45.6-47.44c6.36-10.8-5.53-21.09-15.34-13.59-7.46,6.02-34.82,40.63-41.3,42.33-7.89,2.06-16.15-21.97-28.32-16.32-2.38,1.11-6.86,6.91-6.22,9.71,1.14,5.03,24.22,28.73,29.54,31.28,6.94,3.32,10.89-1.15,16.04-5.96Z"/>
-                 <path fill="#facc15" d="M408.3,546.47c29.33-5.95,30.61,35.44,6.39,37.84-22.55,2.23-27.8-33.49-6.39-37.84Z"/>
-                 <path fill="#facc15" d="M516.09,546.44c27.82-6.37,33.91,33.55,7.55,37.13-24.46,3.32-27.15-32.64-7.55-37.13Z"/>
+                 <path fill="#000000" d="M440.07,238.24c-97,3.49-179.48,79.39-197.75,173.56-15.47,79.76,15.7,162.15,78.67,212.48l37.33,24.37c-26.6,13.3-54.9,30.88-74.07,53.81-65.18-42.19-111.97-114.36-127.14-190.82-35.61-179.57,99.7-351.74,281.34-361.11,4.05-2.79.16-40.81,1.62-48.81,1.7-9.3,12.39-5.4,17.95-2.29,41.95,23.47,82.86,59.26,124.55,84.13,6.54,4.69,6.57,12.57.77,17.95l-126.7,85.46c-4.62,5.53-16.57,1.81-16.57-4.38v-44.35Z"/>
+                 <path fill="#000000" d="M469.64,669.55c3.87,5.85,54.39-9.29,63.07-12.58,61.06-23.18,110.24-76.83,128.26-139.56,29.37-102.21-15.57-208.77-109.59-257.43,24.99-16,54.58-28.49,71.29-54.01,1.9-1.38,3.25-.63,5.13.1,3.43,1.33,19.51,14.87,23.53,18.32,97.04,83.54,132.43,220.49,85.24,340.79-42.39,108.08-149.86,188.04-266.94,191.32-1.68,1.7,1.39,40.55-.03,47.8-.85,4.34-4.98,7.15-9.24,7.47l-138.22-91.24c-.72-4.27-1.49-9.59,2.21-12.78l128.33-87.3c4.14-4.12,16.95.78,16.95,4.76v44.35Z"/>
+                 <path fill="#000000" d="M540.07,514.76c10.72,2.27,11.7,17.43-3.44,19.17-41.9,4.82-92.81-3.68-135.69-.04-20.12-2.73-28.74-22.06-21.31-40.44,1.44-3.57,8.46-8.99,8.31-10.67l-38.29-131.95c-2.63-5.02-19.85-2.45-25.26-3.02-13.46-1.43-15.32-17.69-.07-19.23,37.02-3.75,39.54,4.22,50.86,36.65,37.34,2.62,75.23,2.01,112.8,1.79,16.92-.1,33.42-.14,50.44,0,13.25.1,44.93-8.75,41.81,15.62-1.97,15.33-14.47,50.59-19.66,67.41-4.06,13.14-6.62,35.15-22.39,36.74-40.51,6.26-90.58,3.04-129.88,10.99-15.25,3.09-9.7,16.99-5.62,16.99h137.39ZM474.24,456.76l45.6-47.44c6.36-10.8-5.53-21.09-15.34-13.59-7.46,6.02-34.82,40.63-41.3,42.33-7.89,2.06-16.15-21.97-28.32-16.32-2.38,1.11-6.86,6.91-6.22,9.71,1.14,5.03,24.22,28.73,29.54,31.28,6.94,3.32,10.89-1.15,16.04-5.96Z"/>
+                 <path fill="#000000" d="M408.3,546.47c29.33-5.95,30.61,35.44,6.39,37.84-22.55,2.23-27.8-33.49-6.39-37.84Z"/>
+                 <path fill="#000000" d="M516.09,546.44c27.82-6.37,33.91,33.55,7.55,37.13-24.46,3.32-27.15-32.64-7.55-37.13Z"/>
                  <path fill="#ffffff" d="M429.27,432.67c1.94,2.31,5.64,6.73,10.5,12.48,0,0,1.77,2.44,12.63,13.24.53.53,3.53,2.88,7.61,5.02.58.3,2.18,1.05,4.26.76,2.4-.33,4-2,4.57-2.59,2.83-2.95,23.13-23.89,51.09-52.95.45-.7,1.87-3.1,1.55-6.38-.35-3.53-2.47-5.69-3.04-6.24-.51-.52-3.28-3.24-7.61-3.19-3.35.03-5.66,1.7-6.39,2.28-19.83,20.66-34.2,35.77-36.49,38.22-1.78,1.9-3.55,3.8-3.55,3.8-1.04,1.12-1.98,2.13-2.8,3.01l-2.84-2.84c-.94-.94-1.88-1.88-2.82-2.82-4.18-4.18-8.37-8.37-12.55-12.55-.79-.46-3.8-2.07-7.56-1.26-2.24.48-3.78,1.61-4.56,2.28-.61.67-1.53,1.85-2.08,3.55-.92,2.85-.21,5.3.1,6.19Z"/>
-                 <rect fill="#facc15" x="369.49" y="362.62" width="192.32" height="17.4" transform="translate(11.99 -14.56) rotate(1.81)"/>
+                 <rect fill="#000000" x="369.49" y="362.62" width="192.32" height="17.4" transform="translate(11.99 -14.56) rotate(1.81)"/>
             </svg>`.trim();
 
             const svgUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
             const img = new Image();
             
-            // Cuando el logo SVG se carga en memoria...
             img.onload = function() {
-                // Creamos un Canvas invisible
+                // Creamos un Canvas invisible SOLO para el ícono
                 const canvas = document.createElement("canvas");
-                // Configuramos un tamaño grande para buena resolución
-                canvas.width = 1000; 
-                canvas.height = 200;
+                canvas.width = 512; 
+                canvas.height = 512;
                 const ctx = canvas.getContext("2d");
-
-                // --- DIBUJAMOS EL DISEÑO COMPLETO EN EL CANVAS ---
-                
-                // 1. Dibujamos el Logo SVG con el tamaño y posición correctos
-                // El tamaño del logo será de 150x150 en relación al canvas
-                const logoSize = 150; 
-                ctx.drawImage(img, 0, (canvas.height - logoSize) / 2, logoSize, logoSize);
-
-                // 2. Configuramos la fuente para el texto
-                // Usamos 'bold' y un tamaño proporcional al canvas
-                ctx.font = "bold 80px Helvetica"; 
-
-                // 3. Dibujamos "Eje" en Blanco
-                ctx.fillStyle = "#ffffff"; // Blanco suave (similar a text-slate-100)
-                // Colocamos el texto a la derecha del logo con un margen de 20px
-                ctx.fillText("Eje", logoSize + 20, 125); // El 125 es la posición vertical 'baseline'
-
-                // 4. Medimos el ancho de "Eje" para colocar "Comercio" justo después
-                const ejeWidth = ctx.measureText("Eje").width;
-
-                // 5. Dibujamos "Comercio" en Amarillo
-                ctx.fillStyle = "#facc15"; // Amarillo vibrante (similar a text-yellow-400)
-                // Colocamos el texto justo después de "Eje"
-                ctx.fillText("Comercio", logoSize + 20 + ejeWidth, 125);
-
-                // --- CONVERTIMOS EL CANVAS A UNA IMAGEN ---
+                ctx.drawImage(img, 0, 0, 512, 512);
                 const logoDataUrl = canvas.toDataURL("image/png");
 
-                // --- ESTAMPAMOS EL LOGO COMPLETO EN EL PDF ---
-                // doc.addImage(imageData, format, x, y, width, height)
-                // Mantenemos la relación de aspecto del canvas (1000x200 -> 5:1)
-                const pdfLogoWidth = 60; // Ancho del logo completo en mm en el PDF
-                const pdfLogoHeight = pdfLogoWidth / (canvas.width / canvas.height); // Altura proporcional
-                // Lo colocamos en (x=14mm, y=10mm) para centrarlo verticalmente en el banner de 40mm
-                doc.addImage(logoDataUrl, 'PNG', 14, 10, pdfLogoWidth, pdfLogoHeight); 
-
-                // --- CONTINUAMOS CON EL RESTO DEL PDF (SUBTÍTULO Y TABLAS) ---
+                // --- INICIA GENERACIÓN DEL PDF ---
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
                 
-                // Subtítulo (Blanco)
-                doc.setTextColor(255, 255, 255); 
-                doc.setFontSize(12);
-                doc.setFont("helvetica", "normal");
-                // Lo alineamos a la derecha del logo completo dibujado
-                doc.text("Reporte de Inventario y Estado de Stock", 14 + pdfLogoWidth + 5, 30);
+                const pageWidth = doc.internal.pageSize.width;
+                const pageHeight = doc.internal.pageSize.height;
 
-                // Fecha alineada a la derecha
-                doc.setTextColor(200, 200, 200); 
-                doc.setFontSize(10);
-                doc.text(`Generado: ${dateString}`, pageWidth - 14, 20, { align: 'right' });
-                doc.text(`Hora: ${timeString}`, pageWidth - 14, 26, { align: 'right' });
+                const today = new Date();
+                const dateString = today.toLocaleDateString('es-VE');
+                const timeString = today.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+                const fileName = `Inventario_EjeComercio_${dateString.replace(/\//g, '-')}.pdf`;
 
                 // ==========================================
-                // 📊 2. PREPARACIÓN DE DATOS
+                // 🎨 ENCABEZADO CORPORATIVO
+                // ==========================================
+                
+                // Fondo del Banner
+                doc.setFillColor(15, 23, 42); 
+                doc.rect(0, 0, pageWidth, 40, 'F'); 
+
+                // 1. Estampar el Logo (Ícono) a la izquierda
+                // Posición: x=14, y=8. Tamaño: 14x14 mm.
+                doc.addImage(logoDataUrl, 'PNG', 14, 8, 14, 14); 
+
+                // 2. Título NATIVO alineado perfectamente con el logo
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(22);
+                
+                // Posición X: Margen(14) + Logo(14) + Espaciado(4) = 32
+                // Posición Y: 19 (Alineación vertical con el centro del logo)
+                
+                doc.setTextColor(255, 255, 255); // "Eje" (Blanco)
+                doc.text("Eje", 32, 19);
+                
+                let ejeWidth = doc.getTextWidth("Eje");
+                
+                doc.setTextColor(250, 204, 21); // "Comercio" (Amarillo)
+                doc.text("Comercio", 32 + ejeWidth, 19);
+
+                // 3. Subtítulo (Alineado a la IZQUIERDA, debajo del logo)
+                doc.setTextColor(255, 255, 255); 
+                doc.setFontSize(11);
+                doc.setFont("helvetica", "normal");
+                // El logo termina en Y=22. Colocamos el texto en Y=32.
+                doc.text("Reporte de Inventario y Estado de Stock", 14, 32);
+
+                // 4. Fecha alineada a la derecha
+                doc.setTextColor(200, 200, 200); 
+                doc.setFontSize(10);
+                doc.text(`Generado: ${dateString}`, pageWidth - 14, 15, { align: 'right' });
+                doc.text(`Hora: ${timeString}`, pageWidth - 14, 21, { align: 'right' });
+
+                // ==========================================
+                // 📊 PREPARACIÓN DE DATOS Y TABLAS
                 // ==========================================
                 const allProducts = state.products || [];
                 const outOfStock = allProducts.filter(p => (parseFloat(p.qty) || 0) <= 0);
                 const inStock = allProducts.filter(p => (parseFloat(p.qty) || 0) > 0);
 
-                let currentY = 50; // Empezamos más abajo por el banner corporativo
+                let currentY = 50; 
 
-                // ==========================================
-                // 🔴 3. TABLA DE AGOTADOS (ESTILO ALERTA)
-                // ==========================================
                 if (outOfStock.length > 0) {
                     doc.setFontSize(14);
-                    doc.setTextColor(220, 38, 38); // red-600
+                    doc.setTextColor(220, 38, 38); 
                     doc.setFont("helvetica", "bold");
                     doc.text(`Agotados / Necesitan Restock (${outOfStock.length} items)`, 14, currentY);
                     
@@ -6942,11 +6923,10 @@
                         startY: currentY + 4,
                         head: [['Producto', 'Precio ($)']],
                         body: outOfStock.map(p => [p.name, `$${parseFloat(p.price || 0).toFixed(2)}`]),
-                        // Estilos elegantes
                         theme: 'plain', 
-                        headStyles: { fillColor: [254, 226, 226], textColor: [220, 38, 38], fontStyle: 'bold' }, // Fondo rojo clarito, texto rojo
+                        headStyles: { fillColor: [254, 226, 226], textColor: [220, 38, 38], fontStyle: 'bold' }, 
                         bodyStyles: { textColor: [50, 50, 50] },
-                        alternateRowStyles: { fillColor: [249, 250, 251] }, // Gris súper sutil
+                        alternateRowStyles: { fillColor: [249, 250, 251] }, 
                         columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
                         margin: { top: 10 }
                     });
@@ -6954,14 +6934,11 @@
                     currentY = doc.lastAutoTable.finalY + 15;
                 }
 
-                // ==========================================
-                // 🔵 4. TABLA DE INVENTARIO DISPONIBLE
-                // ==========================================
                 if (inStock.length > 0) {
                     if (currentY > 230) { doc.addPage(); currentY = 20; }
 
                     doc.setFontSize(14);
-                    doc.setTextColor(30, 64, 175); // blue-800
+                    doc.setTextColor(30, 64, 175); 
                     doc.setFont("helvetica", "bold");
                     doc.text(`Inventario Actual (${inStock.length} items)`, 14, currentY);
                     
@@ -6975,18 +6952,17 @@
                             p.qty, 
                             `$${parseFloat(p.price || 0).toFixed(2)}`
                         ]),
-                        // Estilos elegantes (Minimalista corporativo)
                         theme: 'grid',
-                        headStyles: { fillColor: [15, 23, 42], textColor: 255 }, // Cabecera oscura slate-900
+                        headStyles: { fillColor: [15, 23, 42], textColor: 255 }, 
                         bodyStyles: { textColor: [50, 50, 50] },
-                        alternateRowStyles: { fillColor: [241, 245, 249] }, // slate-100 (Filas Zebra)
+                        alternateRowStyles: { fillColor: [241, 245, 249] }, 
                         styles: { 
                             fontSize: 10,
-                            lineColor: [226, 232, 240], // Bordes gris muy suave
+                            lineColor: [226, 232, 240], 
                             lineWidth: 0.1
                         },
                         columnStyles: { 
-                            1: { halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] }, // Cantidad azulita y negrita
+                            1: { halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] }, 
                             2: { halign: 'right' }
                         },
                         margin: { top: 10 }
@@ -6994,7 +6970,7 @@
                 }
 
                 // ==========================================
-                // 📄 5. PIE DE PÁGINA (PAGINACIÓN)
+                // 📄 PIE DE PÁGINA (PAGINACIÓN)
                 // ==========================================
                 const pageCount = doc.internal.getNumberOfPages();
                 doc.setFont("helvetica", "normal");
@@ -7003,10 +6979,8 @@
 
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i);
-                    // Línea separadora
                     doc.setDrawColor(226, 232, 240);
                     doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
-                    // Texto de página
                     doc.text(
                         `Reporte generado por EjeComercio - Página ${i} de ${pageCount}`, 
                         pageWidth / 2, 
@@ -7015,11 +6989,9 @@
                     );
                 }
 
-                // Descargar el archivo
                 doc.save(fileName);
             };
             
-            // Esto dispara la carga de la imagen y el inicio de todo el proceso de arriba
             img.src = svgUrl;
         }
 
