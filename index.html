@@ -6819,9 +6819,8 @@
             });
         }
 
-        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (CORREGIDA) ---
+        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (VERSIÓN PREMIUM) ---
         function exportInventoryPDF() {
-            // 1. Verificamos que la librería haya cargado
             if (!window.jspdf || !window.jspdf.jsPDF) {
                 alert("Las librerías de PDF aún se están cargando o estás offline. Intenta en unos segundos.");
                 return;
@@ -6829,97 +6828,139 @@
 
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
+            
+            // Constantes de la página
+            const pageWidth = doc.internal.pageSize.width;
+            const pageHeight = doc.internal.pageSize.height;
 
-            // 2. Configuración de Fecha y Título
+            // Fechas
             const today = new Date();
             const dateString = today.toLocaleDateString('es-VE');
             const timeString = today.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
             const fileName = `Inventario_EjeComercio_${dateString.replace(/\//g, '-')}.pdf`;
 
-            // Título del Documento
-            doc.setFontSize(22);
-            doc.setTextColor(15, 23, 42); // slate-900
-            doc.text("Reporte de Inventario - EjeComercio", 14, 20);
+            // ==========================================
+            // 🎨 1. ENCABEZADO CORPORATIVO (BANNER)
+            // ==========================================
             
-            doc.setFontSize(10);
-            doc.setTextColor(100);
-            doc.text(`Generado el: ${dateString} a las ${timeString}`, 14, 28);
+            // Dibujamos un rectángulo oscuro en la parte superior (Fondo Slate-900)
+            doc.setFillColor(15, 23, 42); 
+            doc.rect(0, 0, pageWidth, 35, 'F'); // 'F' significa Fill (Rellenar)
 
-            // 3. Preparar la Data
+            // Título Principal (Blanco)
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.setFont("helvetica", "bold");
+            doc.text("EjeComercio", 14, 20);
+
+            // Subtítulo (Amarillo/Dorado)
+            doc.setTextColor(253, 224, 71); // yellow-300
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "normal");
+            doc.text("Reporte de Inventario y Estado de Stock", 14, 28);
+
+            // Fecha alineada a la derecha
+            doc.setTextColor(200, 200, 200); // Gris claro
+            doc.setFontSize(10);
+            doc.text(`Generado: ${dateString}`, pageWidth - 14, 18, { align: 'right' });
+            doc.text(`Hora: ${timeString}`, pageWidth - 14, 24, { align: 'right' });
+
+            // ==========================================
+            // 📊 2. PREPARACIÓN DE DATOS
+            // ==========================================
             const allProducts = state.products || [];
-            
             const outOfStock = allProducts.filter(p => (parseFloat(p.qty) || 0) <= 0);
             const inStock = allProducts.filter(p => (parseFloat(p.qty) || 0) > 0);
 
-            let currentY = 40; 
+            let currentY = 45; // Empezamos más abajo por el banner
 
-            // --- SECCIÓN 1: AGOTADOS ---
+            // ==========================================
+            // 🔴 3. TABLA DE AGOTADOS (ESTILO ALERTA)
+            // ==========================================
             if (outOfStock.length > 0) {
                 doc.setFontSize(14);
                 doc.setTextColor(220, 38, 38); // red-600
-                // TEXTO LIMPIO SIN EMOJIS PARA EVITAR ERRORES DE CODIFICACIÓN
+                doc.setFont("helvetica", "bold");
                 doc.text(`Agotados / Necesitan Restock (${outOfStock.length} items)`, 14, currentY);
                 
                 doc.autoTable({
                     startY: currentY + 4,
-                    // CAMBIO: Mostramos Producto y Precio
                     head: [['Producto', 'Precio ($)']],
-                    body: outOfStock.map(p => [
-                        p.name, 
-                        `$${parseFloat(p.price || 0).toFixed(2)}`
-                    ]),
-                    theme: 'grid',
-                    headStyles: { fillColor: [220, 38, 38] },
-                    styles: { fontSize: 10 },
-                    columnStyles: { 
-                        1: { halign: 'right' } // Alinear precio a la derecha
-                    },
+                    body: outOfStock.map(p => [p.name, `$${parseFloat(p.price || 0).toFixed(2)}`]),
+                    // Estilos elegantes
+                    theme: 'plain', 
+                    headStyles: { fillColor: [254, 226, 226], textColor: [220, 38, 38], fontStyle: 'bold' }, // Fondo rojo clarito, texto rojo
+                    bodyStyles: { textColor: [50, 50, 50] },
+                    alternateRowStyles: { fillColor: [249, 250, 251] }, // Gris súper sutil
+                    columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
                     margin: { top: 10 }
                 });
                 
                 currentY = doc.lastAutoTable.finalY + 15;
-            } else {
-                doc.setFontSize(12);
-                doc.setTextColor(22, 163, 74); // green-600
-                doc.text("Excelente! No tienes productos agotados.", 14, currentY);
-                currentY += 15;
             }
 
-            // --- SECCIÓN 2: INVENTARIO DISPONIBLE ---
+            // ==========================================
+            // 🔵 4. TABLA DE INVENTARIO DISPONIBLE
+            // ==========================================
             if (inStock.length > 0) {
-                
-                if (currentY > 230) {
-                    doc.addPage();
-                    currentY = 20;
-                }
+                if (currentY > 230) { doc.addPage(); currentY = 20; }
 
                 doc.setFontSize(14);
-                doc.setTextColor(37, 99, 235); // blue-600
-                doc.text(`Inventario Actual (${inStock.length} items disponibles)`, 14, currentY);
+                doc.setTextColor(30, 64, 175); // blue-800
+                doc.setFont("helvetica", "bold");
+                doc.text(`Inventario Actual (${inStock.length} items)`, 14, currentY);
                 
                 const sortedInStock = [...inStock].sort((a, b) => parseFloat(a.qty) - parseFloat(b.qty));
 
                 doc.autoTable({
                     startY: currentY + 4,
-                    // CAMBIO: Quitamos Categoría, ajustamos columnas
                     head: [['Producto', 'Cant.', 'Precio ($)']],
                     body: sortedInStock.map(p => [
                         p.name, 
                         p.qty, 
                         `$${parseFloat(p.price || 0).toFixed(2)}`
                     ]),
+                    // Estilos elegantes (Minimalista corporativo)
                     theme: 'grid',
-                    headStyles: { fillColor: [37, 99, 235] },
-                    styles: { fontSize: 10 },
+                    headStyles: { fillColor: [15, 23, 42], textColor: 255 }, // Cabecera oscura slate-900
+                    bodyStyles: { textColor: [50, 50, 50] },
+                    alternateRowStyles: { fillColor: [241, 245, 249] }, // slate-100 (Filas Zebra)
+                    styles: { 
+                        fontSize: 10,
+                        lineColor: [226, 232, 240], // Bordes gris muy suave
+                        lineWidth: 0.1
+                    },
                     columnStyles: { 
-                        1: { halign: 'center' }, // Centrar la cantidad (ahora es la columna 1)
-                        2: { halign: 'right' }   // Alinear precio a la derecha (ahora es la columna 2)
+                        1: { halign: 'center', fontStyle: 'bold', textColor: [37, 99, 235] }, // Cantidad azulita y negrita
+                        2: { halign: 'right' }
                     },
                     margin: { top: 10 }
                 });
             }
 
-            // 4. Descargar el archivo
+            // ==========================================
+            // 📄 5. PIE DE PÁGINA (PAGINACIÓN)
+            // ==========================================
+            const pageCount = doc.internal.getNumberOfPages();
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                // Línea separadora
+                doc.setDrawColor(226, 232, 240);
+                doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+                // Texto de página
+                doc.text(
+                    `Reporte generado por EjeComercio - Página ${i} de ${pageCount}`, 
+                    pageWidth / 2, 
+                    pageHeight - 8, 
+                    { align: 'center' }
+                );
+            }
+
+            // 6. Descargar
             doc.save(fileName);
         }
 
