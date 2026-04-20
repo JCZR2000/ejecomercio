@@ -6819,16 +6819,16 @@
             });
         }
 
-        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF ---
+        // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (CORREGIDA) ---
         function exportInventoryPDF() {
             // 1. Verificamos que la librería haya cargado
             if (!window.jspdf || !window.jspdf.jsPDF) {
-                alert("Las librerías de PDF aún se están cargando o estás offline en tu primera visita. Intenta en unos segundos.");
+                alert("Las librerías de PDF aún se están cargando o estás offline. Intenta en unos segundos.");
                 return;
             }
 
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF(); // Por defecto crea un documento A4
+            const doc = new jsPDF();
 
             // 2. Configuración de Fecha y Título
             const today = new Date();
@@ -6848,42 +6848,46 @@
             // 3. Preparar la Data
             const allProducts = state.products || [];
             
-            // Filtramos y aseguramos que qty sea un número
             const outOfStock = allProducts.filter(p => (parseFloat(p.qty) || 0) <= 0);
             const inStock = allProducts.filter(p => (parseFloat(p.qty) || 0) > 0);
 
-            let currentY = 40; // Posición vertical del "pincel"
+            let currentY = 40; 
 
-            // --- SECCIÓN 1: AGOTADOS (Prioridad Crítica) ---
+            // --- SECCIÓN 1: AGOTADOS ---
             if (outOfStock.length > 0) {
                 doc.setFontSize(14);
                 doc.setTextColor(220, 38, 38); // red-600
-                doc.text(`⚠️ Agotados / Necesitan Restock (${outOfStock.length} items)`, 14, currentY);
+                // TEXTO LIMPIO SIN EMOJIS PARA EVITAR ERRORES DE CODIFICACIÓN
+                doc.text(`Agotados / Necesitan Restock (${outOfStock.length} items)`, 14, currentY);
                 
                 doc.autoTable({
                     startY: currentY + 4,
-                    head: [['Código/Nombre', 'Categoría']],
-                    // Mapeamos los datos de la fila
-                    body: outOfStock.map(p => [p.name, p.category || 'Sin categoría']),
+                    // CAMBIO: Mostramos Producto y Precio
+                    head: [['Producto', 'Precio ($)']],
+                    body: outOfStock.map(p => [
+                        p.name, 
+                        `$${parseFloat(p.price || 0).toFixed(2)}`
+                    ]),
                     theme: 'grid',
-                    headStyles: { fillColor: [220, 38, 38] }, // Cabecera Roja
+                    headStyles: { fillColor: [220, 38, 38] },
                     styles: { fontSize: 10 },
+                    columnStyles: { 
+                        1: { halign: 'right' } // Alinear precio a la derecha
+                    },
                     margin: { top: 10 }
                 });
                 
-                // Actualizamos la posición Y para la siguiente tabla
                 currentY = doc.lastAutoTable.finalY + 15;
             } else {
                 doc.setFontSize(12);
                 doc.setTextColor(22, 163, 74); // green-600
-                doc.text("✅ ¡Excelente! No tienes productos agotados.", 14, currentY);
+                doc.text("Excelente! No tienes productos agotados.", 14, currentY);
                 currentY += 15;
             }
 
-            // --- SECCIÓN 2: INVENTARIO DISPONIBLE (Ordenado para reponer pronto) ---
+            // --- SECCIÓN 2: INVENTARIO DISPONIBLE ---
             if (inStock.length > 0) {
                 
-                // Agregamos nueva página si no hay mucho espacio
                 if (currentY > 230) {
                     doc.addPage();
                     currentY = 20;
@@ -6891,26 +6895,25 @@
 
                 doc.setFontSize(14);
                 doc.setTextColor(37, 99, 235); // blue-600
-                doc.text(`📦 Inventario Actual (${inStock.length} items disponibles)`, 14, currentY);
+                doc.text(`Inventario Actual (${inStock.length} items disponibles)`, 14, currentY);
                 
-                // ORDENAMIENTO: De menor cantidad a mayor cantidad (los críticos arriba)
                 const sortedInStock = [...inStock].sort((a, b) => parseFloat(a.qty) - parseFloat(b.qty));
 
                 doc.autoTable({
                     startY: currentY + 4,
-                    head: [['Producto', 'Categoría', 'Cant.', 'Precio ($)']],
+                    // CAMBIO: Quitamos Categoría, ajustamos columnas
+                    head: [['Producto', 'Cant.', 'Precio ($)']],
                     body: sortedInStock.map(p => [
                         p.name, 
-                        p.category || 'Sin categoría', 
                         p.qty, 
-                        `$${parseFloat(p.price).toFixed(2)}`
+                        `$${parseFloat(p.price || 0).toFixed(2)}`
                     ]),
                     theme: 'grid',
-                    headStyles: { fillColor: [37, 99, 235] }, // Cabecera Azul
+                    headStyles: { fillColor: [37, 99, 235] },
                     styles: { fontSize: 10 },
                     columnStyles: { 
-                        2: { halign: 'center' }, // Centrar la cantidad
-                        3: { halign: 'right' }   // Alinear precio a la derecha
+                        1: { halign: 'center' }, // Centrar la cantidad (ahora es la columna 1)
+                        2: { halign: 'right' }   // Alinear precio a la derecha (ahora es la columna 2)
                     },
                     margin: { top: 10 }
                 });
