@@ -131,14 +131,14 @@
             const debt = state.credits[idx].totalDebt - state.credits[idx].paid;
             
             if (state.surchargeType === 'PERCENT') {
-                amountToAdd = debt * (val / 100);
+                amountToAdd = roundMoney(debt * (val / 100));
             } else {
-                amountToAdd = val;
+                amountToAdd = roundMoney(val);
             }
 
-            state.credits[idx].totalDebt += amountToAdd;
+            state.credits[idx].totalDebt = roundMoney(state.credits[idx].totalDebt + amountToAdd);
             if (!state.credits[idx].surcharge) state.credits[idx].surcharge = 0;
-            state.credits[idx].surcharge += amountToAdd;
+            state.credits[idx].surcharge = roundMoney(state.credits[idx].surcharge + amountToAdd);
             
             saveData();
             closeSurchargeModal();

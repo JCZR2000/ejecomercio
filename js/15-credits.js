@@ -294,9 +294,9 @@
             state.cart.push({
                 id: 'stub_simple_' + Date.now(),
                 name: 'Saldo Anterior (Migración)',
-                price: amount,
+                price: roundMoney(amount),
                 qty: 1,
-                subtotal: amount,
+                subtotal: roundMoney(amount),
                 isStub: true // BANDERA IMPORTANTE
             });
             
@@ -335,7 +335,7 @@
             if (existingItem) {
                 // Si existe, aumentamos cantidad y recalculamos subtotal
                 existingItem.qty++;
-                existingItem.subtotal = existingItem.qty * existingItem.price;
+                existingItem.subtotal = roundMoney(existingItem.qty * existingItem.price);
             } else {
                 // Si no existe, lo agregamos nuevo
                 tempMigCart.push({
@@ -357,7 +357,7 @@
             if (change === -1 && item.qty <= 1) return;
             
             item.qty += change;
-            item.subtotal = item.qty * item.price;
+            item.subtotal = roundMoney(item.qty * item.price);
             renderMigCart();
         }
 

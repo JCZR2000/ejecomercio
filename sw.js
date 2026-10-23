@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v46.1'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v46.2'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -39,7 +39,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v46.1...');
+  console.log('[Service Worker] Instalando v46.2...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -63,48 +63,41 @@ self.addEventListener('activate', (e) => {
   self.clients.claim(); // Tomar control de las pestañas abiertas
 });
 
-// 4. INTERCEPTOR DE RED (Estrategia: Stale-While-Revalidate / Cache Dinámico)
+// 4. INTERCEPTOR DE RED
+// - Archivos propios: red primero, con respaldo en caché (offline).
+// - CDN de la lista (con versión fija en index.html): caché primero.
+// - Todo lo demás (Firestore, OpenFoodFacts, tasas, imágenes externas): directo a la red, sin caché.
+const CDN_HOSTS = ['cdnjs.cloudflare.com', 'unpkg.com', 'cdn.jsdelivr.net', 'cdn.tailwindcss.com'];
+
+function isCdnRequest(url) {
+  if (url.hostname === 'www.gstatic.com') return url.pathname.startsWith('/firebasejs/');
+  return CDN_HOSTS.includes(url.hostname);
+}
+
+// Guarda solo respuestas correctas (ok) u opacas (scripts/estilos de CDN sin CORS); nunca errores
+function cacheIfValid(request, response) {
+  if (response && (response.ok || response.type === 'opaque')) {
+    const copy = response.clone();
+    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+  }
+  return response;
+}
+
 self.addEventListener('fetch', (e) => {
-  // Ignorar peticiones que no sean http/https (ej. chrome-extension://)
-  if (!e.request.url.startsWith('http')) return;
+  // La Cache API solo guarda GET http(s); lo demás (POST de Firebase, chrome-extension://) pasa directo
+  if (e.request.method !== 'GET' || !e.request.url.startsWith('http')) return;
 
-  // B. FILTRO DE MÉTODO (¡LA SOLUCIÓN!): 
-  // Si no es GET (ej: POST de Firebase), no hacemos nada y dejamos que pase directo.
-  // La Cache API NO soporta guardar peticiones POST.
-  if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
 
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      // A. ESTRATEGIA: Network First con Fallback a Caché (Para datos frescos)
-      // Intentamos ir a la red primero para tener siempre la última versión
-      const fetchPromise = fetch(e.request)
-        .then((networkResponse) => {
-          // Si la respuesta es válida, la guardamos en caché (Cacheo Dinámico)
-          // Esto guardará Tailwind, Firebase, FontAwesome, etc. la primera vez que carguen.
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-            // Solo cacheamos respuestas 'basic' (mismo origen) de forma segura aquí
-            // Para CDNs (cors/opaque), necesitamos manejarlo con cuidado o confiar en el caché del navegador
-          }
-
-          // Clonamos la respuesta porque se usa dos veces (browser y cache)
-          const responseToCache = networkResponse.clone();
-
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, responseToCache);
-          });
-
-          return networkResponse;
-        })
-        .catch(() => {
-          // Si falla la red (OFFLINE), devolvemos lo que haya en caché
-          return cachedResponse;
-        });
-
-      // Si tenemos algo en caché, podríamos devolverlo rápido, pero en tu caso
-      // prefiero que intente la red primero para asegurar actualizaciones de precios/lógica.
-      // Si quieres velocidad pura, devolvemos cachedResponse || fetchPromise.
-      // Pero para asegurar consistencia, usaremos el fetchPromise primero (Network First).
-      return fetchPromise.catch(() => cachedResponse);
-    })
-  );
+  if (url.origin === self.location.origin) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => cacheIfValid(e.request, res))
+        .catch(() => caches.match(e.request))
+    );
+  } else if (isCdnRequest(url)) {
+    e.respondWith(
+      caches.match(e.request).then((cached) => cached || fetch(e.request).then((res) => cacheIfValid(e.request, res)))
+    );
+  }
 });

@@ -6,7 +6,7 @@
             const inputUSD = $(`pay_usd_${id}`);
             if (!inputUSD) return;
 
-            const amount = parseFloat(inputUSD.value);
+            const amount = roundMoney(parseFloat(inputUSD.value));
             if (!amount || amount <= 0) return alert('Monto inválido');
 
             const idx = state.credits.findIndex(c => c.id == id);
@@ -15,7 +15,7 @@
             // Antes de cobrar, actualizamos la deuda total en la base de datos
             // con el valor real calculado (incluyendo aumentos)
             const realTotal = calculateRealDebt(state.credits[idx]);
-            state.credits[idx].totalDebt = realTotal;
+            state.credits[idx].totalDebt = roundMoney(realTotal);
             // ----------------------------------
             
             const c = state.credits[idx];
@@ -23,10 +23,10 @@
             // Tolerancia de 0.01 para errores de punto flotante
             if (amount > (c.totalDebt - c.paid + 0.01)) return alert('El monto excede la deuda');
 
-            state.credits[idx].paid += amount;
+            state.credits[idx].paid = roundMoney(state.credits[idx].paid + amount);
             
             // --- NUEVO: Detectar si se completó el pago ---
-            const remaining = state.credits[idx].totalDebt - state.credits[idx].paid;
+            const remaining = roundMoney(state.credits[idx].totalDebt - state.credits[idx].paid);
             if (remaining <= 0.01) {
                 // Se pagó completo: Marcamos la fecha de finalización
                 state.credits[idx].paidDate = new Date().toISOString();

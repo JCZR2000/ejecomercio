@@ -104,14 +104,14 @@
             
             if (inCart) {
                 inCart.qty += qty;
-                inCart.subtotal = inCart.qty * p.price;
+                inCart.subtotal = roundMoney(inCart.qty * p.price);
             } else {
                 state.cart.push({
                     id: p.id,
                     name: p.name,
                     price: p.price,
                     qty,
-                    subtotal: qty * p.price
+                    subtotal: roundMoney(qty * p.price)
                 });
             }
             renderCart();
@@ -138,7 +138,7 @@
 
             if (inCart) {
                 inCart.qty++;
-                inCart.subtotal = inCart.qty * p.price;
+                inCart.subtotal = roundMoney(inCart.qty * p.price);
             } else {
                 state.cart.push({
                     id: p.id,
@@ -176,7 +176,7 @@
 
             // 3. Aplicar cambios
             item.qty += change;
-            item.subtotal = item.qty * item.price;
+            item.subtotal = roundMoney(item.qty * item.price);
             
             // 4. Renderizar cambios
             renderCart();
@@ -286,8 +286,8 @@
             const activeRate = getActiveRate();
             const isCredit = $('isCreditSale').checked;
             const customerName = $('customerName').value.trim();
-            const initialPay = parseFloat($('initialPayUSD').value) || 0;
-            const totalUSD = state.cart.reduce((sum, i) => sum + i.subtotal, 0);
+            const initialPay = roundMoney(parseFloat($('initialPayUSD').value) || 0);
+            const totalUSD = roundMoney(state.cart.reduce((sum, i) => sum + i.subtotal, 0));
             const nextPaymentDate = isCredit ? calculatePaymentDate() : null;
 
             if (isCredit && !state.activeCreditId) {
@@ -318,8 +318,8 @@
                         const idx = state.credits.findIndex(c => c.id == state.activeCreditId);
                         if (idx !== -1) {
                             state.credits[idx].items.push(...state.cart);
-                            state.credits[idx].totalDebt += totalUSD;
-                            state.credits[idx].paid += initialPay;
+                            state.credits[idx].totalDebt = roundMoney(state.credits[idx].totalDebt + totalUSD);
+                            state.credits[idx].paid = roundMoney(state.credits[idx].paid + initialPay);
                             if (nextPaymentDate) state.credits[idx].nextPaymentDate = nextPaymentDate;
                         }
                         exitEditMode(); // <--- Ahora esta función ya no fallará

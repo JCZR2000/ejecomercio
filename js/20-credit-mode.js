@@ -46,6 +46,6 @@
             // Sumamos recargos si existen
             if (credit.surcharge) currentTotal += credit.surcharge;
 
-            return currentTotal;
+            return roundMoney(currentTotal);
         }
 

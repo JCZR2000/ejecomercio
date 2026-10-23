@@ -98,6 +98,20 @@
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
         }
 
+        // Redondea a centavos al GUARDAR montos en dólares (formatMoney solo formatea al mostrar)
+        function roundMoney(n) {
+            return Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+        }
+
+        function selfTestMoney() {
+            console.assert(roundMoney(0.1 + 0.2) === 0.3, 'selfTestMoney: 0.1 + 0.2');
+            console.assert(roundMoney(1.005) === 1.01, 'selfTestMoney: 1.005');
+            const debt = roundMoney(0.1 + 0.1 + 0.1);
+            const paid = roundMoney(0 + 0.30);
+            console.assert(roundMoney(debt - paid) === 0, 'selfTestMoney: 3 x 0.10 pagada con 0.30 queda en 0');
+            console.log('selfTestMoney terminado');
+        }
+
         // Texto del usuario, de un respaldo o de una API que se inserta como HTML
         function escapeHtml(value) {
             return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
