@@ -129,7 +129,7 @@
                         if (finalData.products) state.products = finalData.products;
                         if (finalData.sales) state.sales = finalData.sales;
                         if (finalData.credits) state.credits = finalData.credits;
-                        if (finalData.security) state.security = finalData.security;
+                        if (finalData.security) { state.security = finalData.security; migrateLegacyPin(); }
                 
                         // [RECUPERADO] Métodos de pago (¡Faltaba esto!)
                         if (finalData.paymentMethods) state.paymentMethods = finalData.paymentMethods;

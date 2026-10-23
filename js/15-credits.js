@@ -316,7 +316,7 @@
             list.forEach(p => {
                 const div = document.createElement('div');
                 div.className = "p-2 text-xs border-b hover:bg-indigo-50 cursor-pointer flex justify-between";
-                div.innerHTML = `<span>${p.name}</span> <span class="font-bold">${formatMoney(p.price)}</span>`;
+                div.innerHTML = `<span>${escapeHtml(p.name)}</span> <span class="font-bold">${formatMoney(p.price)}</span>`;
                 div.onmousedown = (e) => {
                     e.preventDefault();
                     addToMigCart(p);
@@ -378,7 +378,7 @@
                     tbody.innerHTML += `
                         <tr class="border-b last:border-0 hover:bg-gray-50 transition">
                             <td class="py-2 pl-2 align-middle">
-                                <div class="text-xs font-medium text-gray-700">${item.name}</div>
+                                <div class="text-xs font-medium text-gray-700">${escapeHtml(item.name)}</div>
                             </td>
 
                             <td class="py-2 align-middle">

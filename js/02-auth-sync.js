@@ -601,6 +601,7 @@
              if (finalData) {
                 state = { ...state, ...finalData };
                 state.isCloudSynced = true; 
+                migrateLegacyPin(); // un dispositivo viejo pudo subir el PIN en claro
 
                 if (!doc.metadata.hasPendingWrites) {
                     localStorage.setItem('inv_products', JSON.stringify(state.products));

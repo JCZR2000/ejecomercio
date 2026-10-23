@@ -28,7 +28,9 @@
             }
         }
 
-        window.editCredit = (id, name) => {
+        window.editCredit = (id) => {
+            const credit = state.credits.find(c => c.id == id);
+            const name = credit ? credit.customer : '';
             checkAuth('credit_add', () => {
                 state.activeCreditId = id;
                 
@@ -210,8 +212,8 @@
                 const plusDisabled = isStub ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400' : 'hover:bg-green-100 text-green-600 bg-green-50 border-green-200';
                 
                 const nameHtml = isStub 
-                    ? `<span class="text-indigo-600"><i class="fa-solid fa-clock-rotate-left mr-1"></i>${item.name}</span> <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded ml-1">VIEJO</span>`
-                    : item.name;
+                    ? `<span class="text-indigo-600"><i class="fa-solid fa-clock-rotate-left mr-1"></i>${escapeHtml(item.name)}</span> <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded ml-1">VIEJO</span>`
+                    : escapeHtml(item.name);
 
                 tbody.innerHTML += `
                 <tr class="border-b bg-white last:border-0">

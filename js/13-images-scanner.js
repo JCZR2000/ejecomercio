@@ -204,7 +204,7 @@
                     // Feedback visual
                     const btn = $('posTitle');
                     const original = btn.innerHTML;
-                    btn.innerHTML = `<i class="fa-solid fa-check text-green-500"></i> ${p.name} Agregado`;
+                    btn.innerHTML = `<i class="fa-solid fa-check text-green-500"></i> ${escapeHtml(p.name)} Agregado`;
                     setTimeout(() => btn.innerHTML = original, 2000);
                 } else {
                     if(confirm(`El código ${decodedText} no está registrado. ¿Ir a Gestión para crearlo?`)) {

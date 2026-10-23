@@ -1,16 +1,11 @@
         // ==========================================
         // 20. MONITOR DE ALMACENAMIENTO (v42)
         // ==========================================
+        let storageWarned = false; // el aviso del 80 % sale una vez por sesión
         function updateStorageUsage() {
-            // 1. Simulamos el payload que se envía a Firebase
-            // (Si usas encriptación, el peso podría variar ligeramente por el overhead de CryptoJS, pero esto es una buena estimación)
-            const payload = JSON.stringify({
-                products: state.products,
-                sales: state.sales,
-                credits: state.credits,
-                paymentMethods: state.paymentMethods,
-                security: state.security
-            });
+            // 1. Mismo documento que sube saveData; cifrado si hay clave
+            const raw = buildCloudPayload();
+            const payload = encryptionKey ? encryptPayload(raw) : JSON.stringify(raw);
 
             // 2. Calculamos bytes (Aprox. caracteres * 1 byte, aunque UTF-8 varía, es suficiente para referencia)
             const bytes = new Blob([payload]).size;
@@ -36,7 +31,10 @@
                 bar.classList.add('bg-yellow-500'); // Zona de Precaución
             } else {
                 bar.classList.add('bg-red-600', 'animate-pulse'); // ¡PELIGRO!
-                alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
+                if (!storageWarned) {
+                    storageWarned = true;
+                    alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
+                }
             }
         }
 
@@ -204,7 +202,7 @@
             
             const imgDiv = $('starProductImg');
             if (winner.img) {
-                imgDiv.innerHTML = `<img src="${winner.img}" class="w-full h-full object-cover">`;
+                imgDiv.innerHTML = `<img src="${escapeHtml(winner.img)}" class="w-full h-full object-cover">`;
             } else {
                 imgDiv.innerHTML = `<i class="fa-solid fa-trophy"></i>`;
             }

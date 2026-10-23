@@ -113,6 +113,7 @@
             // NO cargamos datos aquí. Esperamos a Firebase Auth.
             // Si el usuario no tiene internet, Firebase Auth usará caché y disparará el evento igual.
             // fetchAllRates(); [Función movida a initDataSync después de sincronizar]
+            migrateLegacyPin();
             renderAll();
 
             // 2. KICKSTART v43: Forzar la interfaz correcta al abrir

@@ -4,6 +4,28 @@
         // ---------------------------------------------------------
         // GUARDADO BLINDADO (Con Anti-Wipe + E2EE)
         // ---------------------------------------------------------
+        const CLOUD_LIMIT_BYTES = 1000000;
+
+        // Objeto completo que se sube a la nube (antes de cifrar). Lo usan saveData y el medidor.
+        function buildCloudPayload() {
+            return {
+                products: state.products,
+                sales: state.sales,
+                credits: state.credits,
+                paymentMethods: state.paymentMethods,
+                security: state.security,
+                receiptConfig: state.receiptConfig,
+                receiptType: state.receiptType,
+                fiscalConfig: state.fiscalConfig,
+                customRate: state.customRate,
+                rateMode: state.rateMode,
+                fiadosRateMode: state.fiadosRateMode,
+                bcvUsd: state.bcvUsd,
+                bcvEur: state.bcvEur,
+                lastUpdated: new Date().toISOString()
+            };
+        }
+
         function saveData() {
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
@@ -23,6 +45,9 @@
             localStorage.setItem('inv_bcv_usd', state.bcvUsd);
             localStorage.setItem('inv_bcv_eur', state.bcvEur);
             localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
+            if (state.receiptType) localStorage.setItem('inv_receipt_type', state.receiptType);
+            localStorage.setItem('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
+            localStorage.setItem('inv_credit_mode', state.creditMode);
     
             // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
             if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
@@ -35,7 +60,7 @@
             if (!state.isCloudSynced) return;
 
             // SEGURO 2: ¡CRÍTICO! Anti-Wipe (Evita borrar la DB por error de carga)
-            if (state.products.length === 0 && state.sales.length === 0) {
+            if (state.products.length === 0 && state.sales.length === 0 && state.credits.length === 0) {
                 console.warn("🛡️ BLOQUEO DE SEGURIDAD: Se intentó subir una base de datos vacía.");
                 return; 
             }
@@ -46,28 +71,7 @@
             const user = auth.currentUser;
     
             if (user) {
-                // Preparamos el objeto completo tal cual lo tienes hoy
-                const rawData = {
-                    products: state.products,
-                    sales: state.sales,
-                    credits: state.credits,
-                    paymentMethods: state.paymentMethods,
-                    security: state.security,
-                    receiptConfig: state.receiptConfig,
-                    receiptType: state.receiptType, // NUEVO
-                    fiscalConfig: state.fiscalConfig, // NUEVO
-                    customRate: state.customRate,
-                    rateMode: state.rateMode,
-                    fiadosRateMode: state.fiadosRateMode,
-                    bcvUsd: state.bcvUsd,
-                    bcvEur: state.bcvEur,
-                    lastUpdated: new Date().toISOString()
-                };
-
-                // Guardado Local Extra para las nuevas configuraciones
-                if (state.receiptType) localStorage.setItem('inv_receipt_type', state.receiptType);
-                localStorage.setItem('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
-
+                const rawData = buildCloudPayload();
                 let dataToUpload = {};
 
                 // [DECISIÓN] ¿Encriptar o No?
@@ -91,6 +95,13 @@
 
                 // --- CAMBIO CLAVE: LIMPIEZA DE DATOS ---
                 dataToUpload = sanitizePayload(dataToUpload);
+
+                // Freno hasta la Fase 4: Firestore rechaza documentos de más de 1 MiB
+                if (new Blob([JSON.stringify(dataToUpload)]).size > CLOUD_LIMIT_BYTES) {
+                    updateCloudStatus('OFFLINE');
+                    customAlert('Límite de la nube', 'La base de datos superó el límite de la nube. Tus datos están guardados en este dispositivo. Borra historial o fotos para volver a sincronizar.', 'error');
+                    return;
+                }
 
                 // 1. ACTIVAMOS EL BLOQUEO MANUAL
                 isUploadingToCloud = true;

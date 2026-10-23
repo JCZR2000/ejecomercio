@@ -25,9 +25,19 @@
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (e) => {
-                $('receiptLogoPreview').src = e.target.result;
-                $('receiptLogoPreview').classList.remove('hidden');
-                $('receiptLogoIcon').classList.add('hidden');
+                const img = new Image();
+                img.onload = () => {
+                    // Máximo 300 px por lado, PNG para conservar la transparencia
+                    const scale = Math.min(1, 300 / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    $('receiptLogoPreview').src = canvas.toDataURL('image/png');
+                    $('receiptLogoPreview').classList.remove('hidden');
+                    $('receiptLogoIcon').classList.add('hidden');
+                };
+                img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
@@ -218,7 +228,7 @@
                         <tr>
                             <td class="align-top font-bold">${item.qty}</td>
                             <td class="align-top pr-2">
-                                <div>${item.name}</div>
+                                <div>${escapeHtml(item.name)}</div>
                                 <div class="text-[9px] text-gray-500">x ${formatMoney(item.price)}</div>
                             </td>
                             <td class="align-top text-right font-bold">

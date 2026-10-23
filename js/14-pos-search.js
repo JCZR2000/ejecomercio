@@ -27,7 +27,7 @@
                     const item = document.createElement('div');
                     item.className = `p-2 text-sm border-b last:border-0 transition-colors flex justify-between ${stockClass}`;
                     // Formato: Nombre (Precio)
-                    item.innerHTML = `<span>${p.name} ${stockText}</span> <span class="font-bold">${formatMoney(p.price)}</span>`;
+                    item.innerHTML = `<span>${escapeHtml(p.name)} ${stockText}</span> <span class="font-bold">${formatMoney(p.price)}</span>`;
                     
                     if (!noStock) {
                         // Usamos onmousedown para ganar la carrera al evento 'blur'

@@ -42,7 +42,7 @@
                 // Resumen de items
                 let itemsSummary = "Varios productos";
                 if(c.items && c.items.length > 0) {
-                    itemsSummary = c.items.map(i => `${i.qty}x ${i.name}`).join(', ');
+                    itemsSummary = c.items.map(i => `${i.qty}x ${escapeHtml(i.name)}`).join(', ');
                 }
 
                 // Fecha de pago
@@ -56,7 +56,7 @@
 
                         <div class="flex justify-between items-start mb-1">
                             <div>
-                                <h4 class="font-bold text-gray-700 text-sm">${c.customer}</h4>
+                                <h4 class="font-bold text-gray-700 text-sm">${escapeHtml(c.customer)}</h4>
                                 <span class="bg-green-100 text-green-700 text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">Pagado</span>
                             </div>
                             <div class="text-right pr-6">

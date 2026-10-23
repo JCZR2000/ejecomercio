@@ -62,11 +62,11 @@
 
             // Generar filas
             displayProds.forEach(p => {
-                const img = p.img ? `<img src="${p.img}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
+                const img = p.img ? `<img src="${escapeHtml(p.img)}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
                 
                 invBody.innerHTML += `<tr class="border-b hover:bg-gray-50">
                     <td class="p-2">${img}</td>
-                    <td class="p-2 font-medium">${p.name}</td>
+                    <td class="p-2 font-medium">${escapeHtml(p.name)}</td>
                     <td class="p-2 text-center ${p.qty < 5 ? 'text-red-500 font-bold':''}">${p.qty}</td>
                     <td class="p-2 text-right font-bold text-gray-600">${formatMoney(p.price)}</td>
                     <td class="p-2 text-right text-blue-700 text-xs">Bs ${(p.price * activeRate).toFixed(2)}</td>
@@ -116,7 +116,7 @@
                 const d = new Date(s.date);
                 let detail = '';
                 if (s.type === 'payment') {
-                    detail = `<span class="text-green-600 font-bold"><i class="fa-solid fa-money-bill-wave"></i> ${s.description}</span>`;
+                    detail = `<span class="text-green-600 font-bold"><i class="fa-solid fa-money-bill-wave"></i> ${escapeHtml(s.description)}</span>`;
                 } else {
                     const count = s.items ? s.items.reduce((a, b) => a + b.qty, 0) : 0;
                     detail = `<span class="text-gray-700">Venta: ${count} items</span>`;
@@ -230,7 +230,7 @@
                     else consolidated[i.name] = i.qty;
                 });
 
-                const itemsSummary = Object.entries(consolidated).map(([name, qty]) => `${qty}x ${name}`).join(', ');
+                const itemsSummary = Object.entries(consolidated).map(([name, qty]) => `${qty}x ${escapeHtml(name)}`).join(', ');
                 const dateDisplay = getDateDisplay(c.nextPaymentDate);
                 const surchargeDisplay = c.surcharge ? `<div class="text-xs text-orange-600 mt-1 font-bold">+ Recargo: ${formatMoney(c.surcharge)}</div>` : '';
                 const originalDebt = c.totalDebt - (c.surcharge || 0);
@@ -246,7 +246,7 @@
 
                     <div class="flex justify-between items-start mb-2 pr-6"> <div class="flex flex-col space-y-1 w-2/3"> 
                             <h4 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                                <i class="fa-solid fa-user text-gray-400 text-xs"></i> ${c.customer}
+                                <i class="fa-solid fa-user text-gray-400 text-xs"></i> ${escapeHtml(c.customer)}
                             </h4>
                             <p class="text-[10px] text-gray-500">Venta: ${date}</p>
                             ${dateDisplay}
@@ -269,7 +269,7 @@
                     </div>
 
                     <div class="flex gap-2 items-center mb-2 flex-wrap pt-2 border-t border-gray-100">
-                        <button onclick="editCredit('${c.id}', '${c.customer}')" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded text-xs hover:bg-indigo-200 border border-indigo-200 flex items-center gap-1 font-bold"><i class="fa-solid fa-cart-plus mr-1"></i>Agregar</button>
+                        <button onclick="editCredit('${c.id}')" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded text-xs hover:bg-indigo-200 border border-indigo-200 flex items-center gap-1 font-bold"><i class="fa-solid fa-cart-plus mr-1"></i>Agregar</button>
                         <button onclick="updatePaymentDate('${c.id}')" class="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs hover:bg-blue-200 border border-blue-200 font-bold flex items-center gap-1" title="Cambiar Fecha"><i class="fa-solid fa-calendar-days mr-1"></i>Fecha</button>
                         <button onclick="openSurchargeModal('${c.id}')" class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-xs hover:bg-yellow-200 border border-yellow-200 font-bold flex items-center gap-1" title="Aplicar Recargo"><i class="fa-solid fa-bolt mr-1"></i>Recargo</button>
                         <button onclick="openShareModal('${c.id}')" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs hover:bg-green-200 border border-green-200 font-bold flex items-center gap-1" title="Enviar Recordatorio">

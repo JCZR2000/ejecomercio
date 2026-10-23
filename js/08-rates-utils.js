@@ -98,6 +98,11 @@
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
         }
 
+        // Texto del usuario, de un respaldo o de una API que se inserta como HTML
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
+
         function renderEncryptionUI() {
             const container = document.getElementById('encryptionUI');
             if (!container) return;
@@ -185,6 +190,7 @@
                     renderEncryptionUI(); // Menú de encriptación
                     updateStorageUsage(); // Uso de almacenamiento
                     updateCreditConfigUI(); // Configuración de créditos
+                    updateSecurityUI(); // Muestra si ya hay PIN
                 }
                 updateConfigUI();
             }

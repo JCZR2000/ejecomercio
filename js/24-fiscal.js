@@ -154,7 +154,7 @@
                     tbody.innerHTML += `
                         <div class="flex justify-between mb-1">
                             <span class="w-6">${item.qty}</span>
-                            <span class="flex-1">${item.name}</span>
+                            <span class="flex-1">${escapeHtml(item.name)}</span>
                         </div>
                         <div class="text-right mb-2 pr-1">Bs ${itemTotalBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits:2})}</div>
                     `;
