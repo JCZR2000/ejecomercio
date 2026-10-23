@@ -81,13 +81,15 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
 ## 4. Firebase y publicación
 - Proyecto de Firebase: **`ejecomercio-27f57`** (Auth con Google y Firestore, documento `users/{uid}`).
 - Las reglas de Firestore no están en el repositorio. Cambiarlas requiere aprobación explícita del usuario.
-- **Hosting: GitHub Pages desde la rama `main`** del repositorio `JCZR2000/ejecomercio` (remoto `nube`). Lo que llega a `nube/main` queda publicado.
-- **Publicar requiere aprobación explícita del usuario.** Publicar es llevar `DEV` a `main` (merge o pull request) y hacer push de `main` a `nube`. Más detalle en `Infraestructura.md` de la bóveda.
+- **Hosting: GitHub Pages desde la rama `DEV`** del repositorio `JCZR2000/ejecomercio` (remoto `nube`). Lo que llega a `nube/DEV` queda publicado y **lo usan personas reales** con sus datos.
+- **Publicar requiere aprobación explícita del usuario.** Publicar es hacer merge de `DEV2` en `DEV` y push de `DEV` a `nube`, solo cuando lo cambiado está probado. Más detalle en `Infraestructura.md` de la bóveda.
+- `main` no se usa por ahora (está atrasada).
 - Hay una etiqueta llamada `DEV` además de la rama: usa `refs/heads/DEV` en los comandos de git que lo necesiten.
 - Antes de publicar:
   - Sube `CACHE_NAME` en `sw.js` a la nueva versión (`ejecomercio-vXX.Y`); si no, los teléfonos instalados siguen con la versión vieja.
   - Sirve la carpeta por HTTP en local (el Service Worker no funciona con `file://`) y prueba el flujo cambiado en el navegador, sin errores en la consola.
   - Si el cambio toca sincronización o datos guardados, prueba también con datos viejos (sección 5) y sin conexión.
+  - Las pruebas en local usan el **mismo Firebase que los usuarios reales**: inicia sesión solo con una cuenta de Google de prueba o la del dueño, nunca con la de otra persona.
 
 ## 5. Código
 - La interfaz y los textos para el usuario van en español. Los nombres de variables y funciones, en inglés.
@@ -99,7 +101,9 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
 - Las librerías por CDN llevan versión fija.
 
 ## 6. Git y cierre de cada fase
-- El trabajo se hace en la rama `DEV`. El remoto se llama `nube`. Un push a `DEV` no publica; un push a `main` sí.
+- El trabajo y las pruebas se hacen en la rama **`DEV2`**. El remoto se llama `nube`.
+- **`DEV` es la rama publicada:** no se hacen commits directos en ella; solo recibe merges de `DEV2` aprobados por el usuario. Un push a `DEV2` no publica; un push a `DEV` sí.
+- `Sincronización.bat` sube la rama en la que estés (`git push -u nube head`): revisa la rama antes de usarlo.
 - Haz commit solo cuando el usuario lo pida. Los mensajes van en español y describen el cambio.
 - **Al terminar una fase**, la sesión de ejecución sigue este orden:
   1. Muestra el resumen de lo hecho y de la verificación, y **pide aprobación**.
