@@ -104,7 +104,7 @@
     </div>
 
     <div id="dialogModal"
-        class="fixed inset-0 z-[220] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        class="fixed inset-0 z-[450] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div
             class="bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all scale-100 animate-bounce-in text-center p-6">
     
@@ -179,7 +179,7 @@
                         <i id="userIcon" class="fa-solid fa-user"></i>
                     </button>
 
-                    <button onclick="showStatusInfo()"
+                    <div
                         class="absolute -bottom-1 -right-1 flex items-center justify-center w-5 h-5 z-20 focus:outline-none group"
                         title="Estatus de Conexión">
                         <div class="relative flex items-center justify-center w-full h-full">
@@ -190,7 +190,7 @@
                             <div id="statusPing" class="absolute inset-0 m-auto w-full h-full rounded-full bg-emerald-500 opacity-0 z-0">
                             </div>
                         </div>
-                    </button>
+                    </div>
                     
                     <div id="userMenuDropdown" class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl py-2 hidden z-50 border border-gray-100">
                         <div class="px-4 py-2 border-b border-gray-100 bg-gray-50">

@@ -125,7 +125,10 @@
             let answered = false;
             customConfirm('Se van a borrar datos de la nube', msg, 'warning', async () => {
                 answered = true;
-                if (await ensureCloudBackup('Antes de una pérdida grande de datos')) saveData({ skipLossCheck: true });
+                busyStart('Subiendo a la nube...');
+                try {
+                    if (await ensureCloudBackup('Antes de una pérdida grande de datos')) { saveData({ skipLossCheck: true }); await waitForUpload(); }
+                } finally { busyEnd(); }
             });
             $('dialogMsg').style.whiteSpace = 'pre-line';
             // closeDialog llama a este aviso antes que a "Confirmar": se espera un instante para saber cuál botón fue

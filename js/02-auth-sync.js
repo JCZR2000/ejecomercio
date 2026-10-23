@@ -579,16 +579,22 @@
                 } else if (choice === 'LOCAL') {
                     console.log("📱 Usuario eligió LOCAL. Copia de la nube y subida...");
                     // Si la copia falla no se sube nada y el cuadro sigue abierto
-                    if (snapshot && !await ensureCloudBackup('Antes de usar los datos locales')) return;
-                    startCooldown();
+                    busyStart('Subiendo tus datos...');
+                    try {
+                        if (snapshot && !await ensureCloudBackup('Antes de usar los datos locales')) return;
+                        startCooldown();
 
-                    state.lastUpdated = new Date().toISOString();
-                    localStorage.setItem('inv_last_updated', state.lastUpdated);
+                        state.lastUpdated = new Date().toISOString();
+                        localStorage.setItem('inv_last_updated', state.lastUpdated);
 
-                    // Se acepta pisar la versión que el usuario vio; si la nube cambió otra vez, la subida lo detecta
-                    if (snapshot) setCloudBase(cloudTokenOf(snapshot.doc.data()), cloudCounts(snapshot.data));
-                    state.isCloudSynced = true;
-                    saveData({ skipLossCheck: true });
+                        // Se acepta pisar la versión que el usuario vio; si la nube cambió otra vez, la subida lo detecta
+                        if (snapshot) setCloudBase(cloudTokenOf(snapshot.doc.data()), cloudCounts(snapshot.data));
+                        state.isCloudSynced = true;
+                        saveData({ skipLossCheck: true });
+                        await waitForUpload();
+                    } finally {
+                        busyEnd();
+                    }
                 }
 
                 pendingCloudSnapshot = null;

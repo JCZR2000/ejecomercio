@@ -71,6 +71,7 @@
         // Copia antes de un cambio grande. true = se puede seguir; false = falló (ya se avisó al usuario).
         async function ensureCloudBackup(reason) {
             if (!auth.currentUser || !state.isCloudSynced) return true;
+            busyStart('Guardando copia de seguridad...');
             try {
                 await createCloudBackup(reason);
                 return true;
@@ -78,6 +79,8 @@
                 console.error('Copia en la nube fallida:', e);
                 customAlert('Sin copia de seguridad', 'No se pudo hacer la copia de seguridad en la nube; no se cambió nada.', 'error');
                 return false;
+            } finally {
+                busyEnd();
             }
         }
 
@@ -108,6 +111,7 @@
 
         // Carga una copia en state y la sube con el guardado normal
         async function restoreCloudBackup(id) {
+            busyStart('Restaurando copia...');
             try {
                 const ref = cloudUserRef().collection('backups').doc(id);
                 const head = await ref.get();
@@ -126,12 +130,16 @@
                 state.isCloudSynced = true;
                 migrateLegacyPin();
                 saveData({ skipLossCheck: true });
+                busyStart('Subiendo a la nube...');
+                await waitForUpload();
                 renderAll();
                 renderCloudBackupsUI();
-                customAlert('Copia restaurada', 'Se restauró la copia y se está subiendo a la nube.', 'success');
+                customAlert('Copia restaurada', 'Se restauró la copia y se subió a la nube.', 'success');
             } catch (e) {
                 console.error('Restaurar copia:', e);
                 customAlert('No se pudo restaurar', 'No se pudo restaurar la copia: ' + (e.message || e) + '. No se cambió nada.', 'error');
+            } finally {
+                busyEnd();
             }
         }
 

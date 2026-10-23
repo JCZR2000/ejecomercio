@@ -60,50 +60,6 @@
             }
         }
 
-        // Modal informativo estilo "SweetAlert" pero nativo
-        function showStatusInfo() {
-            let title, msg, icon, color;
-
-            if (appStatus === 'online') {
-                title = "SISTEMA SEGURO";
-                msg = "Conexión estable con la nube. Tus datos están encriptados (AES-256) y sincronizados.";
-                icon = "fa-shield-halved";
-                color = "text-emerald-500";
-            } else if (appStatus === 'syncing') {
-                title = "SINCRONIZANDO...";
-                msg = "Guardando cambios en la nube. Por favor espera un momento.";
-                icon = "fa-rotate";
-                color = "text-amber-500 fa-spin";
-            } else {
-                title = "MODO OFFLINE";
-                msg = "No hay internet. Puedes seguir trabajando; los datos se guardarán localmente y se subirán al volver la conexión.";
-                icon = "fa-wifi";
-                color = "text-rose-500";
-            }
-
-            // Usamos tu modal genérico o un alert bonito por ahora
-            // Si tienes SweetAlert instalado (parece que no, usaremos un alert custom simple)
-            const modalHtml = `
-        <div id="statusModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full overflow-hidden transform transition-all scale-100">
-                <div class="p-6 text-center">
-                    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <i class="fa-solid ${icon} text-3xl ${color}"></i>
-                    </div>
-                    <h3 class="text-lg font-black text-slate-800 mb-2 uppercase">${title}</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">${msg}</p>
-                </div>
-                <div class="bg-gray-50 p-3 border-t border-gray-100">
-                    <button onclick="document.getElementById('statusModal').remove()" class="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-sm shadow-lg shadow-slate-900/20 active:scale-95 transition">
-                        Entendido
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
-        }
-
         document.addEventListener('DOMContentLoaded', () => {
 
             // 1. INICIAR SEMÁFORO (NUEVO)

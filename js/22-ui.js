@@ -196,6 +196,35 @@
             modal.classList.remove('hidden');
         }
 
+        // Aviso de progreso que bloquea la pantalla mientras la nube trabaja. Se puede anidar.
+        let busyDepth = 0, busyTimer = null;
+        function busyStart(msg) {
+            if (busyDepth++ === 0) {
+                const el = document.createElement('div');
+                el.id = 'busyOverlay';
+                el.className = 'fixed inset-0 z-[400] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4';
+                el.innerHTML = '<div class="bg-white rounded-2xl shadow-2xl max-w-xs w-full p-6 text-center">' +
+                    '<i class="fa-solid fa-rotate fa-spin text-3xl text-amber-500 mb-3"></i>' +
+                    '<h3 id="busyMsg" class="text-lg font-black text-slate-800 mb-1"></h3>' +
+                    '<p class="text-sm text-gray-500">Espera un momento.</p>' +
+                    '<p id="busySlow" class="text-sm text-amber-600 font-bold mt-2 hidden">La conexión está lenta. No cierres la app hasta que termine.</p></div>';
+                document.body.appendChild(el);
+                busyTimer = setTimeout(() => { const s = $('busySlow'); if (s) s.classList.remove('hidden'); }, 6000);
+            }
+            $('busyMsg').textContent = msg;
+        }
+        function busyEnd() {
+            if (busyDepth > 0 && --busyDepth === 0) {
+                clearTimeout(busyTimer);
+                const el = $('busyOverlay');
+                if (el) el.remove();
+            }
+        }
+        // La subida de saveData() es en segundo plano: se espera a que termine.
+        async function waitForUpload() {
+            while (isUploadingToCloud) await new Promise(r => setTimeout(r, 300));
+        }
+
         function closeDialog() {
             $('dialogModal').classList.add('hidden');
             if (window.dialogCallback) {
