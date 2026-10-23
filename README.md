@@ -64,3 +64,63 @@ Aplicación web progresiva (PWA) diseñada para la gestión ágil de inventarios
 · Html5-QRCode (Escáner)
 
 · LocalStorage API
+
+<br />
+
+# Estructura:
+
+· `index.html`: marcado de la app; carga `css/app.css` y los scripts de `js/` en orden (scripts clásicos, funciones globales).
+
+· `css/app.css`: estilos de la app.
+
+· `sw.js`, `manifest.json`: Service Worker y PWA.
+
+· `js/00-sw-register.js`: Registro del Service Worker.
+
+· `js/01-firebase-state.js`: Configuración de Firebase, estado global y cifrado del payload.
+
+· `js/02-auth-sync.js`: Autenticación, semáforo de sincronización y visor de diferencias.
+
+· `js/03-status.js`: Sistema de estatus.
+
+· `js/04-credit-dates-surcharges.js`: Fechas y recargos de fiados.
+
+· `js/05-storage.js`: Guardado de datos (saveData, sanitizePayload).
+
+· `js/06-security.js`: Seguridad (PIN).
+
+· `js/07-products.js`: Gestión de productos.
+
+· `js/08-rates-utils.js`: Tasas, conversiones y utilidades.
+
+· `js/09-pos-cart.js`: Ventas y carrito.
+
+· `js/10-credit-payments.js`: Pagos de fiados.
+
+· `js/11-render.js`: Renderizado general y tablas.
+
+· `js/12-navigation-backup.js`: Navegación Material You, respaldo y restauración.
+
+· `js/13-images-scanner.js`: Compresor de imágenes, escáner y API de productos.
+
+· `js/14-pos-search.js`: Búsqueda en el POS.
+
+· `js/15-credits.js`: Orden, compartir, migración y borrado de fiados.
+
+· `js/16-tools.js`: Menú de usuario y calculadora de precios.
+
+· `js/17-encryption.js`: Cifrado E2EE.
+
+· `js/18-credit-history.js`: Historial y limpieza de fiados.
+
+· `js/19-dashboard.js`: Monitor de almacenamiento y dashboard.
+
+· `js/20-credit-mode.js`: Precios dinámicos.
+
+· `js/21-receipts.js`: Recibos.
+
+· `js/22-ui.js`: UI Material You, modal de seguridad, diálogos y reinicio de red.
+
+· `js/23-inventory-pdf.js`: Exportar inventario a PDF.
+
+· `js/24-fiscal.js`: Facturación fiscal (SENIAT).

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v45.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v46.0'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -6,6 +6,32 @@ const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
+  './css/app.css',
+  './js/00-sw-register.js',
+  './js/01-firebase-state.js',
+  './js/02-auth-sync.js',
+  './js/03-status.js',
+  './js/04-credit-dates-surcharges.js',
+  './js/05-storage.js',
+  './js/06-security.js',
+  './js/07-products.js',
+  './js/08-rates-utils.js',
+  './js/09-pos-cart.js',
+  './js/10-credit-payments.js',
+  './js/11-render.js',
+  './js/12-navigation-backup.js',
+  './js/13-images-scanner.js',
+  './js/14-pos-search.js',
+  './js/15-credits.js',
+  './js/16-tools.js',
+  './js/17-encryption.js',
+  './js/18-credit-history.js',
+  './js/19-dashboard.js',
+  './js/20-credit-mode.js',
+  './js/21-receipts.js',
+  './js/22-ui.js',
+  './js/23-inventory-pdf.js',
+  './js/24-fiscal.js',
   './icon-192.png',
   './icon-512.png'
   // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos
@@ -13,7 +39,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v45.0...');
+  console.log('[Service Worker] Instalando v46.0...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
