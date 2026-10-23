@@ -232,16 +232,27 @@
                         const btn = document.querySelector('button[onclick="requestAction(\'factory_reset\')"]');
                         if(btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Borrando nube...';
 
+                        // Primero se borran los trozos (fotos y ventas); el contador fiscal NO, para no repetir números.
+                        const userRef = db.collection('users').doc(user.uid);
+                        const deleteChunks = async () => {
+                            const snap = await userRef.collection('chunks').get();
+                            for (let i = 0; i < snap.docs.length; i += 400) {
+                                const b = db.batch();
+                                snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+                                await b.commit();
+                            }
+                        };
+
                         // SOBRESCRIBIMOS el documento con un objeto casi vacío.
                         // Al NO usar { merge: true }, esto elimina todos los campos anteriores (fiados, productos, etc).
-                        db.collection('users').doc(user.uid).set({
+                        deleteChunks().then(() => userRef.set({
                             products: [],
                             sales: [],
                             credits: [],
                             paymentMethods: {},
                             security: { pin: null },
                             lastUpdated: new Date().toISOString()
-                        })
+                        }))
                         .then(() => {
                             console.log("✅ Nube formateada exitosamente.");
                             // SOLO AHORA, que la nube confirmó, borramos local y recargamos.
@@ -300,21 +311,10 @@
         // FUNCIÓN ESPECIAL: BORRADO INTENCIONAL EN NUBE
         // ==========================================
         function forceClearCloud(fieldToClear) {
-            const user = auth.currentUser;
-            if (!user) return;
-
-            // Preparamos el objeto con el campo vacío
-            let updateData = {};
-            updateData[fieldToClear] = []; // Envia un array vacío explícitamente
-            updateData['lastUpdated'] = new Date().toISOString();
-
             console.log(`⚠️ EJECUTANDO BORRADO FORZADO DE: ${fieldToClear}`);
-
-            // Usamos .update() en lugar de .set() para borrar solo ese campo
-            // y saltarnos la validación interna de saveData()
-            db.collection('users').doc(user.uid).update(updateData)
-                .then(() => console.log("✅ Nube limpiada correctamente."))
-                .catch(err => console.error("Error limpiando nube:", err));
+            // El estado ya está vaciado: la subida normal sube lo que queda y borra los trozos sobrantes.
+            // allowEmpty solo se salta el anti-wipe.
+            saveData({ allowEmpty: true });
         }
 
         function saveCustomRate() {

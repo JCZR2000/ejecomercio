@@ -69,6 +69,9 @@
                 currentNumber: 1
             },
 
+            // Índice de lo último que se sabe de la nube (Fase 4): { key, chunks: { id: hash } }
+            cloudManifest: JSON.parse(localStorage.getItem('inv_cloud_manifest')) || {},
+
             // Variables de sesión
             cart: [],
             isCloudSynced: false, 

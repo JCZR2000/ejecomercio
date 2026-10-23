@@ -76,6 +76,85 @@
             $('fiscalReceiptModal').classList.add('hidden');
         }
 
+        // ------------------------------------------
+        // CORRELATIVO POR BLOQUES (Fase 4)
+        // Cada dispositivo reserva 25 números en users/{uid}/counters/fiscal y los gasta aun sin conexión.
+        // ------------------------------------------
+        const FISCAL_BLOCK_SIZE = 25;
+        const FISCAL_LOW_WATER = 10;
+        let reservingFiscal = false;
+        let fiscalOfflineWarned = false;
+
+        function getFiscalBlock() {
+            try { return JSON.parse(localStorage.getItem('inv_fiscal_block')); } catch (e) { return null; }
+        }
+
+        // Pura: siguiente número del bloque, o null si está gastado
+        function takeFiscalNumber(block) {
+            if (!block || block.next > block.end) return null;
+            return { number: block.next, block: { next: block.next + 1, end: block.end } };
+        }
+
+        function fiscalRemaining() {
+            const b = getFiscalBlock();
+            return b ? Math.max(0, b.end - b.next + 1) : 0;
+        }
+
+        async function reserveFiscalBlock() {
+            const user = auth.currentUser;
+            if (!user || reservingFiscal || !navigator.onLine) return;
+            reservingFiscal = true;
+            try {
+                const ref = db.collection('users').doc(user.uid).collection('counters').doc('fiscal');
+                const start = await db.runTransaction(async tx => {
+                    const snap = await tx.get(ref);
+                    const s = Math.max((snap.exists && snap.data().next) || 1, state.fiscalConfig.currentNumber || 1);
+                    tx.set(ref, { next: s + FISCAL_BLOCK_SIZE });
+                    return s;
+                });
+                localStorage.setItem('inv_fiscal_block', JSON.stringify({ next: start, end: start + FISCAL_BLOCK_SIZE - 1 }));
+                // Sube el contador general para que dispositivos viejos y el Modo Offline sigan por encima
+                state.fiscalConfig.currentNumber = Math.max(state.fiscalConfig.currentNumber || 1, start + FISCAL_BLOCK_SIZE);
+                saveData();
+            } catch (e) {
+                console.warn('No se pudo reservar el bloque fiscal:', e);
+            } finally {
+                reservingFiscal = false;
+            }
+        }
+
+        function selfTestFiscal() {
+            const a = takeFiscalNumber({ next: 5, end: 6 });
+            console.assert(a.number === 5 && a.block.next === 6, 'selfTestFiscal: primer número');
+            const b = takeFiscalNumber(a.block);
+            console.assert(b.number === 6, 'selfTestFiscal: último número');
+            console.assert(takeFiscalNumber(b.block) === null, 'selfTestFiscal: bloque gastado');
+            console.assert(takeFiscalNumber(null) === null, 'selfTestFiscal: sin bloque');
+            console.log('selfTestFiscal terminado');
+        }
+
+        // Devuelve el número fiscal a asignar y deja el contador al día
+        function allocateFiscalNumber() {
+            const cfg = state.fiscalConfig;
+            if (!auth.currentUser) return cfg.currentNumber++; // Modo Offline: un solo dispositivo
+            const block = getFiscalBlock();
+            const taken = takeFiscalNumber(block);
+            let n;
+            if (taken) {
+                n = taken.number;
+                localStorage.setItem('inv_fiscal_block', JSON.stringify(taken.block));
+            } else {
+                n = Math.max(cfg.currentNumber, block ? block.end + 1 : 0);
+                cfg.currentNumber = n + 1;
+                if (!fiscalOfflineWarned) {
+                    fiscalOfflineWarned = true;
+                    customAlert('Números fiscales', 'Sin conexión no quedan números reservados; este número podría repetirse en otro dispositivo. Conéctate para reservar más.', 'warning');
+                }
+            }
+            if (fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
+            return n;
+        }
+
         function prepareFiscalReceiptModal(data) {
             // Llenar datos de la empresa
             $('printFiscRif').textContent = state.fiscalConfig.rif;
@@ -97,9 +176,8 @@
 
             // Asignar Correlativo Permanente si no tiene
             if (!data.fiscalNum) {
-                const newNum = state.fiscalConfig.currentNumber.toString().padStart(6, '0');
+                const newNum = allocateFiscalNumber().toString().padStart(6, '0');
                 data.fiscalNum = newNum;
-                state.fiscalConfig.currentNumber++;
                 
                 // Buscar y guardar en la DB real para que sea permanente
                 if (data.id) {

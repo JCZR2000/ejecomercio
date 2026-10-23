@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v46.2'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v47.0'; // Actualizado para forzar la recarga
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -13,6 +13,7 @@ const STATIC_ASSETS = [
   './js/03-status.js',
   './js/04-credit-dates-surcharges.js',
   './js/05-storage.js',
+  './js/05a-cloud-chunks.js',
   './js/06-security.js',
   './js/07-products.js',
   './js/08-rates-utils.js',

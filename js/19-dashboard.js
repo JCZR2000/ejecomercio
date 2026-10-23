@@ -3,24 +3,25 @@
         // ==========================================
         let storageWarned = false; // el aviso del 80 % sale una vez por sesión
         function updateStorageUsage() {
-            // 1. Mismo documento que sube saveData; cifrado si hay clave
-            const raw = buildCloudPayload();
-            const payload = encryptionKey ? encryptPayload(raw) : JSON.stringify(raw);
+            // 1. Mismas partes que sube saveData; el cifrado agrega ~33 %
+            const { main, chunks } = buildCloudParts();
+            const factor = encryptionKey ? 1.34 : 1;
+            const mainBytes = new Blob([JSON.stringify(main)]).size * factor;
+            const chunkBytes = Object.values(chunks).map(c => c.json.length * factor);
+            const totalBytes = mainBytes + chunkBytes.reduce((a, b) => a + b, 0);
 
-            // 2. Calculamos bytes (Aprox. caracteres * 1 byte, aunque UTF-8 varía, es suficiente para referencia)
-            const bytes = new Blob([payload]).size;
-            const limit = 1048576; // 1 MB en bytes (Límite Firestore por documento)
-            
-            // 3. Convertimos a KB para mostrar
-            const kb = (bytes / 1024).toFixed(2);
+            // 2. La barra mide el documento más grande frente al límite de Firestore por documento (1 MiB)
+            const bytes = Math.max(mainBytes, ...chunkBytes);
+            const limit = 1048576;
             const percentage = Math.min(((bytes / limit) * 100), 100).toFixed(1);
+            const toKb = n => (n / 1024).toFixed(0);
 
             // 4. Actualizamos UI
             const bar = $('storageBar');
             const text = $('storageText');
             
             bar.style.width = `${percentage}%`;
-            text.textContent = `${kb} KB / 1024 KB (${percentage}%)`;
+            text.textContent = `Documento principal ${toKb(mainBytes)} KB · Total en la nube ${toKb(totalBytes)} KB (documento más grande: ${percentage}% del límite)`;
 
             // 5. Colores del Semáforo
             bar.className = "h-2.5 rounded-full transition-all duration-1000 ";

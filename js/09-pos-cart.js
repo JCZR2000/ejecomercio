@@ -312,11 +312,16 @@
                 });
 
                 // C. Registro de la Transacción
+                // receiptId: el recibo debe llevar el id real para que su número fiscal quede guardado en la venta/fiado
+                let receiptId = Date.now();
+                let receiptFiscalNum;
                 if (isCredit) {
                     if (state.activeCreditId) {
+                        receiptId = state.activeCreditId;
                         // ... (Lógica de actualizar fiado existente) ...
                         const idx = state.credits.findIndex(c => c.id == state.activeCreditId);
                         if (idx !== -1) {
+                            receiptFiscalNum = state.credits[idx].fiscalNum;
                             state.credits[idx].items.push(...state.cart);
                             state.credits[idx].totalDebt = roundMoney(state.credits[idx].totalDebt + totalUSD);
                             state.credits[idx].paid = roundMoney(state.credits[idx].paid + initialPay);
@@ -326,7 +331,7 @@
                     } else {
                         // ... (Nuevo fiado) ...
                         state.credits.push({
-                            id: Date.now(),
+                            id: receiptId,
                             customer: customerName,
                             items: [...state.cart],
                             totalDebt: totalUSD,
@@ -353,14 +358,16 @@
                         paid: initialPay,
                         date: new Date().toISOString(),
                         customer: customerName,
-                        isCredit: true
+                        isCredit: true,
+                        id: receiptId,
+                        fiscalNum: receiptFiscalNum
                     };
                     $('successModal').classList.remove('hidden');
                     switchTab('credits'); // Ir a pestaña fiados
                 } else {
                     // Venta Contado
                     state.sales.unshift({
-                        id: Date.now(),
+                        id: receiptId,
                         date: new Date().toISOString(),
                         type: 'sale',
                         items: [...state.cart],
@@ -373,7 +380,8 @@
                         total: totalUSD,
                         date: new Date().toISOString(),
                         type: 'sale',
-                        customer: ''
+                        customer: '',
+                        id: receiptId
                     };
                     $('successModal').classList.remove('hidden');
                 }

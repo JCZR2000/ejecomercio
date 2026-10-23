@@ -26,7 +26,7 @@
             };
         }
 
-        function saveData() {
+        function saveData({ allowEmpty = false } = {}) {
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
 
@@ -59,77 +59,103 @@
             // SEGURO 1: No subir si no estamos sincronizados (Evita sobrescribir la nube con datos viejos)
             if (!state.isCloudSynced) return;
 
-            // SEGURO 2: ¡CRÍTICO! Anti-Wipe (Evita borrar la DB por error de carga)
-            if (state.products.length === 0 && state.sales.length === 0 && state.credits.length === 0) {
+            // SEGURO 2: ¡CRÍTICO! Anti-Wipe (Evita borrar la DB por error de carga).
+            // allowEmpty solo lo usa un borrado intencional del usuario.
+            if (!allowEmpty && state.products.length === 0 && state.sales.length === 0 && state.credits.length === 0) {
                 console.warn("🛡️ BLOQUEO DE SEGURIDAD: Se intentó subir una base de datos vacía.");
-                return; 
+                return;
             }
 
-            // -----------------------------------------------------
-            // PREPARACIÓN DE SUBIDA (Lógica Nueva)
-            // -----------------------------------------------------
+            if (auth.currentUser) uploadToCloud();
+        }
+
+        // Una sola subida a la vez; si saveData se llama mientras sube, se repite una vez al terminar.
+        let pendingCloudSave = false;
+        async function uploadToCloud() {
+            if (isUploadingToCloud) { pendingCloudSave = true; return; }
             const user = auth.currentUser;
-    
-            if (user) {
-                const rawData = buildCloudPayload();
-                let dataToUpload = {};
-
-                // [DECISIÓN] ¿Encriptar o No?
-                if (encryptionKey) {
-                    console.log("🔒 Subiendo datos encriptados...");
-                    // MODO E2EE: Encriptamos todo el objeto 'rawData'
-                    const encryptedString = encryptPayload(rawData);
-            
-                    dataToUpload = {
-                        encryptedData: encryptedString,
-                        isEncrypted: true,
-                        lastUpdated: new Date().toISOString()
-                    };
-                } else {
-                    // MODO CLÁSICO: Subimos los datos planos (como lo haces hoy)
-                    dataToUpload = { 
-                        ...rawData, 
-                        isEncrypted: false 
-                    };
-                }
-
-                // --- CAMBIO CLAVE: LIMPIEZA DE DATOS ---
-                dataToUpload = sanitizePayload(dataToUpload);
-
-                // Freno hasta la Fase 4: Firestore rechaza documentos de más de 1 MiB
-                if (new Blob([JSON.stringify(dataToUpload)]).size > CLOUD_LIMIT_BYTES) {
-                    updateCloudStatus('OFFLINE');
-                    customAlert('Límite de la nube', 'La base de datos superó el límite de la nube. Tus datos están guardados en este dispositivo. Borra historial o fotos para volver a sincronizar.', 'error');
-                    return;
-                }
-
-                // 1. ACTIVAMOS EL BLOQUEO MANUAL
-                isUploadingToCloud = true;
-                updateCloudStatus('SYNCING'); 
-        
-                // NOTA TÉCNICA: Usamos .set() sin merge:true intencionalmente
-                const writePromise = db.collection('users').doc(user.uid).set(dataToUpload);
-
-                writePromise
-                    .then(() => {
-                        console.log("💾☁️ Guardado en la nube (Confirmación)");
-
-                        // 3. LA SOLUCIÓN NUCLEAR: Esperar confirmación REAL del servidor
-                        // Esta promesa solo se resuelve cuando Google dice "Lo tengo".
-                        isUploadingToCloud = false;
-
-                        // AHORA SÍ es seguro poner verde manual, porque sin persistencia,
-                        // el .then() solo ocurre si el servidor aceptó los datos.
-                        updateCloudStatus('ONLINE');
-                    })
-
-                    .catch(err => {
-                        console.error("Error crítico:", err);
-                        isUploadingToCloud = false; // Liberar candado si falla.
-                        updateCloudStatus('OFFLINE'); // Avisar visualmente que falló
-                        alert("⚠️ Error al subir datos. Revisa tu conexión.");
-                    });
+            isUploadingToCloud = true;
+            updateCloudStatus('SYNCING');
+            try {
+                do {
+                    pendingCloudSave = false;
+                    if (!await uploadCloudOnce(user)) { updateCloudStatus('OFFLINE'); return; }
+                } while (pendingCloudSave);
+                console.log("💾☁️ Guardado en la nube (Confirmación)");
+                updateCloudStatus('ONLINE');
+            } catch (err) {
+                console.error("Error crítico:", err);
+                updateCloudStatus('OFFLINE');
+                alert("⚠️ Error al subir datos. Revisa tu conexión.");
+            } finally {
+                isUploadingToCloud = false;
             }
+        }
+
+        // Devuelve false si el freno de tamaño impidió subir.
+        async function uploadCloudOnce(user) {
+            const userRef = db.collection('users').doc(user.uid);
+            const chunksRef = userRef.collection('chunks');
+            const { main, chunks, kept } = buildCloudParts();
+            const fp = keyFingerprint();
+            const old = state.cloudManifest || {};
+            const oldChunks = old.chunks || {};
+
+            let mainDoc;
+            if (encryptionKey) {
+                console.log("🔒 Subiendo datos encriptados...");
+                mainDoc = { encryptedData: encryptPayload(main), isEncrypted: true, lastUpdated: new Date().toISOString() };
+            } else {
+                mainDoc = { ...main, isEncrypted: false };
+            }
+            mainDoc = sanitizePayload(mainDoc);
+
+            // Trozos que cambiaron (o todos, si cambió la clave o es la primera subida)
+            const docs = {};
+            let tooBig = new Blob([JSON.stringify(mainDoc)]).size > CLOUD_LIMIT_BYTES ? 'El documento principal' : null;
+            for (const [id, c] of Object.entries(chunks)) {
+                if (old.key === fp && oldChunks[id] === c.hash) continue;
+                docs[id] = { data: encryptionKey ? encryptJsonText(c.json) : c.json, isEncrypted: !!encryptionKey };
+                if (!tooBig && docs[id].data.length > CLOUD_LIMIT_BYTES) tooBig = id.startsWith('img_') ? 'Una foto' : 'Un bloque de ventas';
+            }
+            if (tooBig) {
+                customAlert('Límite de la nube', `${tooBig} superó el límite de la nube. Tus datos están guardados en este dispositivo. Borra historial o fotos para volver a sincronizar.`, 'error');
+                return false;
+            }
+
+            // 1. Trozos nuevos, en lotes de hasta 400 operaciones o ~5 MB
+            let batch = db.batch(), ops = 0, bytes = 0;
+            for (const [id, d] of Object.entries(docs)) {
+                if (ops >= 400 || (ops && bytes + d.data.length > 5000000)) {
+                    await batch.commit();
+                    batch = db.batch(); ops = 0; bytes = 0;
+                }
+                batch.set(chunksRef.doc(id), d);
+                ops++; bytes += d.data.length;
+            }
+            if (ops) await batch.commit();
+
+            // 2. Documento principal (.set() sin merge, intencional)
+            await userRef.set(mainDoc);
+
+            // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)
+            const stale = Object.keys(oldChunks).filter(id => !chunks[id] && !kept.includes(id));
+            for (let i = 0; i < stale.length; i += 400) {
+                const b = db.batch();
+                stale.slice(i, i + 400).forEach(id => b.delete(chunksRef.doc(id)));
+                await b.commit();
+            }
+
+            const manifest = { key: fp, chunks: {} };
+            for (const [id, c] of Object.entries(chunks)) manifest.chunks[id] = c.hash;
+            kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
+            setCloudManifest(manifest);
+            return true;
+        }
+
+        function setCloudManifest(m) {
+            state.cloudManifest = m;
+            localStorage.setItem('inv_cloud_manifest', JSON.stringify(m));
         }
 
         // Función para limpiar valores 'undefined' que rompen Firestore

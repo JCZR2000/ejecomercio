@@ -257,7 +257,7 @@
                                     closeSecurityModal();
 
                                     // REENRUTAMIENTO: En vez de cargar directo, pasamos al validador
-                                    processSyncData(success, doc);
+                                    hydrateCloudData(success, doc);
                                 } else {
                                     // FALLO
                                     alert("❌ Clave incorrecta.");
@@ -307,7 +307,7 @@
                     // -------------------------------------------------
                     if (finalCloudData) {
                         // En lugar de llamar a finishLoadingData directo, llamamos a processSyncData
-                        processSyncData(finalCloudData, doc);
+                        hydrateCloudData(finalCloudData, doc);
                     }
 
                 } else {
@@ -315,12 +315,74 @@
                     // Aquí SI usamos saveData() porque queremos empujar lo local a la nube
                     console.log("⬆️ Usuario nuevo: Subiendo datos locales...");
                     state.isCloudSynced = true; 
+                    setCloudManifest({}); // el manifiesto guardado pudo ser de otra cuenta
                     saveData(); 
                 }
             }, error => {
                 console.error("Error Sync:", error);
                 updateCloudStatus('OFFLINE'); // Rojo si falla la conexión
             });
+        }
+
+        // --- FUNCIÓN: Rearma el documento completo (con fotos y ventas) desde los trozos de la nube ---
+        let hydrateSeq = 0;
+        async function hydrateCloudData(cloudData, doc, attempt = 0) {
+            // Mismo filtro de eco que processSyncData: nuestra propia escritura no se vuelve a leer
+            if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
+            const seq = ++hydrateSeq;
+            const chunksRef = db.collection('users').doc(auth.currentUser.uid).collection('chunks');
+            const manifest = { key: cloudData.chunkKey || '', chunks: {} };
+            let { schema, chunkKey, salesChunks, ...result } = cloudData;
+            const isV2 = schema === 2 && !('sales' in cloudData);
+
+            // Trae un trozo, descifra y comprueba que coincide con el hash esperado
+            const fetchChunk = async (id, hash) => {
+                const snap = await chunksRef.doc(id).get();
+                if (!snap.exists) throw new Error('falta el trozo ' + id);
+                const d = snap.data();
+                const text = d.isEncrypted ? decryptJsonText(d.data) : d.data;
+                if (typeof text !== 'string' || hashText(text) !== hash) throw new Error('trozo ' + id + ' no coincide');
+                return JSON.parse(text);
+            };
+
+            try {
+                if (isV2) {
+                    const local = {};
+                    splitSales(state.sales).forEach(c => { local[c.id] = { hash: hashText(JSON.stringify(c.items)), items: c.items }; });
+                    const parts = await Promise.all((salesChunks || []).map(async c => {
+                        manifest.chunks[c.id] = c.hash;
+                        const items = local[c.id] && local[c.id].hash === c.hash ? local[c.id].items : await fetchChunk(c.id, c.hash);
+                        return { id: c.id, items };
+                    }));
+                    result.sales = joinSales(parts);
+                }
+                // Fotos: se reutiliza la local si coincide con imgRef; si no, se trae. Una foto que falla no es grave.
+                const localById = new Map((state.products || []).map(p => [p.id, p]));
+                result.products = await Promise.all((cloudData.products || []).map(async p => {
+                    const { imgRef, ...prod } = p;
+                    if (!imgRef) return prod;
+                    manifest.chunks['img_' + p.id] = imgRef;
+                    const lp = localById.get(p.id);
+                    if (lp && lp.img && hashText(JSON.stringify(lp.img)) === imgRef) return { ...prod, img: lp.img };
+                    try {
+                        return { ...prod, img: await fetchChunk('img_' + p.id, imgRef) };
+                    } catch (e) {
+                        console.warn('Foto no disponible:', e.message);
+                        return lp && lp.img ? { ...prod, img: lp.img } : p; // sin foto se conserva imgRef para no borrarla de la nube
+                    }
+                }));
+            } catch (err) {
+                // Sin ventas completas NO se llama a processSyncData: no se pisan las locales con datos incompletos
+                console.warn('☁️ Hidratación incompleta:', err.message);
+                if (seq !== hydrateSeq) return;
+                updateCloudStatus('SYNCING');
+                if (attempt < 3) setTimeout(() => { if (seq === hydrateSeq) hydrateCloudData(cloudData, doc, attempt + 1); }, 10000);
+                return;
+            }
+            if (seq !== hydrateSeq) return; // llegó un snapshot más nuevo
+            if (!isV2) manifest.chunks = {}; // formato viejo: la próxima subida reparte todo
+            setCloudManifest(manifest);
+            processSyncData(result, doc);
         }
 
         // --- FUNCIÓN: Intermediario para detectar conflictos (MODO ESTRICTO INTELIGENTE) ---
@@ -620,6 +682,7 @@
             
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
+                    if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
                     console.log("☁️ Sincronizado y listo.");
 
                     // Solo actualizamos tasas si es la primera vez y ya terminamos de cargar datos
