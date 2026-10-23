@@ -1,4 +1,5 @@
-const CACHE_NAME = 'ejecomercio-v47.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v48.0'; // Actualizado para forzar la recarga
+const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -22,6 +23,7 @@ const STATIC_ASSETS = [
   './js/11-render.js',
   './js/12-navigation-backup.js',
   './js/13-images-scanner.js',
+  './js/13a-storage-images.js',
   './js/14-pos-search.js',
   './js/15-credits.js',
   './js/16-tools.js',
@@ -40,7 +42,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v46.2...');
+  console.log('[Service Worker] Instalando v48.0...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
@@ -54,7 +56,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
-        if (key !== CACHE_NAME) {
+        if (key !== CACHE_NAME && key !== IMG_CACHE) {
           console.log('[Service Worker] Borrando caché antigua:', key);
           return caches.delete(key);
         }
@@ -95,6 +97,15 @@ self.addEventListener('fetch', (e) => {
       fetch(e.request)
         .then((res) => cacheIfValid(e.request, res))
         .catch(() => caches.match(e.request))
+    );
+  } else if (url.hostname === 'firebasestorage.googleapis.com' && url.searchParams.get('alt') === 'media') {
+    // Fotos de producto: el enlace lleva el hash y nunca cambia -> caché primero, en una caché que sobrevive a las versiones.
+    // Solo alt=media: las demás llamadas GET del SDK (listAll, metadatos, enlace) van siempre a la red.
+    e.respondWith(
+      caches.open(IMG_CACHE).then((cache) => cache.match(e.request).then((cached) => cached || fetch(e.request).then((res) => {
+        if (res && (res.ok || res.type === 'opaque')) cache.put(e.request, res.clone());
+        return res;
+      })))
     );
   } else if (isCdnRequest(url)) {
     e.respondWith(

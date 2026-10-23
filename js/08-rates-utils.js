@@ -135,6 +135,7 @@
                         <p class="text-[10px] text-green-700 mb-3">
                             Tus datos están blindados. Solo tú tienes la llave.
                         </p>
+                        <p class="text-[10px] text-gray-500 mb-3 leading-tight"><i class="fa-solid fa-image mr-1"></i>Las fotos de los productos se guardan sin cifrar en la nube. Los datos (productos, ventas, fiados y configuración) sí van cifrados.</p>
                 
                         <div class="grid grid-cols-2 gap-2">
                             <button onclick="changeEncryptionPassword()" class="bg-white border border-green-300 text-green-700 py-2 rounded text-xs font-bold hover:bg-green-50 transition">
@@ -160,6 +161,7 @@
                             Protege tus datos en la nube para que sean ilegibles sin tu contraseña.
                             <br><span class="font-bold text-red-500">Advertencia: Si olvidas la clave, pierdes los datos.</span>
                         </p>
+                        <p class="text-[10px] text-gray-500 mb-3 leading-tight"><i class="fa-solid fa-image mr-1"></i>Las fotos de los productos se guardan sin cifrar en la nube. Los datos (productos, ventas, fiados y configuración) sí van cifrados.</p>
                         <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-purple-700 transition">
                             <i class="fa-solid fa-shield-halved mr-1"></i> Activar Protección Extrema
                         </button>
@@ -245,7 +247,10 @@
 
                         // SOBRESCRIBIMOS el documento con un objeto casi vacío.
                         // Al NO usar { merge: true }, esto elimina todos los campos anteriores (fiados, productos, etc).
-                        deleteChunks().then(() => userRef.set({
+                        // Las fotos de Storage también; si Storage falla, se sigue (no es motivo para no formatear)
+                        const deleteImages = () => deleteStorageFolder(storage.ref(`users/${user.uid}`))
+                            .catch(e => console.warn('No se pudieron borrar las fotos de Storage:', e.message || e));
+                        deleteChunks().then(deleteImages).then(() => userRef.set({
                             products: [],
                             sales: [],
                             credits: [],

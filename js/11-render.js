@@ -62,7 +62,7 @@
 
             // Generar filas
             displayProds.forEach(p => {
-                const img = p.img ? `<img src="${escapeHtml(p.img)}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
+                const img = productImageSrc(p) ? `<img src="${escapeHtml(productImageSrc(p))}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
                 
                 invBody.innerHTML += `<tr class="border-b hover:bg-gray-50">
                     <td class="p-2">${img}</td>

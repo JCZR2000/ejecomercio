@@ -192,7 +192,7 @@
                     winner = { 
                         name: name, 
                         qty: data.qty, 
-                        img: prodInStock ? prodInStock.img : null 
+                        img: prodInStock ? productImageSrc(prodInStock) : null 
                     };
                 }
             });

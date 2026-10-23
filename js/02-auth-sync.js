@@ -316,7 +316,8 @@
                     console.log("⬆️ Usuario nuevo: Subiendo datos locales...");
                     state.isCloudSynced = true; 
                     setCloudManifest({}); // el manifiesto guardado pudo ser de otra cuenta
-                    saveData(); 
+                    saveData();
+                    afterCloudSyncImages();
                 }
             }, error => {
                 console.error("Error Sync:", error);
@@ -683,6 +684,7 @@
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
                     if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
+                    afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
 
                     // Solo actualizamos tasas si es la primera vez y ya terminamos de cargar datos

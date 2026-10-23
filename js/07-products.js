@@ -30,14 +30,15 @@
                     // MODO EDICIÓN
                     const idx = state.products.findIndex(p => p.id == state.editingId);
                     if (idx !== -1) {
-                        let finalImg = state.products[idx].img; 
-                        if (state.tempImg) finalImg = state.tempImg;
-                        else if (state.isImageDeleted) finalImg = null;
-
-                        state.products[idx] = {
-                            ...state.products[idx],
-                            name, qty, price, barcode, img: finalImg
-                        };
+                        const prod = { ...state.products[idx], name, qty, price, barcode };
+                        // Foto nueva o quitada: se olvida la de Storage (el archivo lo borra pruneStorageImages)
+                        if (state.tempImg || state.isImageDeleted) {
+                            delete prod.imgUrl;
+                            delete prod.imgHash;
+                            if (state.tempImg) prod.img = state.tempImg;
+                            else delete prod.img;
+                        }
+                        state.products[idx] = prod;
                     }
                 } else {
                     // MODO CREACIÓN
@@ -49,9 +50,10 @@
                 }
 
                 // 4. Guardar y Refrescar
-                saveData(); 
-                renderAll(); 
-                
+                saveData();
+                renderAll();
+                uploadPendingImages(); // en segundo plano; sin sesión o sin conexión no hace nada
+
                 // 5. Limpiar y Cerrar (Aquí es donde fallaba antes)
                 cancelEdit(); 
                 
@@ -74,8 +76,8 @@
             $('prodPrice').value = p.price;
 
             // Imagen
-            if (p.img) {
-                $('imgPreview').src = p.img;
+            if (productImageSrc(p)) {
+                $('imgPreview').src = productImageSrc(p);
                 $('imgPreview').classList.remove('hidden');
                 $('imgIcon').classList.add('hidden');
                 $('btnRemoveImg').classList.remove('hidden');

@@ -16,6 +16,7 @@
         const app = firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
+        const storage = firebase.storage();
         let unsubscribe = null; // Para control de sincronización
 
         // Habilitar Persistencia Offline
