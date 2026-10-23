@@ -4,7 +4,7 @@
         // Las fotos van SIN cifrar (decisión del usuario, 2026-10-23).
         // ==========================================
         const IMG_CACHE = 'ejecomercio-img';
-        const IMG_PRUNE_AGE_MS = 24 * 60 * 60 * 1000;
+        const IMG_PRUNE_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 días: da margen a las copias de la nube
         const failedImageUrls = new Set(); // enlaces externos que no se pudieron subir en esta sesión
         let isUploadingImages = false;
         let hasPrunedImages = false;
@@ -73,7 +73,7 @@
             }
         }
 
-        // Borra los archivos que ningún producto usa y tienen más de 24 h. Una vez por sesión.
+        // Borra los archivos que ningún producto ni copia usa y tienen más de 7 días. Una vez por sesión.
         async function pruneStorageImages() {
             if (hasPrunedImages || !auth.currentUser || !state.isCloudSynced) return;
             hasPrunedImages = true;
@@ -82,6 +82,8 @@
             if (state.products.some(p => p.imgUrl && !p.imgHash)) return;
             const used = new Set(state.products.filter(p => p.imgUrl).map(p => imagePath(uid, p.id, p.imgHash)));
             try {
+                // Fotos que usan las copias de la nube (solo las cabeceras). Si no se pueden leer, no se borra nada.
+                (await db.collection('users').doc(uid).collection('backups').get()).docs.forEach(d => (d.data().imgPaths || []).forEach(x => used.add(x)));
                 const list = await storage.ref(`users/${uid}/products`).listAll();
                 for (const item of list.items) {
                     if (used.has(item.fullPath)) continue;

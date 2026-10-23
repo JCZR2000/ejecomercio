@@ -32,7 +32,8 @@
             const chunks = [];
             let cur = [], size = 0;
             const flush = () => {
-                if (cur.length) chunks.push({ id: 'sales_' + String(chunks.length).padStart(3, '0'), items: cur });
+                // Fase 6: el hash en el id evita que un dispositivo atrasado pise un trozo que usa el otro
+                if (cur.length) chunks.push({ id: 'sales_' + String(chunks.length).padStart(3, '0') + '_' + hashText(JSON.stringify(cur)).slice(0, 8), items: cur });
                 cur = []; size = 0;
             };
             for (let i = (sales || []).length - 1; i >= 0; i--) {
@@ -72,12 +73,71 @@
             };
         }
 
+        // ==========================================
+        // Fase 6: sincronización segura (funciones puras)
+        // ==========================================
+        // Ficha de la versión de la nube: rev (nuevo) + lastUpdated, ambos al nivel superior del documento.
+        function cloudTokenOf(raw) {
+            return raw ? `${raw.rev || 0}|${raw.lastUpdated || ''}` : '';
+        }
+
+        function cloudCounts(d) {
+            return { products: (d.products || []).length, sales: (d.sales || []).length, credits: (d.credits || []).length };
+        }
+
+        // base: ficha de la última versión de la nube aceptada (null = dispositivo de una versión vieja).
+        function decideSync(base, cloudToken, dirty) {
+            if (base === null) return 'LEGACY';
+            if (cloudToken === base) return dirty ? 'UPLOAD' : 'NONE';
+            return dirty ? 'CONFLICT' : 'LOAD';
+        }
+
+        // Tipos que bajan a 0 desde más de 0, o a menos de la mitad desde 5 o más.
+        function bigLoss(baseCounts, nowCounts) {
+            if (!baseCounts) return [];
+            return ['products', 'sales', 'credits'].filter(t => {
+                const b = baseCounts[t] || 0, n = (nowCounts && nowCounts[t]) || 0;
+                return (b > 0 && n === 0) || (b >= 5 && n < b / 2);
+            });
+        }
+
+        // Una parte cifrada crece ~1,35x: 400 000 caracteres siguen bajo el límite de 1 MiB de Firestore.
+        const BACKUP_PART_CHARS = 400000;
+
+        function splitText(text, size = BACKUP_PART_CHARS) {
+            const parts = [];
+            for (let i = 0; i < text.length; i += size) parts.push(text.slice(i, i + size));
+            return parts;
+        }
+
+        function selfTestSync() {
+            const t = decideSync;
+            console.assert(t(null, '1|a', true) === 'LEGACY', 'selfTestSync: LEGACY');
+            console.assert(t('1|a', '1|a', false) === 'NONE', 'selfTestSync: NONE');
+            console.assert(t('1|a', '1|a', true) === 'UPLOAD', 'selfTestSync: UPLOAD');
+            console.assert(t('1|a', '2|b', false) === 'LOAD', 'selfTestSync: LOAD');
+            console.assert(t('1|a', '2|b', true) === 'CONFLICT', 'selfTestSync: CONFLICT');
+            const c = (b, n) => bigLoss({ products: b, sales: 0, credits: 0 }, { products: n, sales: 0, credits: 0 }).length;
+            console.assert(c(0, 0) === 0, 'selfTestSync: 0 a 0');
+            console.assert(c(10, 4) === 1, 'selfTestSync: 10 a 4 es pérdida');
+            console.assert(c(10, 6) === 0, 'selfTestSync: 10 a 6 no');
+            console.assert(c(3, 1) === 0, 'selfTestSync: 3 a 1 no');
+            console.assert(c(2, 0) === 1, 'selfTestSync: 2 a 0 es pérdida');
+            console.assert(bigLoss(null, { products: 0 }).length === 0, 'selfTestSync: sin base no hay pérdida');
+            console.assert(cloudTokenOf({ rev: 3, lastUpdated: 'x' }) === '3|x' && cloudTokenOf({ lastUpdated: 'x' }) === '0|x' && cloudTokenOf(null) === '', 'selfTestSync: ficha');
+            const text = 'ñ'.repeat(2500) + 'abc';
+            const parts = splitText(text, 900);
+            console.assert(parts.length === 3 && parts.join('') === text && splitText('') .length === 0, 'selfTestSync: partir y unir texto');
+            console.log('selfTestSync terminado');
+        }
+
         function selfTestChunks() {
             const bk = { products: state.products, sales: state.sales };
             const mkSale = i => ({ id: 's' + i, total: i, note: 'x'.repeat(100) });
             const sales = Array.from({ length: 30 }, (_, i) => mkSale(30 - i)); // más nueva primero
             const split = splitSales(sales, 1000);
             console.assert(split.length > 1, 'selfTestChunks: debe haber varios trozos');
+            console.assert(split.every((c, i) => new RegExp('^sales_' + String(i).padStart(3, '0') + '_[0-9a-f]{8}$').test(c.id)), 'selfTestChunks: id sales_NNN_hash8');
             console.assert(JSON.stringify(joinSales(split)) === JSON.stringify(sales), 'selfTestChunks: dividir y unir');
             const split2 = splitSales([mkSale(31), ...sales], 1000);
             const h = s => s.map(c => hashText(JSON.stringify(c.items)));

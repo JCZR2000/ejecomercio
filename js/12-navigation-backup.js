@@ -88,7 +88,7 @@
             if (!file) return;
             const reader = new FileReader();
     
-            reader.onload = (e) => {
+            reader.onload = async (e) => {
                 try {
                     let jsonContent = JSON.parse(e.target.result);
                     let finalData = jsonContent; // Asumimos texto plano por defecto
@@ -124,6 +124,8 @@
 
                     // Confirmación final antes de sobrescribir
                     if (confirm('¿Restaurar este respaldo?\nSe sobrescribirán los datos actuales y se subirán a la nube.')) {
+                        // Copia de la nube antes de pisarla; si falla no se cambia nada
+                        if (!await ensureCloudBackup('Antes de restaurar un respaldo')) return;
                 
                         // INYECCIÓN DE DATOS (Lista Completa)
                         if (finalData.products) state.products = finalData.products;
@@ -141,7 +143,7 @@
                 
                         // Guardado inteligente:
                         // saveData() detectará si hay encryptionKey y subirá todo encriptado a la nube automáticamente
-                        saveData(); 
+                        saveData({ skipLossCheck: true }); 
                 
                         renderAll();
                         $('restoreInput').value = ''; // Limpiar input file

@@ -26,7 +26,21 @@
             };
         }
 
-        function saveData({ allowEmpty = false } = {}) {
+        // Fase 6: ficha de la última versión de la nube aceptada por este dispositivo (null = viene de una versión vieja)
+        let selfCloudToken = null; // ficha de nuestra última subida: su eco no se vuelve a procesar
+        let saveSeq = 0;
+        const getCloudBase = () => localStorage.getItem('inv_cloud_base');
+        function setCloudBase(token, counts) {
+            localStorage.setItem('inv_cloud_base', token);
+            localStorage.setItem('inv_cloud_base_counts', JSON.stringify(counts || {}));
+        }
+        const getCloudBaseCounts = () => { try { return JSON.parse(localStorage.getItem('inv_cloud_base_counts')); } catch (e) { return null; } };
+        const isCloudDirty = () => localStorage.getItem('inv_cloud_dirty') === '1';
+
+        // background: guardado que no es un cambio del usuario (tasas): no marca cambios pendientes ni pregunta en conflictos.
+        // skipLossCheck: el usuario ya confirmó un borrado grande.
+        function saveData({ allowEmpty = false, background = false, skipLossCheck = false } = {}) {
+            if (!background) { saveSeq++; localStorage.setItem('inv_cloud_dirty', '1'); }
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
 
@@ -59,27 +73,37 @@
             // SEGURO 1: No subir si no estamos sincronizados (Evita sobrescribir la nube con datos viejos)
             if (!state.isCloudSynced) return;
 
-            // SEGURO 2: ¡CRÍTICO! Anti-Wipe (Evita borrar la DB por error de carga).
-            // allowEmpty solo lo usa un borrado intencional del usuario.
-            if (!allowEmpty && state.products.length === 0 && state.sales.length === 0 && state.credits.length === 0) {
+            // SEGURO 2: Anti-Wipe solo para dispositivos sin base (vienen de una versión vieja).
+            // Con base, la capa 3 (bigLoss en uploadToCloud) pregunta antes de subir pérdidas grandes.
+            if (!allowEmpty && getCloudBase() === null && state.products.length === 0 && state.sales.length === 0 && state.credits.length === 0) {
                 console.warn("🛡️ BLOQUEO DE SEGURIDAD: Se intentó subir una base de datos vacía.");
                 return;
             }
 
-            if (auth.currentUser) uploadToCloud();
+            if (auth.currentUser) uploadToCloud({ background, skipLossCheck });
         }
 
         // Una sola subida a la vez; si saveData se llama mientras sube, se repite una vez al terminar.
         let pendingCloudSave = false;
-        async function uploadToCloud() {
+        async function uploadToCloud({ background = false, skipLossCheck = false } = {}) {
             if (isUploadingToCloud) { pendingCloudSave = true; return; }
+            if (!skipLossCheck) {
+                const loss = bigLoss(getCloudBaseCounts(), cloudCounts(state));
+                if (loss.length) { if (!background) askBigLoss(loss); return; }
+            }
             const user = auth.currentUser;
             isUploadingToCloud = true;
             updateCloudStatus('SYNCING');
             try {
                 do {
                     pendingCloudSave = false;
-                    if (!await uploadCloudOnce(user)) { updateCloudStatus('OFFLINE'); return; }
+                    const r = await uploadCloudOnce(user);
+                    if (r === 'CONFLICT') {
+                        // La nube cambió desde la última versión aceptada: se vuelve a decidir con la versión actual
+                        if (!background) await pullAndDecide();
+                        return;
+                    }
+                    if (!r) { updateCloudStatus('OFFLINE'); return; }
                 } while (pendingCloudSave);
                 console.log("💾☁️ Guardado en la nube (Confirmación)");
                 updateCloudStatus('ONLINE');
@@ -92,9 +116,43 @@
             }
         }
 
-        // Devuelve false si el freno de tamaño impidió subir.
+        const LOSS_LABELS = { products: 'Productos', sales: 'Ventas', credits: 'Fiados' };
+
+        // Capa 3: pérdida grande de datos. Sí = copia y subida; No = se descartan los cambios locales.
+        function askBigLoss(loss) {
+            const base = getCloudBaseCounts() || {}, now = cloudCounts(state);
+            const msg = loss.map(t => `${LOSS_LABELS[t]}: ${base[t] || 0} → ${now[t] || 0}`).join('\n') + '\n\n¿Subir este cambio? Se guardará una copia de la nube antes. Si cancelas, se descartan los cambios de este dispositivo.';
+            let answered = false;
+            customConfirm('Se van a borrar datos de la nube', msg, 'warning', async () => {
+                answered = true;
+                if (await ensureCloudBackup('Antes de una pérdida grande de datos')) saveData({ skipLossCheck: true });
+            });
+            $('dialogMsg').style.whiteSpace = 'pre-line';
+            // closeDialog llama a este aviso antes que a "Confirmar": se espera un instante para saber cuál botón fue
+            window.dialogCallback = () => setTimeout(async () => {
+                $('dialogMsg').style.whiteSpace = '';
+                if (answered) return;
+                try {
+                    const full = await readCloudFull({ photos: true });
+                    if (full) { setCloudManifest(full.manifest); finishLoadingData(full.data, full.snap); }
+                    else localStorage.setItem('inv_cloud_dirty', '');
+                } catch (e) {
+                    console.error('No se pudo recargar la nube:', e);
+                    customAlert('Sin conexión', 'No se pudo recargar la nube. Los cambios de este dispositivo siguen sin subir.', 'error');
+                }
+            }, 0);
+        }
+
+        // Devuelve true, false (el freno de tamaño impidió subir) o 'CONFLICT' (la nube cambió; no se escribió el documento principal).
         async function uploadCloudOnce(user) {
             const userRef = db.collection('users').doc(user.uid);
+            const base = getCloudBase(); // null = dispositivo viejo: sin comprobación hasta que acepte una versión
+            const seq = saveSeq;
+            const upCounts = cloudCounts(state);
+            if (base !== null) {
+                const s0 = await userRef.get({ source: 'server' });
+                if (cloudTokenOf(s0.exists ? s0.data() : null) !== base) return 'CONFLICT';
+            }
             const chunksRef = userRef.collection('chunks');
             const { main, chunks, kept } = buildCloudParts();
             const fp = keyFingerprint();
@@ -135,8 +193,20 @@
             }
             if (ops) await batch.commit();
 
-            // 2. Documento principal (.set() sin merge, intencional)
-            await userRef.set(mainDoc);
+            // 2. Documento principal en transacción: solo se escribe si la nube sigue en la versión base.
+            // shortcut: un conflicto aquí deja trozos nuevos huérfanos (pequeños); se borran con el reinicio de fábrica.
+            let newToken;
+            const res = await db.runTransaction(async tx => {
+                const s = await tx.get(userRef);
+                const cur = s.exists ? s.data() : null;
+                if (base !== null && cloudTokenOf(cur) !== base) return 'CONFLICT';
+                const doc = { ...mainDoc, rev: ((cur && cur.rev) || 0) + 1 }; // set() sin merge, intencional
+                newToken = cloudTokenOf(doc);
+                selfCloudToken = newToken;
+                tx.set(userRef, doc);
+                return 'OK';
+            });
+            if (res === 'CONFLICT') return 'CONFLICT';
 
             // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)
             const stale = Object.keys(oldChunks).filter(id => !chunks[id] && !kept.includes(id));
@@ -150,6 +220,8 @@
             for (const [id, c] of Object.entries(chunks)) manifest.chunks[id] = c.hash;
             kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
             setCloudManifest(manifest);
+            setCloudBase(newToken, upCounts);
+            if (seq === saveSeq) localStorage.setItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
             return true;
         }
 

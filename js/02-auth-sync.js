@@ -95,9 +95,7 @@
         function handleAuthAction() {
             const user = auth.currentUser;
             if (user) {
-                if(confirm("¿Cerrar sesión y detener sincronización?")) {
-                    auth.signOut().then(() => location.reload());
-                }
+                confirmSignOut();
             } else {
                 loginWithGoogle();
             }
@@ -145,11 +143,27 @@
                 });
         }
 
-        function logout() {
-            if(confirm("¿Cerrar sesión y detener sincronización?")) {
-                auth.signOut();
-                location.reload();
+        // Cierre de sesión (único). Opción: borrar los datos de este dispositivo (solo si no hay cambios sin subir).
+        function confirmSignOut() {
+            customConfirm('Cerrar sesión', 'Se detendrá la sincronización.', 'warning', () => signOutNow(cb.checked));
+            const label = document.createElement('label');
+            label.className = 'flex items-start gap-2 text-left text-xs text-slate-600 mt-3';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.className = 'mt-0.5';
+            label.append(cb, document.createTextNode('Borrar los datos de este dispositivo'));
+            $('dialogMsg').appendChild(label);
+        }
+
+        function signOutNow(wipe) {
+            if (!wipe) return auth.signOut().then(() => location.reload());
+            if (isCloudDirty()) {
+                return customAlert('Cambios sin subir', 'Hay cambios sin subir a la nube. Conéctate y espera a que se suban antes de borrar este dispositivo.', 'error');
             }
+            if (unsubscribe) unsubscribe();
+            localStorage.clear(); // incluye inv_enc_key
+            const img = ('caches' in window) ? caches.delete(IMG_CACHE).catch(() => {}) : Promise.resolve();
+            img.then(() => auth.signOut()).finally(() => location.reload());
         }
 
         // ==========================================
@@ -228,6 +242,10 @@
                 }
 
                 // ----------------------------------------------------
+
+                // Capa 1 (Fase 6): sin persistencia, una instantánea desde caché no sabe nada de la nube.
+                // Solo se decide con respuestas del servidor.
+                if (doc.metadata.fromCache) return;
 
                 if (doc.exists) {
                     const cloudData = doc.data();
@@ -316,6 +334,7 @@
                     console.log("⬆️ Usuario nuevo: Subiendo datos locales...");
                     state.isCloudSynced = true; 
                     setCloudManifest({}); // el manifiesto guardado pudo ser de otra cuenta
+                    setCloudBase('', {}); // el servidor confirmo que no existe: la subida comprueba que siga sin existir
                     saveData();
                     afterCloudSyncImages();
                 }
@@ -330,21 +349,13 @@
         async function hydrateCloudData(cloudData, doc, attempt = 0) {
             // Mismo filtro de eco que processSyncData: nuestra propia escritura no se vuelve a leer
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
+            if (cloudTokenOf(doc.data()) === selfCloudToken) return; // eco de nuestra propia subida
             const seq = ++hydrateSeq;
-            const chunksRef = db.collection('users').doc(auth.currentUser.uid).collection('chunks');
             const manifest = { key: cloudData.chunkKey || '', chunks: {} };
             let { schema, chunkKey, salesChunks, ...result } = cloudData;
             const isV2 = schema === 2 && !('sales' in cloudData);
 
-            // Trae un trozo, descifra y comprueba que coincide con el hash esperado
-            const fetchChunk = async (id, hash) => {
-                const snap = await chunksRef.doc(id).get();
-                if (!snap.exists) throw new Error('falta el trozo ' + id);
-                const d = snap.data();
-                const text = d.isEncrypted ? decryptJsonText(d.data) : d.data;
-                if (typeof text !== 'string' || hashText(text) !== hash) throw new Error('trozo ' + id + ' no coincide');
-                return JSON.parse(text);
-            };
+            const fetchChunk = fetchCloudChunk;
 
             try {
                 if (isV2) {
@@ -397,6 +408,24 @@
 
             // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
+
+            // Fase 6: decisión por versión base. Solo un dispositivo sin base (LEGACY) usa la lógica antigua de abajo.
+            const decision = decideSync(getCloudBase(), cloudTokenOf(doc.data()), isCloudDirty());
+            if (decision !== 'LEGACY') {
+                isFirstSyncCheck = false;
+                if (decision === 'NONE' || decision === 'LOAD') {
+                    finishLoadingData(cloudData, doc);
+                } else if (decision === 'UPLOAD') {
+                    console.log("⬆️ Cambios locales sin subir sobre la misma versión de la nube: subiendo...");
+                    state.isCloudSynced = true;
+                    saveData();
+                    afterCloudSyncImages();
+                    if (!hasInitialRatesUpdate) { hasInitialRatesUpdate = true; setTimeout(() => fetchAllRates(), 500); }
+                } else {
+                    showConflictModal(cloudData, doc);
+                }
+                return;
+            }
 
             // --- FUNCIÓN AUXILIAR: Sumar todo el stock físico (LO QUE FALTABA) ---
             const calculateTotalStock = (productsArray) => {
@@ -467,48 +496,7 @@
                 // ¡MOSTRAMOS EL MODAL CON TODA LA INFO!
                 console.warn(`⚠️ CONFLICTO REAL: Local tiene prioridad o datos únicos.`);
 
-                pendingCloudSnapshot = { data: cloudData, doc: doc };
-
-                // --- UI DEL MODAL (TU LÓGICA VISUAL ORIGINAL) ---
-                const fmtLocal = localMetrics.time ? new Date(localMetrics.time).toLocaleString() : '---';
-                const fmtCloud = cloudMetrics.time ? new Date(cloudMetrics.time).toLocaleString() : '---';
-
-                let localBadge = "";
-                let cloudBadge = "";
-
-                // Badges de Ventas
-                if (localMetrics.sales > cloudMetrics.sales) {
-                    localBadge = `<span class="block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
-                } else if (cloudMetrics.sales > localMetrics.sales) {
-                    cloudBadge = `<span class="block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
-                }
-                // Badges de Stock (si ventas iguales)
-                else if (localMetrics.totalStock < cloudMetrics.totalStock) {
-                    localBadge = `<span class="block mt-1 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (Stock Actual)</span>`;
-                } else if (cloudMetrics.totalStock < localMetrics.totalStock) {
-                    cloudBadge = `<span class="block mt-1 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (Stock Actual)</span>`;
-                }
-
-                // Inyección HTML
-                document.getElementById('confLocalDate').innerHTML = `
-                    <div class="flex flex-col items-center">
-                        <span class="font-bold text-slate-700">${fmtLocal}</span>
-                        <span class="text-xs text-slate-500 mt-1">🛒 Ventas: ${localMetrics.sales}</span>
-                        <span class="text-xs text-slate-800 font-bold bg-slate-100 px-2 rounded mt-0.5">📦 Stock Total: ${localMetrics.totalStock}</span>
-                        ${localBadge}
-                    </div>
-                `;
-
-                document.getElementById('confCloudDate').innerHTML = `
-                    <div class="flex flex-col items-center">
-                        <span class="font-bold text-slate-700">${fmtCloud}</span>
-                        <span class="text-xs text-slate-500 mt-1">🛒 Ventas: ${cloudMetrics.sales}</span>
-                        <span class="text-xs text-slate-800 font-bold bg-slate-100 px-2 rounded mt-0.5">📦 Stock Total: ${cloudMetrics.totalStock}</span>
-                        ${cloudBadge}
-                    </div>
-                `;
-
-                document.getElementById('conflictModal').classList.remove('hidden');
+                showConflictModal(cloudData, doc);
 
             } else {
                 // Si todo es idéntico o es instalación limpia
@@ -518,50 +506,96 @@
             isFirstSyncCheck = false;
         }
 
-        // --- FUNCIÓN DEL MODAL: Resuelve qué versión gana ---
-        function resolveConflict(choice) {
-            const modal = document.getElementById('conflictModal');
+        // Cuadro de conflicto: fecha, productos, ventas y fiados de cada lado. Recomienda solo por más ventas.
+        function showConflictModal(cloudData, doc) {
+            console.warn("⚠️ CONFLICTO: hay cambios locales sin subir y la nube cambió.");
+            pendingCloudSnapshot = { data: cloudData, doc: doc };
+            const side = (d) => ({
+                time: d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : '---',
+                ...cloudCounts(d)
+            });
+            const L = side(state), C = side(cloudData);
+            const badge = (color) => `<span class="block mt-1 text-xs bg-${color}-100 text-${color}-800 px-2 py-0.5 rounded font-bold w-fit">Recomendado (+Ventas)</span>`;
+            const html = (v, b) => `
+                <div class="flex flex-col items-center">
+                    <span class="font-bold text-slate-700">${v.time}</span>
+                    <span class="text-xs text-slate-500 mt-1">📦 Productos: ${v.products}</span>
+                    <span class="text-xs text-slate-500">🛒 Ventas: ${v.sales}</span>
+                    <span class="text-xs text-slate-500">💳 Fiados: ${v.credits}</span>
+                    ${b}
+                </div>`;
+            $('confLocalDate').innerHTML = html(L, L.sales > C.sales ? badge('green') : '');
+            $('confCloudDate').innerHTML = html(C, C.sales > L.sales ? badge('blue') : '');
+            $('conflictModal').classList.remove('hidden');
+        }
 
-            // 1. ACTIVAR ESCUDO (COOLDOWN) 🛡️
-            // Durante 3 segundos, ignoraremos cualquier "eco" o rebote de la red.
-            conflictCooldown = true;
-            setTimeout(() => {
-                conflictCooldown = false;
-                console.log("🛡️ Cooldown finalizado. Vigilancia reactivada.");
-            }, 3000);
-            
-            if (choice === 'CLOUD') {
-                if (pendingCloudSnapshot) {
-                    console.log("☁️ Usuario eligió NUBE. Sobrescribiendo datos locales...");
-                    
-                    // Cargamos los datos que teníamos en "cuarentena"
-                    finishLoadingData(pendingCloudSnapshot.data, pendingCloudSnapshot.doc);
-                    
-                    // Forzamos la fecha local para que coincida y no vuelva a saltar el modal
-                    localStorage.setItem('inv_last_updated', pendingCloudSnapshot.data.lastUpdated); 
-                    state.lastUpdated = pendingCloudSnapshot.data.lastUpdated;
-
-                    // La tasa del dólar probablemente sea vieja. ¡Actualicémosla de nuevo!
-                    setTimeout(() => {
-                        console.log("🔄 Reactualizando tasas tras conflicto...");
-                        fetchAllRates();
-                    }, 500);
-                }
-            } else if (choice === 'LOCAL') {
-                console.log("📱 Usuario eligió LOCAL. Forzando subida a nube...");
-                
-                // Actualizamos fecha local para que sea "la más reciente" oficialmente
-                state.lastUpdated = new Date().toISOString();
-                localStorage.setItem('inv_last_updated', state.lastUpdated);
-                
-                // Habilitamos subida y empujamos
-                state.isCloudSynced = true; 
-                saveData(); 
+        // Pide la versión actual al servidor y la pasa por la decisión (tras un conflicto al subir)
+        async function pullAndDecide() {
+            try {
+                const full = await readCloudFull({ photos: true });
+                if (!full) return;
+                setCloudManifest(full.manifest);
+                processSyncData(full.data, full.snap);
+            } catch (e) {
+                console.error('No se pudo leer la nube tras el conflicto:', e);
+                updateCloudStatus('OFFLINE');
             }
+        }
 
-            // Limpieza
-            pendingCloudSnapshot = null;
-            modal.classList.add('hidden');
+        // --- FUNCIÓN DEL MODAL: Resuelve qué versión gana ---
+        let resolvingConflict = false;
+        async function resolveConflict(choice) {
+            if (resolvingConflict) return;
+            resolvingConflict = true;
+            try {
+                const modal = document.getElementById('conflictModal');
+                const snapshot = pendingCloudSnapshot;
+
+                // ESCUDO (COOLDOWN) 🛡️: durante 3 segundos se ignora cualquier "eco" o rebote de la red.
+                const startCooldown = () => {
+                    conflictCooldown = true;
+                    setTimeout(() => {
+                        conflictCooldown = false;
+                        console.log("🛡️ Cooldown finalizado. Vigilancia reactivada.");
+                    }, 3000);
+                };
+
+                if (choice === 'CLOUD') {
+                    startCooldown();
+                    if (snapshot) {
+                        console.log("☁️ Usuario eligió NUBE. Sobrescribiendo datos locales...");
+                        finishLoadingData(snapshot.data, snapshot.doc);
+
+                        // Forzamos la fecha local para que coincida y no vuelva a saltar el modal
+                        localStorage.setItem('inv_last_updated', snapshot.data.lastUpdated);
+                        state.lastUpdated = snapshot.data.lastUpdated;
+
+                        // La tasa del dólar probablemente sea vieja. ¡Actualicémosla de nuevo!
+                        setTimeout(() => {
+                            console.log("🔄 Reactualizando tasas tras conflicto...");
+                            fetchAllRates();
+                        }, 500);
+                    }
+                } else if (choice === 'LOCAL') {
+                    console.log("📱 Usuario eligió LOCAL. Copia de la nube y subida...");
+                    // Si la copia falla no se sube nada y el cuadro sigue abierto
+                    if (snapshot && !await ensureCloudBackup('Antes de usar los datos locales')) return;
+                    startCooldown();
+
+                    state.lastUpdated = new Date().toISOString();
+                    localStorage.setItem('inv_last_updated', state.lastUpdated);
+
+                    // Se acepta pisar la versión que el usuario vio; si la nube cambió otra vez, la subida lo detecta
+                    if (snapshot) setCloudBase(cloudTokenOf(snapshot.doc.data()), cloudCounts(snapshot.data));
+                    state.isCloudSynced = true;
+                    saveData({ skipLossCheck: true });
+                }
+
+                pendingCloudSnapshot = null;
+                modal.classList.add('hidden');
+            } finally {
+                resolvingConflict = false;
+            }
         }
 
         // ==========================================
@@ -683,6 +717,9 @@
             
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
+                    // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
+                    setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state));
+                    localStorage.setItem('inv_cloud_dirty', '');
                     if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");

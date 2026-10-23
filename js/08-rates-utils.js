@@ -204,6 +204,7 @@
                 if (!$('configModal').classList.contains('hidden')) {
                     updateRateUI(); // Actualizar UI de tasa
                     renderEncryptionUI(); // Menú de encriptación
+                    renderCloudBackupsUI(); // Copias en la nube
                     updateStorageUsage(); // Uso de almacenamiento
                     updateCreditConfigUI(); // Configuración de créditos
                     updateSecurityUI(); // Muestra si ya hay PIN
@@ -250,7 +251,7 @@
                         // Las fotos de Storage también; si Storage falla, se sigue (no es motivo para no formatear)
                         const deleteImages = () => deleteStorageFolder(storage.ref(`users/${user.uid}`))
                             .catch(e => console.warn('No se pudieron borrar las fotos de Storage:', e.message || e));
-                        deleteChunks().then(deleteImages).then(() => userRef.set({
+                        deleteChunks().then(() => deleteAllCloudBackups(userRef)).then(deleteImages).then(() => userRef.set({
                             products: [],
                             sales: [],
                             credits: [],
@@ -278,36 +279,45 @@
             // 2. VACIAR SOLO INVENTARIO
             else if (action === 'clean_inv') {
                 if (confirm('¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)')) {
-                    state.products = [];
-                    localStorage.setItem('inv_products', '[]');
-                    forceClearCloud('products');
-                    renderAll();
-                    toggleMenu('config');
-                    alert('Inventario vaciado.');
+                    ensureCloudBackup('Antes de vaciar el inventario').then(ok => {
+                        if (!ok) return;
+                        state.products = [];
+                        localStorage.setItem('inv_products', '[]');
+                        forceClearCloud('products');
+                        renderAll();
+                        toggleMenu('config');
+                        alert('Inventario vaciado.');
+                    });
                 }
             } 
             
             // 3. BORRAR SOLO HISTORIAL
             else if (action === 'clean_hist') {
                 if (confirm('¿Borrar todo el historial de ventas?')) {
-                    state.sales = [];
-                    localStorage.setItem('inv_sales', '[]');
-                    forceClearCloud('sales');
-                    renderAll();
-                    toggleMenu('config');
-                    alert('Historial borrado.');
+                    ensureCloudBackup('Antes de borrar el historial').then(ok => {
+                        if (!ok) return;
+                        state.sales = [];
+                        localStorage.setItem('inv_sales', '[]');
+                        forceClearCloud('sales');
+                        renderAll();
+                        toggleMenu('config');
+                        alert('Historial borrado.');
+                    });
                 }
             }
 
             // 4. BORRAR SOLO FIADOS
             else if (action === 'clean_credits') {
                 if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nEsta acción no se puede deshacer.')) {
-                    state.credits = [];
-                    localStorage.setItem('inv_credits', '[]');
-                    forceClearCloud('credits');
-                    renderAll();
-                    toggleMenu('config');
-                    alert('Lista de fiados eliminada.');
+                    ensureCloudBackup('Antes de borrar los fiados').then(ok => {
+                        if (!ok) return;
+                        state.credits = [];
+                        localStorage.setItem('inv_credits', '[]');
+                        forceClearCloud('credits');
+                        renderAll();
+                        toggleMenu('config');
+                        alert('Lista de fiados eliminada.');
+                    });
                 }
             }
         }
@@ -318,8 +328,8 @@
         function forceClearCloud(fieldToClear) {
             console.log(`⚠️ EJECUTANDO BORRADO FORZADO DE: ${fieldToClear}`);
             // El estado ya está vaciado: la subida normal sube lo que queda y borra los trozos sobrantes.
-            // allowEmpty solo se salta el anti-wipe.
-            saveData({ allowEmpty: true });
+            // El usuario ya confirmó el borrado y la copia ya se hizo: no se pregunta otra vez.
+            saveData({ allowEmpty: true, skipLossCheck: true });
         }
 
         function saveCustomRate() {
@@ -363,7 +373,7 @@
                 // Si falla (ej. sin internet), no borramos las tasas viejas, mantenemos las locales.
             }
 
-            saveData();
+            saveData({ background: true }); // las tasas no marcan cambios ni provocan conflictos
             btn.innerHTML = '<i class="fa-solid fa-sync-alt"></i>';
             renderAll();
         }
