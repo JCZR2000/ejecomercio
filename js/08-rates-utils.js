@@ -227,7 +227,7 @@
                     const wipeLocalAndReload = () => {
                         console.log("🧹 Borrando datos locales...");
                         localStorage.clear();
-                        window.location.reload();
+                        deleteImageDb().finally(() => window.location.reload()); // también las fotos locales (IndexedDB)
                     };
 
                     if (user) {

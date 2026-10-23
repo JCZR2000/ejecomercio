@@ -163,7 +163,7 @@
             if (unsubscribe) unsubscribe();
             localStorage.clear(); // incluye inv_enc_key
             const img = ('caches' in window) ? caches.delete(IMG_CACHE).catch(() => {}) : Promise.resolve();
-            img.then(() => auth.signOut()).finally(() => location.reload());
+            Promise.all([img, deleteImageDb()]).then(() => auth.signOut()).finally(() => location.reload());
         }
 
         // ==========================================
@@ -350,6 +350,7 @@
             // Mismo filtro de eco que processSyncData: nuestra propia escritura no se vuelve a leer
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
             if (cloudTokenOf(doc.data()) === selfCloudToken) return; // eco de nuestra propia subida
+            if (!localImagesReady) await localImagesLoaded; // para reutilizar las fotos locales (lp.img)
             const seq = ++hydrateSeq;
             const manifest = { key: cloudData.chunkKey || '', chunks: {} };
             let { schema, chunkKey, salesChunks, ...result } = cloudData;
@@ -707,7 +708,7 @@
                 migrateLegacyPin(); // un dispositivo viejo pudo subir el PIN en claro
 
                 if (!doc.metadata.hasPendingWrites) {
-                    localStorage.setItem('inv_products', JSON.stringify(state.products));
+                    writeLocalProducts();
                     localStorage.setItem('inv_sales', JSON.stringify(state.sales));
                     localStorage.setItem('inv_credits', JSON.stringify(state.credits));
                     localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));

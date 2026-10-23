@@ -48,7 +48,7 @@
             localStorage.setItem('inv_last_updated', state.lastUpdated);
 
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
-            localStorage.setItem('inv_products', JSON.stringify(state.products));
+            persistProducts(); // inv_products sin el base64 de las fotos ya guardadas en IndexedDB (Fase 7)
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
@@ -87,6 +87,8 @@
         let pendingCloudSave = false;
         async function uploadToCloud({ background = false, skipLossCheck = false } = {}) {
             if (isUploadingToCloud) { pendingCloudSave = true; return; }
+            // Sin las fotos locales cargadas, buildCloudParts vería productos sin img y la nube perdería su trozo img_
+            if (!localImagesReady) await localImagesLoaded;
             if (!skipLossCheck) {
                 const loss = bigLoss(getCloudBaseCounts(), cloudCounts(state));
                 if (loss.length) { if (!background) askBigLoss(loss); return; }
