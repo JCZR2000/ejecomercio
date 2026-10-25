@@ -130,7 +130,7 @@
                 state.isCloudSynced = true;
                 migrateLegacyPin();
                 saveData({ skipLossCheck: true });
-                busyStart('Subiendo a la nube...');
+                $('busyMsg').textContent = 'Subiendo a la nube...'; // un solo busyStart/busyEnd
                 await waitForUpload();
                 renderAll();
                 renderCloudBackupsUI();

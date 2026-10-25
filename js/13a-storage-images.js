@@ -8,6 +8,7 @@
         const failedImageUrls = new Set(); // enlaces externos que no se pudieron subir en esta sesión
         let isUploadingImages = false;
         let hasPrunedImages = false;
+        let hasRepairedImages = false;
 
         // img gana: si existe es más nueva (un dispositivo v47 cambia img sin tocar imgUrl).
         function productImageSrc(p) {
@@ -27,6 +28,10 @@
         async function uploadProductImage(p) {
             const imgHash = hashText(p.img);
             const ref = storage.ref(imagePath(auth.currentUser.uid, p.id, imgHash));
+            // Mismo hash = misma foto: nunca se sube encima (cambiaría el token y rompería los enlaces guardados).
+            // shortcut: dos dispositivos subiendo la misma foto nueva a la vez pueden pisar el token; repairImageUrls lo corrige en la siguiente sesión.
+            try { return { imgUrl: await ref.getDownloadURL(), imgHash }; }
+            catch (e) { if (e.code !== 'storage/object-not-found') throw e; }
             const meta = { cacheControl: 'public, max-age=31536000, immutable' };
             if (p.img.startsWith('data:')) {
                 await ref.putString(p.img, 'data_url', meta);
@@ -69,6 +74,45 @@
             }
             if (changed) {
                 saveData();
+                renderAll();
+            }
+        }
+
+        // Cambia imgUrl solo si el producto sigue existiendo y su imgUrl sigue siendo oldUrl. Devuelve cuántos cambió.
+        function applyImageUrlFixes(products, fixes) {
+            let n = 0;
+            for (const f of fixes) {
+                const p = (products || []).find(x => String(x.id) === String(f.id));
+                if (p && p.imgUrl === f.oldUrl) { p.imgUrl = f.newUrl; n++; }
+            }
+            return n;
+        }
+
+        // Pide a Firebase el enlace actual de cada foto y corrige imgUrl si cambió. Una vez por sesión.
+        async function repairImageUrls() {
+            if (hasRepairedImages || !auth.currentUser || !navigator.onLine || !state.isCloudSynced) return;
+            hasRepairedImages = true;
+            const uid = auth.currentUser.uid;
+            const todo = state.products.filter(p => p.imgUrl && p.imgHash && !p.img);
+            const fixes = [];
+            try {
+                for (let i = 0; i < todo.length; i += 8) {
+                    await Promise.all(todo.slice(i, i + 8).map(async p => {
+                        try {
+                            const newUrl = await storage.ref(imagePath(uid, p.id, p.imgHash)).getDownloadURL();
+                            if (newUrl !== p.imgUrl) fixes.push({ id: p.id, oldUrl: p.imgUrl, newUrl });
+                        } catch (e) {
+                            if (e.code !== 'storage/object-not-found') throw e;
+                            console.warn('Foto no encontrada en Storage:', p.id); // no se borra imgUrl: una copia de la nube puede necesitarlo
+                        }
+                    }));
+                }
+            } catch (e) {
+                console.warn('Reparación de enlaces de fotos detenida:', e.message || e);
+                return;
+            }
+            if (applyImageUrlFixes(state.products, fixes)) {
+                saveData({ background: true });
                 renderAll();
             }
         }
@@ -120,7 +164,7 @@
 
         // Se llama tras cada sincronización con la nube
         function afterCloudSyncImages() {
-            uploadPendingImages().then(() => {
+            uploadPendingImages().then(repairImageUrls).then(() => {
                 if (!hasPrunedImages) pruneStorageImages().then(pruneImageCache);
             });
         }
@@ -151,5 +195,16 @@
             const mp = parts.main.products[0];
             console.assert(!parts.chunks.img_2 && !('imgRef' in mp) && mp.imgUrl === prods[1].imgUrl && parts.kept.length === 0,
                 'selfTestStorageImages: Storage sin trozo img_');
+            // Fase 8: applyImageUrlFixes
+            const fx = [{ id: 1, imgUrl: 'old' }, { id: 2, imgUrl: 'otro' }, { id: '3', imgUrl: 'old' }, { id: 4, imgUrl: 'old' }];
+            const n = applyImageUrlFixes(fx, [
+                { id: 1, oldUrl: 'old', newUrl: 'new' },   // coincide
+                { id: 2, oldUrl: 'old', newUrl: 'new' },   // imgUrl ya es otro
+                { id: 99, oldUrl: 'old', newUrl: 'new' },  // ya no existe
+                { id: 3, oldUrl: 'old', newUrl: 'new' },   // id de texto
+                { id: '4', oldUrl: 'old', newUrl: 'new' }  // id numérico buscado como texto
+            ]);
+            console.assert(n === 3 && fx[0].imgUrl === 'new' && fx[1].imgUrl === 'otro' && fx[2].imgUrl === 'new' && fx[3].imgUrl === 'new',
+                'selfTestStorageImages: applyImageUrlFixes ' + n);
             console.log('selfTestStorageImages terminado');
         }
