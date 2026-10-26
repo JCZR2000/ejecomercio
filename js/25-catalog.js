@@ -31,8 +31,10 @@
                 const name = String((p && p.name) || '').trim();
                 const price = roundMoney(p && p.price);
                 if (!name || !(price > 0)) continue;
-                // img = foto nueva aún sin subir: sale sin foto hasta que uploadPendingImages la sube
-                const photo = !p.img && typeof p.imgUrl === 'string' && p.imgUrl.startsWith(CATALOG_PHOTO_PREFIX) ? p.imgUrl : null;
+                // Con img y imgUrl a la vez (copias viejas de la nube) vale imgUrl si su hash es el de img; si no, img es una foto
+                // nueva aún sin subir y sale sin foto hasta que uploadPendingImages la sube
+                const uploaded = typeof p.imgUrl === 'string' && p.imgUrl.startsWith(CATALOG_PHOTO_PREFIX);
+                const photo = uploaded && (!p.img || (p.imgHash && p.imgHash === hashText(p.img))) ? p.imgUrl : null;
                 list.push({ id: String(p.id), name, category: String(p.category || '').trim(), price, photo, available: Number(p.qty) > 0 });
             }
             return {
@@ -148,18 +150,35 @@
             const c = state.catalogConfig;
             if (!c || !c.enabled) { b.classList.add('hidden'); return; }
             const q = getCatalogQueue();
-            let text, color;
-            if (isPublishingCatalog) { text = 'Publicando…'; color = 'text-blue-300'; }
-            else if (catalogError) { text = 'Error'; color = 'text-red-400'; }
-            else if (q) { text = `Pendiente (${Math.max(1, Math.ceil((q.due - Date.now()) / 60000))} min)`; color = 'text-yellow-300'; }
-            else {
-                const at = Number(localStorage.getItem('inv_catalog_published_at'));
-                text = at ? 'Publicada ' + new Date(at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : 'Vitrina';
-                color = 'text-emerald-400';
+            const { text, color } = catalogStatusInfo();
+            // En pantallas chicas solo el icono (el detalle sale al tocarlo)
+            b.className = `${color} text-[11px] font-bold flex items-center gap-1 h-8 px-2 rounded bg-slate-800 border border-slate-700`;
+            b.title = catalogError || text;
+            b.innerHTML = `<i class="fa-solid fa-store text-sm"></i><span class="hidden md:inline">${escapeHtml(text)}</span>`;
+        }
+
+        function catalogStatusInfo() {
+            const q = getCatalogQueue();
+            if (isPublishingCatalog) return { text: 'Publicando…', color: 'text-blue-300' };
+            if (catalogError) return { text: 'Error', color: 'text-red-400' };
+            if (q) return { text: `Pendiente (${Math.max(1, Math.ceil((q.due - Date.now()) / 60000))} min)`, color: 'text-yellow-300' };
+            const at = Number(localStorage.getItem('inv_catalog_published_at'));
+            return { text: at ? 'Publicada ' + new Date(at).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : 'Vitrina', color: 'text-emerald-400' };
+        }
+
+        // Al tocar el indicador: detalle del estado y, si hay algo pendiente, opción de publicar ya
+        function showCatalogDetail() {
+            const { text } = catalogStatusInfo();
+            const at = Number(localStorage.getItem('inv_catalog_published_at'));
+            const last = at ? 'Última publicación: ' + new Date(at).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Aún no se ha publicado.';
+            const msg = [text, last, catalogError].filter(Boolean).join('\n');
+            if (getCatalogQueue() && !isPublishingCatalog) {
+                customConfirm('Vitrina en línea', msg + '\n\n¿Publicar ahora?', 'warning', () => runCatalogQueue(true));
+                $('dialogMsg').style.whiteSpace = 'pre-line';
+            } else {
+                customAlert('Vitrina en línea', msg, catalogError ? 'error' : 'success');
+                $('dialogMsg').style.whiteSpace = 'pre-line';
             }
-            b.className = `${color} text-[10px] font-bold flex items-center gap-1 px-2 py-1 rounded bg-slate-800 border border-slate-700`;
-            b.title = catalogError || 'Vitrina en línea';
-            b.innerHTML = `<i class="fa-solid fa-store"></i><span>${escapeHtml(text)}</span>`;
         }
 
         // ---------- Configuración ----------
@@ -266,7 +285,9 @@
             const txt = JSON.stringify(cat);
             ['"qty"', '"cost"', '"notes"', '"barcode"', '"supplier"', 'data:image', 'interna', 'Cliente Ficticio Zeta', 'paymentMethods', 'security', 'credits', 'sales', 'fiado']
                 .forEach(s => console.assert(!txt.includes(s), 'selfTestCatalog: apareció ' + s));
-            console.assert(cat.products[0].photo === null, 'selfTestCatalog: img + imgUrl debe dar photo null');
+            console.assert(cat.products[0].photo === null, 'selfTestCatalog: img nueva (hash distinto) + imgUrl debe dar photo null');
+            const both = buildPublicCatalog([{ id: 9, name: 'Dos', qty: 1, price: 1, img: 'data:image/jpeg;base64,AAA', imgHash: hashText('data:image/jpeg;base64,AAA'), imgUrl: fb }], { title: 'T' }, { currency: '$', rate: 0 });
+            console.assert(both.products[0].photo === fb, 'selfTestCatalog: img + imgUrl con el mismo hash debe dar la foto subida');
             console.assert(cat.products[1].photo === fb && cat.products[1].available === true, 'selfTestCatalog: imgUrl de Firebase / qty texto');
             console.assert(cat.products[2].photo === null && cat.products[2].available === false, 'selfTestCatalog: otro dominio / qty 0');
             console.assert(cat.products[1].category === '', 'selfTestCatalog: sin category -> vacío');

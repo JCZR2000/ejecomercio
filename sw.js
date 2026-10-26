@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v51.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v51.1'; // Actualizado para forzar la recarga
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
@@ -56,6 +56,8 @@ self.addEventListener('install', (e) => {
 
 // 3. ACTIVACIÓN: Limpiar cachés viejas
 self.addEventListener('activate', (e) => {
+  // Versiones anteriores guardaron el JSON de la vitrina en la caché de fotos: se borra para no mostrarlo viejo
+  e.waitUntil(caches.open(IMG_CACHE).then((c) => c.keys().then((reqs) => Promise.all(reqs.filter((r) => r.url.includes('catalogo%2F')).map((r) => c.delete(r))))));
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
