@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v51.1</title>
+    <title>EjeComercio v51.2</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -154,7 +154,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v51.1</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v51.2</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -560,6 +560,19 @@
                         <p class="text-[10px] text-gray-500">Catálogo público con pedido por WhatsApp. Se publica: nombre, categoría, precio, foto y si hay o no. Nunca existencias, costos, clientes ni deudas.</p>
                         <input type="text" id="catalogTitle" maxlength="60" placeholder="Título (si lo dejas vacío, el nombre del negocio)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
                         <input type="tel" id="catalogWhatsapp" maxlength="20" placeholder="WhatsApp con código de país (584120000000)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
+                        <input type="text" id="catalogSlogan" maxlength="80" placeholder="Lema (vacío = el de siempre)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs text-gray-600">Color</span>
+                            <div id="catalogColors" class="flex gap-2"></div>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs text-gray-600">Logo</span>
+                            <div class="flex items-center gap-2">
+                                <img id="catalogLogoPreview" class="hidden w-8 h-8 rounded object-contain bg-white border" alt="">
+                                <label class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold cursor-pointer">Subir<input type="file" accept="image/*" class="hidden" onchange="onCatalogLogoPicked(event)"></label>
+                                <button type="button" id="catalogLogoRemove" onclick="removeCatalogLogo()" class="hidden bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold">Quitar</button>
+                            </div>
+                        </div>
                         <label class="flex items-center justify-between text-xs text-gray-600">Espera antes de publicar
                             <select id="catalogDelay" onchange="saveCatalogConfig()" class="border rounded px-2 py-1 text-xs bg-white">
                                 <option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>

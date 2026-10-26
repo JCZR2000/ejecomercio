@@ -5,7 +5,9 @@
         // ==========================================
         const CATALOG_ALLOWED_FIELDS = ['id', 'name', 'category', 'price', 'photo', 'available'];
         const CATALOG_PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
-        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, whatsapp: '', title: '' };
+        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '' };
+// Paletas de la vitrina (la página tiene los mismos nombres); el valor es la muestra del selector
+const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', azul: '#075985', morado: '#6b21a8', oscuro: '#262626' };
         let catalogTimer = null;
         let isPublishingCatalog = false;
         let catalogError = '';
@@ -20,6 +22,9 @@
             c.delayMin = Math.min(10, Math.max(5, parseInt(c.delayMin) || 5));
             c.whatsapp = normalizeCatalogWhatsapp(c.whatsapp);
             c.title = String(c.title || '');
+            c.slogan = String(c.slogan || '').slice(0, 80);
+            if (!CATALOG_COLORS[c.color]) c.color = 'indigo';
+            if (typeof c.logoUrl !== 'string' || !c.logoUrl.startsWith(CATALOG_PHOTO_PREFIX)) { c.logoUrl = ''; c.logoHash = ''; }
             state.catalogConfig = c;
             return c;
         }
@@ -40,7 +45,13 @@
             return {
                 v: 1,
                 updatedAt: new Date().toISOString(),
-                shop: { title: String(config.title || 'Catálogo'), whatsapp: String(config.whatsapp || '') },
+                shop: {
+                    title: String(config.title || 'Catálogo'),
+                    whatsapp: String(config.whatsapp || ''),
+                    slogan: String(config.slogan || '').slice(0, 80),
+                    color: CATALOG_COLORS[config.color] ? config.color : 'indigo',
+                    logo: typeof config.logoUrl === 'string' && config.logoUrl.startsWith(CATALOG_PHOTO_PREFIX) ? config.logoUrl : ''
+                },
                 currency: money.currency,
                 rate: money.rate > 0 ? money.rate : null,
                 products: list
@@ -197,7 +208,13 @@
             // No se pisa lo que el usuario está escribiendo
             if (document.activeElement !== $('catalogTitle')) $('catalogTitle').value = c.title;
             if (document.activeElement !== $('catalogWhatsapp')) $('catalogWhatsapp').value = c.whatsapp;
+            if (document.activeElement !== $('catalogSlogan')) $('catalogSlogan').value = c.slogan;
             $('catalogDelay').value = String(c.delayMin);
+            $('catalogColors').innerHTML = Object.entries(CATALOG_COLORS).map(([k, hex]) =>
+                `<button type="button" onclick="setCatalogColor('${k}')" title="${k}" class="w-7 h-7 rounded-full border-2 ${c.color === k ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-white'} shadow" style="background:${hex}"></button>`).join('');
+            $('catalogLogoPreview').src = c.logoUrl;
+            $('catalogLogoPreview').classList.toggle('hidden', !c.logoUrl);
+            $('catalogLogoRemove').classList.toggle('hidden', !c.logoUrl);
             $('catalogLinkBox').classList.toggle('hidden', !c.enabled);
             if (c.enabled) $('catalogLinkInput').value = catalogPublicUrl();
             $('catalogError').textContent = catalogError;
@@ -212,7 +229,7 @@
                 renderCatalogConfigUI();
                 return;
             }
-            state.catalogConfig = { ...c, whatsapp, title: $('catalogTitle').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
+            state.catalogConfig = { ...c, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
             localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
             saveData(); // sincroniza la configuración y agenda la subida
             renderCatalogConfigUI();
@@ -227,7 +244,7 @@
                     return;
                 }
                 if (!auth.currentUser) { customAlert('Inicia sesión', 'La vitrina necesita una sesión iniciada.', 'error'); return; }
-                state.catalogConfig = { ...c, enabled: true, whatsapp, title: $('catalogTitle').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
+                state.catalogConfig = { ...c, enabled: true, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
                 localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
                 saveData();
                 // Al activar se publica de inmediato, sin espera
@@ -246,6 +263,74 @@
                     renderCatalogConfigUI();
                 });
             }
+        }
+
+        function setCatalogColor(key) {
+            if (!CATALOG_COLORS[key]) return;
+            state.catalogConfig = { ...normalizeCatalogConfig(), color: key };
+            localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+            saveData();
+            renderCatalogConfigUI();
+        }
+
+        // Reduce el logo a 256 px como máximo (PNG: conserva la transparencia)
+        function resizeCatalogLogo(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onerror = () => reject(reader.error);
+                reader.onload = () => {
+                    const img = new Image();
+                    img.onerror = () => reject(new Error('No es una imagen válida'));
+                    img.onload = () => {
+                        const scale = Math.min(1, 256 / Math.max(img.width, img.height));
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.max(1, Math.round(img.width * scale));
+                        canvas.height = Math.max(1, Math.round(img.height * scale));
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/png'));
+                    };
+                    img.src = reader.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        const catalogLogoPath = (uid, hash) => `users/${uid}/brand/logo_${hash}.png`;
+
+        // Se sube a la carpeta privada del usuario (users/); la vitrina publica solo su enlace de descarga, como las fotos de productos
+        async function onCatalogLogoPicked(ev) {
+            const file = ev.target.files[0];
+            ev.target.value = '';
+            const user = auth.currentUser;
+            if (!file) return;
+            if (!user || !navigator.onLine) { customAlert('Sin conexión', 'Necesitas sesión y conexión para subir el logo.', 'error'); return; }
+            busyStart('Subiendo logo...');
+            try {
+                const dataUrl = await resizeCatalogLogo(file);
+                const hash = hashText(dataUrl);
+                const ref = storage.ref(catalogLogoPath(user.uid, hash));
+                await ref.putString(dataUrl, 'data_url', { cacheControl: 'public, max-age=31536000, immutable' });
+                const logoUrl = await ref.getDownloadURL();
+                const old = normalizeCatalogConfig();
+                state.catalogConfig = { ...old, logoUrl, logoHash: hash };
+                localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+                saveData();
+                if (old.logoHash && old.logoHash !== hash) storage.ref(catalogLogoPath(user.uid, old.logoHash)).delete().catch(() => {});
+                renderCatalogConfigUI();
+            } catch (e) {
+                console.warn('Logo no subido:', e);
+                customAlert('No se pudo subir el logo', e.message || 'Intenta de nuevo.', 'error');
+            } finally { busyEnd(); }
+        }
+
+        function removeCatalogLogo() {
+            const old = normalizeCatalogConfig();
+            state.catalogConfig = { ...old, logoUrl: '', logoHash: '' };
+            localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+            saveData();
+            // La página tolera un logo que ya no existe (muestra la inicial) mientras llega la vitrina nueva
+            if (old.logoHash && auth.currentUser) storage.ref(catalogLogoPath(auth.currentUser.uid, old.logoHash)).delete().catch(() => {});
+            renderCatalogConfigUI();
         }
 
         function copyCatalogLink() {
@@ -295,5 +380,8 @@
             console.assert(catalogHash(cat) === catalogHash(again), 'selfTestCatalog: el hash no debe depender de updatedAt');
             products[1].price = 2.5;
             console.assert(catalogHash(cat) !== catalogHash(buildPublicCatalog(products, { title: 'Bodega Ficticia', whatsapp: '584120000000' }, { currency: '$', rate: 36.5 })), 'selfTestCatalog: el hash debe cambiar con el precio');
+            const shopOut = buildPublicCatalog(products, { title: 'T', slogan: 'x'.repeat(100), color: 'fucsia', logoUrl: 'https://otro.dominio/l.png' }, { currency: '$', rate: 0 }).shop;
+            console.assert(shopOut.slogan.length === 80 && shopOut.color === 'indigo' && shopOut.logo === '', 'selfTestCatalog: lema, color y logo se validan');
+            console.assert(buildPublicCatalog(products, { title: 'T', color: 'rojo', logoUrl: fb }, { currency: '$', rate: 0 }).shop.logo === fb, 'selfTestCatalog: logo de Firebase');
             console.log('selfTestCatalog terminado');
         }

@@ -11,16 +11,22 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { scrollbar-width: none; }
         .card-img { aspect-ratio: 4 / 3; }
+        /* Tema: la página pone --h1..--h3 (degradado), --acc (resalte), --btn y --cat según shop.color */
+        :root { --h1: #0f172a; --h2: #1e293b; --h3: #312e81; --acc: #facc15; --btn: #1e1b4b; --cat: #6366f1; }
+        .hdr { background: linear-gradient(135deg, var(--h1), var(--h2), var(--h3)); }
+        .acc-bg { background: var(--acc); color: #0f172a; }
+        .btn-add { background: var(--btn); }
+        .cat-label { color: var(--cat); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen pb-32 antialiased">
-    <header class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white px-4 pt-5 pb-4 shadow-lg">
+    <header class="hdr text-white px-4 pt-5 pb-4 shadow-lg">
         <div class="max-w-5xl mx-auto">
             <div class="flex items-center gap-3">
-                <div id="shopInitial" class="w-11 h-11 rounded-xl bg-yellow-400 text-slate-900 font-extrabold text-xl flex items-center justify-center shrink-0"><i class="fa-solid fa-store"></i></div>
+                <div id="shopInitial" class="w-11 h-11 rounded-xl acc-bg font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden"><i class="fa-solid fa-store"></i></div>
                 <div class="min-w-0">
                     <h1 id="shopTitle" class="font-extrabold text-xl leading-tight truncate">Catálogo</h1>
-                    <p class="text-xs text-slate-300">Haz tu pedido y te lo confirmamos por WhatsApp</p>
+                    <p id="shopSlogan" class="text-xs text-slate-300">Haz tu pedido y te lo confirmamos por WhatsApp</p>
                 </div>
             </div>
             <div id="controls" class="hidden mt-4 space-y-3">
@@ -69,7 +75,16 @@
     // Copia de escapeHtml de js/08-rates-utils.js
     const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
-    let shop = { title: 'Catálogo', whatsapp: '' };
+    const DEFAULT_SLOGAN = 'Haz tu pedido y te lo confirmamos por WhatsApp';
+    const THEMES = {
+        indigo: ['#0f172a', '#1e293b', '#312e81', '#facc15', '#1e1b4b', '#6366f1'],
+        verde: ['#052e16', '#14532d', '#166534', '#a3e635', '#14532d', '#16a34a'],
+        rojo: ['#450a0a', '#7f1d1d', '#991b1b', '#fbbf24', '#7f1d1d', '#dc2626'],
+        azul: ['#082f49', '#0c4a6e', '#075985', '#38bdf8', '#0c4a6e', '#0284c7'],
+        morado: ['#3b0764', '#581c87', '#6b21a8', '#f0abfc', '#581c87', '#9333ea'],
+        oscuro: ['#0a0a0a', '#171717', '#262626', '#facc15', '#262626', '#737373']
+    };
+    let shop = { title: 'Catálogo', whatsapp: '', slogan: '', color: 'indigo', logo: '' };
     let currency = '$', rate = null, products = [], activeCat = '';
     const cart = new Map(); // id -> cantidad
 
@@ -89,7 +104,13 @@
     function normalize(data) {
         data = data && typeof data === 'object' ? data : {};
         const s = (typeof data.shop === 'object' && data.shop) || {};
-        shop = { title: String(s.title || 'Catálogo'), whatsapp: String(s.whatsapp || '').replace(/\D/g, '') };
+        shop = {
+            title: String(s.title || 'Catálogo'),
+            whatsapp: String(s.whatsapp || '').replace(/\D/g, ''),
+            slogan: String(s.slogan || '').trim().slice(0, 80),
+            color: THEMES[s.color] ? s.color : 'indigo',
+            logo: typeof s.logo === 'string' && s.logo.startsWith(PHOTO_PREFIX) ? s.logo : ''
+        };
         currency = typeof data.currency === 'string' && data.currency ? data.currency : '$';
         rate = Number(data.rate) > 0 ? Number(data.rate) : null;
         products = (Array.isArray(data.products) ? data.products : [])
@@ -120,7 +141,7 @@
             return showMessage('Sin conexión. Intenta de nuevo', true);
         }
         $('shopTitle').textContent = shop.title;
-        $('shopInitial').textContent = shop.title.trim().charAt(0).toUpperCase() || '?';
+        applyTheme();
         document.title = shop.title;
         if (!products.length) return showMessage('No hay productos disponibles por ahora');
         $('message').classList.add('hidden');
@@ -131,9 +152,29 @@
         render();
     }
 
+    // Tema, logo y lema de la vitrina; sin logo (o si no carga) se muestra la inicial del negocio
+    function applyTheme() {
+        const t = THEMES[shop.color];
+        ['--h1', '--h2', '--h3', '--acc', '--btn', '--cat'].forEach((v, i) => document.documentElement.style.setProperty(v, t[i]));
+        document.querySelector('meta[name=theme-color]').content = t[0];
+        $('shopSlogan').textContent = shop.slogan || DEFAULT_SLOGAN;
+        const box = $('shopInitial');
+        const initial = () => { box.className = box.className.replace(' bg-white', ''); box.textContent = shop.title.trim().charAt(0).toUpperCase() || '?'; };
+        if (shop.logo) {
+            box.classList.add('bg-white');
+            box.innerHTML = '';
+            const img = document.createElement('img');
+            img.alt = '';
+            img.className = 'w-full h-full object-contain';
+            img.onerror = initial;
+            img.src = shop.logo;
+            box.appendChild(img);
+        } else initial();
+    }
+
     function renderChips() {
         const cats = [...new Set(products.map(p => p.category))].sort((a, b) => a === 'Otros' ? 1 : b === 'Otros' ? -1 : a.localeCompare(b, 'es'));
-        const chip = (c, label) => `<button data-cat="${escapeHtml(c)}" class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition ${c === activeCat ? 'bg-yellow-400 text-slate-900' : 'bg-white/10 text-white hover:bg-white/20'}">${escapeHtml(label)}</button>`;
+        const chip = (c, label) => `<button data-cat="${escapeHtml(c)}" class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition ${c === activeCat ? 'acc-bg' : 'bg-white/10 text-white hover:bg-white/20'}">${escapeHtml(label)}</button>`;
         $('chips').innerHTML = cats.length > 1 ? chip('', 'Todo') + cats.map(c => chip(c, c)).join('') : '';
     }
 
@@ -148,9 +189,9 @@
                 : '<div class="card-img w-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-300 text-4xl"><i class="fa-solid fa-box-open"></i></div>';
             const action = qty
                 ? `<div class="flex items-center justify-between bg-slate-100 rounded-xl p-1"><button data-act="dec" data-id="${id}" class="w-9 h-9 rounded-lg bg-white shadow-sm font-bold text-lg active:scale-95">−</button><span class="font-extrabold">${qty}</span><button data-act="inc" data-id="${id}" class="w-9 h-9 rounded-lg bg-green-600 text-white shadow-sm font-bold text-lg active:scale-95">+</button></div>`
-                : `<button data-act="inc" data-id="${id}" class="w-full bg-slate-900 hover:bg-indigo-700 text-white rounded-xl py-2.5 text-sm font-bold active:scale-95 transition"><i class="fa-solid fa-plus mr-1 text-xs"></i>Añadir</button>`;
+                : `<button data-act="inc" data-id="${id}" class="btn-add w-full hover:opacity-90 text-white rounded-xl py-2.5 text-sm font-bold active:scale-95 transition"><i class="fa-solid fa-plus mr-1 text-xs"></i>Añadir</button>`;
             return `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">${img}
-                <div class="p-3 flex-1 flex flex-col gap-0.5"><div class="text-[10px] uppercase tracking-wide text-indigo-500 font-bold truncate">${escapeHtml(p.category)}</div>
+                <div class="p-3 flex-1 flex flex-col gap-0.5"><div class="text-[10px] uppercase tracking-wide cat-label font-bold truncate">${escapeHtml(p.category)}</div>
                 <div class="text-sm font-bold leading-snug line-clamp-2">${escapeHtml(p.name)}</div>
                 <div class="mt-1 text-lg font-extrabold text-slate-900">${escapeHtml(currency)} ${fmt(p.price)}</div>${bs}
                 <div class="mt-auto pt-2">${action}</div></div></div>`;
