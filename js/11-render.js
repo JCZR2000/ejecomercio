@@ -270,6 +270,7 @@
 
                     <div class="flex gap-2 items-center mb-2 flex-wrap pt-2 border-t border-gray-100">
                         <button onclick="editCredit('${c.id}')" class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded text-xs hover:bg-indigo-200 border border-indigo-200 flex items-center gap-1 font-bold"><i class="fa-solid fa-cart-plus mr-1"></i>Agregar</button>
+                        <button onclick="requestEditCredit('${c.id}')" class="bg-gray-100 text-gray-700 px-3 py-1 rounded text-xs hover:bg-gray-200 border border-gray-200 flex items-center gap-1 font-bold" title="Quitar productos"><i class="fa-solid fa-pen mr-1"></i>Editar</button>
                         <button onclick="updatePaymentDate('${c.id}')" class="bg-blue-100 text-blue-700 px-3 py-1 rounded text-xs hover:bg-blue-200 border border-blue-200 font-bold flex items-center gap-1" title="Cambiar Fecha"><i class="fa-solid fa-calendar-days mr-1"></i>Fecha</button>
                         <button onclick="openSurchargeModal('${c.id}')" class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded text-xs hover:bg-yellow-200 border border-yellow-200 font-bold flex items-center gap-1" title="Aplicar Recargo"><i class="fa-solid fa-bolt mr-1"></i>Recargo</button>
                         <button onclick="openShareModal('${c.id}')" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs hover:bg-green-200 border border-green-200 font-bold flex items-center gap-1" title="Enviar Recordatorio">

@@ -217,8 +217,6 @@
         }
 
         function requestPayCredit(id) {
-            checkAuth('credit_pay', () => {
-                payCredit(id);
-            });
+            checkAuth('credit_pay', () => startPayCredits(id));
         }
 

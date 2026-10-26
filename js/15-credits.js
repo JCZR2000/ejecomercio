@@ -536,3 +536,144 @@
             });
         }
 
+
+        // ==========================================
+        // 18b. EDITAR FIADO (quitar productos)
+        // ==========================================
+        let editCreditId = null;
+
+        // Sin efectos: no toca state ni el DOM.
+        function planCreditItemRemoval(credit, itemIdx, qty) {
+            const item = credit.items && credit.items[itemIdx];
+            if (!item) return { error: 'Producto no encontrado' };
+            if (credit.paidDate) return { error: 'El fiado ya está saldado' };
+            qty = Number(qty);
+            if (!Number.isInteger(qty) || qty < 1 || qty > item.qty) return { error: `Cantidad inválida (1 a ${item.qty})` };
+            if (credit.items.length === 1 && qty === item.qty) return { error: 'Es el único producto. Para anular el fiado usa la papelera' };
+
+            const items = credit.items.map(i => ({ ...i }));
+            if (qty === item.qty) items.splice(itemIdx, 1);
+            else {
+                items[itemIdx].qty = item.qty - qty;
+                items[itemIdx].subtotal = roundMoney(items[itemIdx].qty * item.price);
+            }
+            const totalDebt = state.creditMode === 'FIXED'
+                ? roundMoney(credit.totalDebt - roundMoney(qty * item.price))
+                : calculateRealDebt({ ...credit, items });
+            if (credit.paid > totalDebt + 0.01) {
+                return { error: `El cliente ya abonó ${formatMoney(credit.paid)} y el nuevo total sería ${formatMoney(totalDebt)}. Registra la devolución aparte` };
+            }
+            return {
+                items, totalDebt,
+                settled: roundMoney(totalDebt - credit.paid) <= 0.01,
+                returnQty: item.isStub ? 0 : qty,
+                productId: item.id
+            };
+        }
+
+        function requestEditCredit(id) {
+            checkAuth('admin', () => openEditCreditModal(id));
+        }
+
+        function openEditCreditModal(id) {
+            const c = state.credits.find(x => x.id == id);
+            if (!c) return;
+            if (c.paidDate) return alert('El fiado ya está saldado');
+            editCreditId = id;
+            $('authModal').classList.add('hidden');
+            renderEditCreditModal();
+            $('editCreditModal').classList.remove('hidden');
+        }
+
+        function renderEditCreditModal() {
+            const c = state.credits.find(x => x.id == editCreditId);
+            if (!c) return closeEditCreditModal();
+            $('editCreditTitle').innerText = `Editar fiado — ${c.customer}`;
+            $('editCreditFiscal').classList.toggle('hidden', !c.fiscalNum);
+            $('editCreditItems').innerHTML = c.items.map((it, i) => `
+                <div class="border rounded p-2 text-xs">
+                    <div class="font-bold text-gray-800">${escapeHtml(it.name)}</div>
+                    ${it.isStub ? '<div class="text-[10px] text-amber-600">Deuda anterior (no vuelve al inventario)</div>' : ''}
+                    <div class="text-gray-500">${it.qty} × ${formatMoney(it.price)} = ${formatMoney(it.subtotal)}</div>
+                    <div class="flex gap-2 mt-1 items-center">
+                        <input type="number" id="editQty_${i}" min="1" max="${it.qty}" value="${it.qty}" class="w-16 border rounded px-1 py-0.5 text-xs">
+                        <button onclick="removeCreditItem(${i})" class="bg-red-100 text-red-700 px-3 py-1 rounded font-bold hover:bg-red-200">Quitar</button>
+                    </div>
+                </div>`).join('');
+            $('editCreditDebt').innerText = `${formatMoney(roundMoney(calculateRealDebt(c) - c.paid))}`;
+        }
+
+        function closeEditCreditModal() {
+            editCreditId = null;
+            $('editCreditModal').classList.add('hidden');
+        }
+
+        function removeCreditItem(itemIdx) {
+            const c = state.credits.find(x => x.id == editCreditId);
+            if (!c) return;
+            const qty = parseInt($(`editQty_${itemIdx}`).value, 10);
+            const plan = planCreditItemRemoval(c, itemIdx, qty);
+            if (plan.error) return alert(plan.error);
+
+            const item = c.items[itemIdx];
+            const prod = item.isStub ? null : state.products.find(p => p.id == plan.productId);
+            const stockMsg = item.isStub ? 'Es deuda anterior: no se devuelven existencias.'
+                : prod ? `Vuelven ${plan.returnQty} al inventario.`
+                : 'El producto ya no está en el inventario: no se devuelven existencias.';
+            if (!confirm(`¿Quitar ${qty}x ${item.name} del fiado de ${c.customer}? ${stockMsg} Nueva deuda: ${formatMoney(roundMoney(plan.totalDebt - c.paid))}`)) return;
+
+            c.items = plan.items;
+            c.totalDebt = plan.totalDebt;
+            if (prod) prod.qty = (Number(prod.qty) || 0) + plan.returnQty;
+            if (plan.settled) {
+                c.paidDate = new Date().toISOString();
+                setTimeout(autoPruneCredits, 500);
+            }
+            saveData();
+            renderAll();
+            if (plan.settled) {
+                closeEditCreditModal();
+                setTimeout(() => alert('¡Deuda saldada!'), 100);
+            } else renderEditCreditModal();
+        }
+
+        function selfTestCreditEdit() {
+            const bak = structuredClone({ credits: state.credits, products: state.products, sales: state.sales, creditMode: state.creditMode });
+            try {
+                state.sales = [];
+                state.creditMode = 'FIXED';
+                state.products = [{ id: 'p1', price: 1, qty: 0 }, { id: 'p2', price: 5, qty: 0 }];
+                const mk = (id) => ({
+                    id, customer: 'Ficticio', paid: 0, totalDebt: 30, surcharge: 0,
+                    items: [
+                        { id: 'p1', name: 'A', price: 1, qty: 5, subtotal: 5 },
+                        { id: 'p2', name: 'B', price: 5, qty: 5, subtotal: 25 },
+                        { id: 's', name: 'C', price: 0, qty: 1, subtotal: 0, isStub: true }
+                    ]
+                });
+                const c = mk(1);
+                const before = JSON.stringify(c);
+                let r = planCreditItemRemoval(c, 1, 5);
+                console.assert(JSON.stringify(c) === before, 'no muta el fiado');
+                console.assert(!r.error && r.totalDebt === 5 && r.returnQty === 5 && r.items.length === 2, 'quitar línea entera');
+                r = planCreditItemRemoval(c, 0, 2);
+                console.assert(r.items[0].qty === 3 && r.items[0].subtotal === 3 && r.totalDebt === 28, 'quitar parte');
+                r = planCreditItemRemoval(c, 2, 1);
+                console.assert(!r.error && r.returnQty === 0, 'stub no devuelve');
+                for (const q of [0, -1, 6, 1.5]) console.assert(planCreditItemRemoval(c, 0, q).error, 'qty inválida ' + q);
+                const one = { ...mk('t'), items: [{ id: 'p1', name: 'A', price: 1, qty: 2, subtotal: 2 }], totalDebt: 2 };
+                console.assert(planCreditItemRemoval(one, 0, 2).error, 'último producto');
+                console.assert(!planCreditItemRemoval(one, 0, 1).error, 'parte del último sí');
+                const paid = { ...mk(2), paid: 10 };
+                console.assert(planCreditItemRemoval(paid, 1, 5).error, 'abonado mayor que nuevo total');
+                const eq = { ...mk(3), paid: 5 };
+                console.assert(planCreditItemRemoval(eq, 1, 5).settled === true, 'abonado igual salda');
+                state.creditMode = 'DYNAMIC';
+                state.products[0].price = 2;
+                r = planCreditItemRemoval(mk(4), 1, 5);
+                console.assert(r.totalDebt === 10, 'DYNAMIC usa precio actual');
+            } finally {
+                state.credits = bak.credits; state.products = bak.products; state.sales = bak.sales; state.creditMode = bak.creditMode;
+            }
+            console.log('selfTestCreditEdit terminado');
+        }
