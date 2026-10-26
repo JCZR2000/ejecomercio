@@ -70,6 +70,9 @@
                 currentNumber: 1
             },
 
+            // Vitrina en línea (Fase 10); la cola de publicación es por dispositivo y no va aquí
+            catalogConfig: JSON.parse(localStorage.getItem('inv_catalog_config')) || { enabled: false, delayMin: 5, whatsapp: '', title: '' },
+
             // Índice de lo último que se sabe de la nube (Fase 4): { key, chunks: { id: hash } }
             cloudManifest: JSON.parse(localStorage.getItem('inv_cloud_manifest')) || {},
 

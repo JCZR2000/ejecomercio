@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen pb-28">
+    <header class="bg-slate-900 text-white p-4 sticky top-0 z-10 shadow">
+        <h1 id="shopTitle" class="font-bold text-lg truncate">Catálogo</h1>
+        <div id="controls" class="hidden mt-2 flex gap-2">
+            <input id="search" type="search" placeholder="Buscar..." class="flex-1 min-w-0 rounded px-3 py-1.5 text-sm text-gray-800 outline-none">
+            <select id="categoryFilter" class="rounded px-2 py-1.5 text-sm text-gray-800 max-w-[40%]"></select>
+        </div>
+    </header>
+
+    <main class="p-3 max-w-3xl mx-auto">
+        <p id="message" class="text-center text-gray-500 py-16"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...</p>
+        <button id="retryBtn" class="hidden mx-auto block bg-slate-800 text-white px-4 py-2 rounded font-bold text-sm">Reintentar</button>
+        <div id="list" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+    </main>
+
+    <div id="cartBar" class="hidden fixed bottom-0 inset-x-0 bg-white border-t shadow-2xl p-3">
+        <div class="max-w-3xl mx-auto">
+            <div id="cartItems" class="text-xs text-gray-600 mb-2 max-h-24 overflow-y-auto space-y-1"></div>
+            <a id="orderBtn" target="_blank" rel="noopener" class="block text-center bg-green-600 text-white font-bold py-2.5 rounded-lg">
+                <i class="fa-brands fa-whatsapp mr-1"></i> Pedir por WhatsApp · <span id="cartTotal"></span>
+            </a>
+            <p class="text-[10px] text-gray-400 text-center mt-1">El negocio confirmará disponibilidad y precio</p>
+        </div>
+    </div>
+
+<script>
+    // Sin SDK de Firebase: solo lee el JSON público que publica la app.
+    const BUCKET = 'ejecomercio-27f57.firebasestorage.app';
+    const PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
+    const $ = (id) => document.getElementById(id);
+    // Copia de escapeHtml de js/08-rates-utils.js
+    const escapeHtml = (v) => String(v ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+
+    let shop = { title: 'Catálogo', whatsapp: '' };
+    let currency = '$', rate = null, products = [];
+    const cart = new Map(); // id -> cantidad
+
+    const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function showMessage(text, retry) {
+        $('message').textContent = text;
+        $('message').classList.remove('hidden');
+        $('retryBtn').classList.toggle('hidden', !retry);
+        $('list').innerHTML = '';
+        $('controls').classList.add('hidden');
+    }
+
+    // Tolera JSON viejo, incompleto o de una versión futura: cada campo tiene valor por defecto.
+    function normalize(data) {
+        const s = (data && typeof data.shop === 'object' && data.shop) || {};
+        shop = { title: String(s.title || 'Catálogo'), whatsapp: String(s.whatsapp || '').replace(/\D/g, '') };
+        currency = typeof data.currency === 'string' && data.currency ? data.currency : '$';
+        rate = Number(data.rate) > 0 ? Number(data.rate) : null;
+        products = (Array.isArray(data.products) ? data.products : [])
+            .filter(p => p && p.name && Number(p.price) > 0)
+            .map((p, i) => ({
+                id: String(p.id ?? 'p' + i),
+                name: String(p.name),
+                category: String(p.category || '').trim() || 'Otros',
+                price: Number(p.price),
+                photo: typeof p.photo === 'string' && p.photo.startsWith(PHOTO_PREFIX) ? p.photo : '',
+                available: p.available !== false
+            }));
+    }
+
+    async function load() {
+        const uid = new URLSearchParams(location.search).get('u') || '';
+        if (!/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
+        showMessage('Cargando...');
+        $('message').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
+        try {
+            const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/catalogo%2F${uid}.json?alt=media`);
+            if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            normalize(await res.json());
+        } catch (e) {
+            console.warn('Vitrina:', e);
+            return showMessage('Sin conexión. Intenta de nuevo', true);
+        }
+        $('shopTitle').textContent = shop.title;
+        document.title = shop.title;
+        if (!products.length) return showMessage('Esta vitrina no tiene productos por ahora');
+        $('message').classList.add('hidden');
+        $('retryBtn').classList.add('hidden');
+        const cats = [...new Set(products.map(p => p.category))].sort((a, b) => a.localeCompare(b, 'es'));
+        $('categoryFilter').innerHTML = '<option value="">Todas</option>' + cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        $('controls').classList.remove('hidden');
+        render();
+    }
+
+    function render() {
+        const q = $('search').value.trim().toLowerCase(), cat = $('categoryFilter').value;
+        const shown = products.filter(p => (!cat || p.category === cat) && (!q || p.name.toLowerCase().includes(q)));
+        $('list').innerHTML = shown.length ? shown.map(p => {
+            const qty = cart.get(p.id) || 0;
+            const bs = rate ? `<div class="text-[11px] text-gray-500">Bs ${fmt(p.price * rate)}</div>` : '';
+            const img = p.photo
+                ? `<img src="${escapeHtml(p.photo)}" loading="lazy" alt="" class="w-full h-28 object-cover">`
+                : '<div class="w-full h-28 bg-gray-100 flex items-center justify-center text-gray-300 text-3xl"><i class="fa-solid fa-box"></i></div>';
+            const action = !p.available
+                ? '<div class="text-xs font-bold text-red-500 text-center py-1">Agotado</div>'
+                : (qty
+                    ? `<div class="flex items-center justify-between"><button data-act="dec" data-id="${escapeHtml(p.id)}" class="w-8 h-8 rounded bg-gray-200 font-bold">−</button><span class="font-bold">${qty}</span><button data-act="inc" data-id="${escapeHtml(p.id)}" class="w-8 h-8 rounded bg-green-600 text-white font-bold">+</button></div>`
+                    : `<button data-act="inc" data-id="${escapeHtml(p.id)}" class="w-full bg-green-600 text-white rounded py-1 text-sm font-bold">Añadir</button>`);
+            return `<div class="bg-white rounded-lg shadow overflow-hidden flex flex-col ${p.available ? '' : 'opacity-60'}">${img}
+                <div class="p-2 flex-1 flex flex-col gap-1"><div class="text-[10px] uppercase text-gray-400 truncate">${escapeHtml(p.category)}</div>
+                <div class="text-sm font-bold leading-tight">${escapeHtml(p.name)}</div>
+                <div class="text-green-700 font-bold">${escapeHtml(currency)} ${fmt(p.price)}</div>${bs}
+                <div class="mt-auto pt-1">${action}</div></div></div>`;
+        }).join('') : '<p class="col-span-full text-center text-gray-500 py-10">Sin resultados</p>';
+        renderCart();
+    }
+
+    function renderCart() {
+        const items = [...cart].map(([id, n]) => ({ p: products.find(x => x.id === id), n })).filter(x => x.p);
+        $('cartBar').classList.toggle('hidden', !items.length);
+        if (!items.length) return;
+        const total = items.reduce((s, x) => s + x.p.price * x.n, 0);
+        $('cartItems').innerHTML = items.map(x => `<div>${x.n}x ${escapeHtml(x.p.name)} (${escapeHtml(currency)}${fmt(x.p.price * x.n)})</div>`).join('');
+        $('cartTotal').textContent = `${currency}${fmt(total)}`;
+        const text = `Hola ${shop.title}, quiero hacer este pedido:\n` +
+            items.map(x => `- ${x.n}x ${x.p.name} (${currency}${fmt(x.p.price * x.n)})`).join('\n') +
+            `\nTotal aproximado: ${currency}${fmt(total)}`;
+        if (shop.whatsapp) { $('orderBtn').href = `https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(text)}`; $('orderBtn').classList.remove('hidden'); }
+        else $('orderBtn').classList.add('hidden'); // sin WhatsApp no hay a quién pedir
+    }
+
+    $('list').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-act]');
+        if (!b) return;
+        const id = b.dataset.id, n = (cart.get(id) || 0) + (b.dataset.act === 'inc' ? 1 : -1);
+        if (n > 0) cart.set(id, n); else cart.delete(id);
+        render();
+    });
+    $('search').addEventListener('input', render);
+    $('categoryFilter').addEventListener('change', render);
+    $('retryBtn').addEventListener('click', load);
+    load();
+</script>
+</body>
+</html>

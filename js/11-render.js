@@ -10,6 +10,10 @@
                 $('clearSearchBtn').classList.add('hidden');
             }
 
+            // Categorías existentes para el campo del producto
+            $('categoryOptions').innerHTML = [...new Set(state.products.map(p => String(p.category || '').trim()).filter(Boolean))]
+                .sort((a, b) => a.localeCompare(b, 'es')).map(c => `<option value="${escapeHtml(c)}">`).join('');
+
             // 2. Actualizar UI de tasas
             updateRateUI();
             const activeRate = getActiveRate();

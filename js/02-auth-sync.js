@@ -719,7 +719,8 @@
                     localStorage.setItem('inv_bcv_usd', state.bcvUsd);
                     localStorage.setItem('inv_bcv_eur', state.bcvEur);
                     localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
-            
+                    localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
+
                     if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
             
                     renderAll();

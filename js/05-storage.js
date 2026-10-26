@@ -17,6 +17,7 @@
                 receiptConfig: state.receiptConfig,
                 receiptType: state.receiptType,
                 fiscalConfig: state.fiscalConfig,
+                catalogConfig: state.catalogConfig,
                 customRate: state.customRate,
                 rateMode: state.rateMode,
                 fiadosRateMode: state.fiadosRateMode,
@@ -62,7 +63,9 @@
             if (state.receiptType) localStorage.setItem('inv_receipt_type', state.receiptType);
             localStorage.setItem('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
             localStorage.setItem('inv_credit_mode', state.creditMode);
-    
+            localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+            scheduleCatalogPublish(); // funciona sin conexión: solo agenda la cola del dispositivo
+
             // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
             if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v50.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v51.0'; // Actualizado para forzar la recarga
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
@@ -37,6 +37,7 @@ const STATIC_ASSETS = [
   './js/22-ui.js',
   './js/23-inventory-pdf.js',
   './js/24-fiscal.js',
+  './js/25-catalog.js',
   './icon-192.png',
   './icon-512.png'
   // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos
@@ -100,7 +101,7 @@ self.addEventListener('fetch', (e) => {
         .then((res) => cacheIfValid(e.request, res))
         .catch(() => caches.match(e.request))
     );
-  } else if (url.hostname === 'firebasestorage.googleapis.com' && url.searchParams.get('alt') === 'media') {
+  } else if (url.hostname === 'firebasestorage.googleapis.com' && url.searchParams.get('alt') === 'media' && url.pathname.includes('/o/users%2F')) {
     // Fotos de producto: el enlace lleva el hash y nunca cambia -> caché primero, en una caché que sobrevive a las versiones.
     // Solo alt=media: las demás llamadas GET del SDK (listAll, metadatos, enlace) van siempre a la red.
     e.respondWith(

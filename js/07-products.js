@@ -14,6 +14,7 @@
                 // 1. Captura de datos
                 const name = $('prodName').value.trim();
                 const barcode = $('prodBarcode').value.trim();
+                const category = $('prodCategory').value.trim();
                 const qtyVal = $('prodQty').value;
                 const priceVal = $('prodPrice').value;
                 
@@ -31,6 +32,7 @@
                     const idx = state.products.findIndex(p => p.id == state.editingId);
                     if (idx !== -1) {
                         const prod = { ...state.products[idx], name, qty, price, barcode };
+                        if (category) prod.category = category; else delete prod.category;
                         // Foto nueva o quitada: se olvida la de Storage (el archivo lo borra pruneStorageImages)
                         if (state.tempImg || state.isImageDeleted) {
                             delete prod.imgUrl;
@@ -42,11 +44,13 @@
                     }
                 } else {
                     // MODO CREACIÓN
-                    state.products.unshift({ 
+                    const prod = {
                         id: Date.now(),
-                        name, qty, price, barcode, 
+                        name, qty, price, barcode,
                         img: state.tempImg || null
-                    });
+                    };
+                    if (category) prod.category = category;
+                    state.products.unshift(prod);
                 }
 
                 // 4. Guardar y Refrescar
@@ -74,6 +78,7 @@
             $('prodName').value = p.name;
             $('prodQty').value = p.qty;
             $('prodPrice').value = p.price;
+            $('prodCategory').value = p.category || '';
 
             // Imagen
             if (productImageSrc(p)) {
@@ -122,6 +127,7 @@
             $('prodBarcode').value = '';
             $('prodQty').value = '';
             $('prodPrice').value = '';
+            $('prodCategory').value = '';
             $('prodImg').value = '';
             $('productId').value = '';
 

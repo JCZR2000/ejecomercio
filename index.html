@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v50.0</title>
+    <title>EjeComercio v51.0</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -154,7 +154,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v50.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v51.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -173,6 +173,7 @@
                     </button>
                 </div>
 
+                <button type="button" id="catalogBadge" onclick="runCatalogQueue(true)" class="hidden"></button>
                 <div class="relative z-10">
                     <button onclick="toggleUserMenu()" class="bg-gray-700 hover:bg-gray-600 text-white p-1.5 rounded-full w-9 h-9 flex items-center justify-center transition shadow overflow-hidden border border-gray-600">
                         <img id="userAvatar" src="" class="w-full h-full object-cover hidden rounded-full">
@@ -547,6 +548,33 @@
                 <div class="mt-4 border-t pt-4">
                     <p class="text-xs text-gray-500 uppercase font-bold mb-2">Copias en la nube</p>
                     <div id="cloudBackupsUI"></div>
+                </div>
+                <hr class="border-gray-200">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Exportación externa</p>
+                    <div class="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm font-bold text-gray-700"><i class="fa-solid fa-store text-indigo-500 mr-1"></i> Vitrina en línea</span>
+                            <button type="button" id="catalogToggleBtn" onclick="toggleCatalog(!state.catalogConfig.enabled)" class="px-3 py-1 rounded text-xs font-bold bg-gray-200 text-gray-600">Apagada</button>
+                        </div>
+                        <p class="text-[10px] text-gray-500">Catálogo público con pedido por WhatsApp. Se publica: nombre, categoría, precio, foto y si hay o no. Nunca existencias, costos, clientes ni deudas.</p>
+                        <input type="text" id="catalogTitle" maxlength="60" placeholder="Título (si lo dejas vacío, el nombre del negocio)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
+                        <input type="tel" id="catalogWhatsapp" maxlength="20" placeholder="WhatsApp con código de país (584120000000)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
+                        <label class="flex items-center justify-between text-xs text-gray-600">Espera antes de publicar
+                            <select id="catalogDelay" onchange="saveCatalogConfig()" class="border rounded px-2 py-1 text-xs bg-white">
+                                <option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>
+                            </select>
+                        </label>
+                        <div id="catalogLinkBox" class="hidden space-y-2">
+                            <div class="flex gap-2">
+                                <input type="text" id="catalogLinkInput" readonly class="flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white">
+                                <button type="button" onclick="copyCatalogLink()" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">Copiar</button>
+                                <button type="button" onclick="shareCatalogLink()" class="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Compartir</button>
+                            </div>
+                            <p class="text-[10px] text-gray-500">La vitrina es pública aunque el cifrado esté activado. Se actualiza cuando usas la app.</p>
+                        </div>
+                        <p id="catalogError" class="text-[10px] text-red-600 font-bold"></p>
+                    </div>
                 </div>
                 <hr class="border-gray-200">
 
@@ -1498,6 +1526,14 @@
                             </div>
                         </div>
             
+                        <div class="relative">
+                            <input type="text" id="prodCategory" list="categoryOptions" maxlength="40" placeholder=" "
+                                class="peer w-full h-12 rounded-xl border border-gray-300 px-3 pt-3 text-sm focus:border-indigo-500 outline-none bg-gray-50 text-gray-700">
+                            <label
+                                class="absolute left-3 top-1 text-[10px] text-gray-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 font-bold">Categoría (opcional)</label>
+                            <datalist id="categoryOptions"></datalist>
+                        </div>
+
                         <div class="flex gap-2">
                             <button type="button" onclick="attemptSubmit()" id="submitBtn"
                                 class="flex-1 h-12 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 active:scale-95 transition flex items-center justify-center gap-2">
@@ -1952,5 +1988,6 @@
     <script src="js/22-ui.js"></script>
     <script src="js/23-inventory-pdf.js"></script>
     <script src="js/24-fiscal.js"></script>
+    <script src="js/25-catalog.js"></script>
 </body>
 </html>

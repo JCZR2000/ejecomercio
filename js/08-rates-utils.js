@@ -208,6 +208,7 @@
                     updateStorageUsage(); // Uso de almacenamiento
                     updateCreditConfigUI(); // Configuración de créditos
                     updateSecurityUI(); // Muestra si ya hay PIN
+                    renderCatalogConfigUI(); // Vitrina en línea
                 }
                 updateConfigUI();
             }

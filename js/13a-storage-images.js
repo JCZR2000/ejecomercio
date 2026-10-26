@@ -165,6 +165,7 @@
         // Se llama tras cada sincronización con la nube
         function afterCloudSyncImages() {
             uploadPendingImages().then(repairImageUrls).then(() => {
+                afterCloudSyncCatalog(); // con los enlaces de fotos ya al día
                 if (!hasPrunedImages) pruneStorageImages().then(pruneImageCache);
             });
         }
