@@ -31,215 +31,324 @@
         });
 
         // ==========================================
-        // 16. SISTEMA DE COMPARTIR / RECORDATORIO
+        // 16. SISTEMA DE COMPARTIR / RECORDATORIO (Fase 12: cobro guiado en 3 pasos)
+        // El recordatorio NO registra pagos: solo pide un monto. El abono se registra con «Pagar».
         // ==========================================
-
-        // Variable para recordar qué cliente estamos editando en el modal
         state.currentShareId = null;
-        
-        // ==========================================
-        // 16. SISTEMA DE COMPARTIR / RECORDATORIO (V39.5)
-        // ==========================================
+        const SHARE_LAST_METHODS_KEY = 'inv_share_last_methods'; // local, no se sincroniza
+        const SHARE_METHOD_KEYS = ['PAGO_MOVIL', 'TRANSFER', 'BINANCE', 'CUSTOM'];
+        let shareDraft = { step: 1, debt: 0, rate: 0, rateName: '' };
 
-        state.currentShareId = null;
-        // Objeto para guardar datos de pago en memoria
-        state.paymentMethods = JSON.parse(localStorage.getItem('inv_payment_methods')) || {
-            TRANSFER: { bank: '', account: '', id: '' },
-            PAGO_MOVIL: { bank: '', phone: '', id: '' },
-            BINANCE: { email: '' },
-            CUSTOM: { text: '' }
-        };
-        
+        // Completa las claves que falten sin borrar datos (copias viejas pueden venir con paymentMethods: {})
+        function getPaymentMethods() {
+            const pm = (state.paymentMethods && typeof state.paymentMethods === 'object') ? state.paymentMethods : {};
+            const defaults = {
+                TRANSFER: { bank: '', account: '', id: '' },
+                PAGO_MOVIL: { bank: '', phone: '', id: '' },
+                BINANCE: { email: '' },
+                CUSTOM: { text: '' },
+                WHATSAPP: { phone: '' }
+            };
+            Object.keys(defaults).forEach(k => {
+                pm[k] = { ...defaults[k], ...((pm[k] && typeof pm[k] === 'object') ? pm[k] : {}) };
+            });
+            state.paymentMethods = pm;
+            return pm;
+        }
+        state.paymentMethods = JSON.parse(localStorage.getItem('inv_payment_methods')) || {};
+        getPaymentMethods();
+
+        // --- Funciones puras (las comprueba selfTestPaymentRequest) ---
+        const pendingDebtOf = (total, paid) => Math.max(0, roundMoney(Number(total) - Number(paid)));
+        const isValidShareAmount = (v, debt) => Number.isFinite(v) && v > 0 && v <= debt + 0.005;
+        const calcBs = (usd, rate) => roundMoney(usd * rate);
+        const formatBsPlain = (n) => roundMoney(n).toFixed(2).replace('.', ','); // para pegar en el banco: sin miles, coma decimal
+        const phoneDigits = (s) => String(s || '').replace(/\D/g, '');
+        const formatUsdText = (n) => '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+        const formatBsText = (n) => 'Bs ' + new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+        const clipText = (s, max) => String(s || '').trim().slice(0, max || 120);
+
+        function formatShareDate(d) {
+            const p = (n) => String(n).padStart(2, '0');
+            return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+        }
+
+        function getFiadosRateName() {
+            const mode = state.fiadosRateMode === 'DEFAULT' ? state.rateMode : state.fiadosRateMode;
+            if (mode === 'EUR') return 'Euro BCV';
+            if (mode === 'CUSTOM') return 'personalizada';
+            return 'BCV';
+        }
+
+        // Datos del enlace: base64url de JSON UTF-8 en el hash (no llega al servidor)
+        function encodePaymentPayload(payload) {
+            const bytes = new TextEncoder().encode(JSON.stringify(payload));
+            let bin = '';
+            bytes.forEach(b => bin += String.fromCharCode(b));
+            return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function buildPaymentLink(payload) {
+            const base = location.origin + location.pathname.replace(/[^/]*$/, '') + 'pagar.html';
+            return base + '#d=' + encodePaymentPayload(payload);
+        }
+
+        function decodePaymentPayload(hash) {
+            try {
+                const m = /(?:^|[#&])d=([A-Za-z0-9_-]+)/.exec(String(hash || ''));
+                if (!m) return null;
+                let b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+                while (b64.length % 4) b64 += '=';
+                const bin = atob(b64);
+                const bytes = Uint8Array.from(bin, ch => ch.charCodeAt(0));
+                const p = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+                return (p && typeof p === 'object' && p.v === 1) ? p : null;
+            } catch (e) { return null; }
+        }
+
+        // Lista de métodos con la forma del enlace a partir de los datos guardados
+        function buildShareMethodList(keys) {
+            const pm = getPaymentMethods();
+            return keys.map(t => {
+                const d = pm[t];
+                if (t === 'PAGO_MOVIL') return { t, bank: clipText(d.bank), phone: phoneDigits(d.phone).slice(0, 120), id: clipText(d.id) };
+                if (t === 'TRANSFER') return { t, bank: clipText(d.bank), account: clipText(d.account), id: clipText(d.id) };
+                if (t === 'BINANCE') return { t, email: clipText(d.email) };
+                return { t: 'CUSTOM', text: clipText(d.text, 400) };
+            });
+        }
+
+        function shareMethodBlock(m, amountUsd, bsPlain) {
+            if (m.t === 'PAGO_MOVIL') return `Datos para Pago Móvil:\nBanco: ${m.bank}\nTeléfono: ${phoneDigits(m.phone)}\nC.I./RIF: ${m.id}\nMonto: ${bsPlain}`;
+            if (m.t === 'TRANSFER') return `Datos para Transferencia:\nBanco: ${m.bank}\nCuenta: ${m.account}\nC.I./RIF: ${m.id}\nMonto: ${bsPlain}`;
+            if (m.t === 'BINANCE') return `Datos para Binance Pay:\nCorreo/ID: ${m.email}\nMonto: ${formatUsdText(amountUsd)}`;
+            return `Datos para pagar:\n${m.text}`;
+        }
+
+        // opts: { debt, rate, rateName, date (Date), link ('' = sin enlace) }
+        function buildShareMessage(credit, amountUsd, methods, opts) {
+            const bs = calcBs(amountUsd, opts.rate);
+            const debtBs = calcBs(opts.debt, opts.rate);
+            const rateText = (n) => `${formatBsText(n)} a tasa ${opts.rateName} ${opts.rate} del ${formatShareDate(opts.date)}`;
+            const full = !(amountUsd < opts.debt - 0.005);
+
+            const consolidated = {};
+            credit.items.forEach(i => { consolidated[i.name] = (consolidated[i.name] || 0) + i.qty; });
+            const itemsList = Object.entries(consolidated).map(([name, qty]) => `- ${qty}x ${name}`).join('\n');
+
+            let msg = `Hola ${credit.customer},\n\n`;
+            if (full) msg += `Te recuerdo tu saldo pendiente de ${formatUsdText(opts.debt)} (${rateText(debtBs)}).\n`;
+            else msg += `Te recuerdo tu saldo pendiente de ${formatUsdText(opts.debt)}.\nMonto a pagar: ${formatUsdText(amountUsd)} (${rateText(bs)})\n`;
+            if (itemsList) msg += `\nProductos:\n${itemsList}\n`;
+            methods.forEach(m => { msg += `\n${shareMethodBlock(m, amountUsd, formatBsPlain(bs))}\n`; });
+            if (opts.link) msg += `\nPaga y copia los datos aquí: ${opts.link}\n`;
+            return msg + '\n¡Gracias por tu compra!';
+        }
+
+        function getShareWhatsapp() {
+            const fromMethods = normalizeCatalogWhatsapp(getPaymentMethods().WHATSAPP.phone);
+            return fromMethods || normalizeCatalogWhatsapp((state.catalogConfig || {}).whatsapp);
+        }
+
+        // --- Asistente ---
+        function getShareCredit() { return state.credits.find(x => x.id == state.currentShareId); }
+
         function openShareModal(id) {
             state.currentShareId = id;
-            $('chkIncludeBs').checked = false;
-            $('chkIncludePayment').checked = false;
-            togglePaymentSection(); // Resetea vista de pagos
-            regenerateShareMessage();
+            const c = getShareCredit();
+            if (!c) return;
+            getPaymentMethods();
+            shareDraft = {
+                step: 1,
+                debt: pendingDebtOf(calculateRealDebt(c), c.paid),
+                rate: getFiadosActiveRate(),
+                rateName: getFiadosRateName()
+            };
+            document.querySelector('input[name=shareAmtMode][value=FULL]').checked = true;
+            $('shareOtherAmount').value = '';
+            $('shareFullUsd').textContent = formatUsdText(shareDraft.debt);
+            let last = [];
+            try { last = JSON.parse(localStorage.getItem(SHARE_LAST_METHODS_KEY)) || []; } catch (e) { last = []; }
+            SHARE_METHOD_KEYS.forEach(k => { $('chkM_' + k).checked = Array.isArray(last) && last.includes(k); });
+            ['formTransfer', 'formMobile', 'formBinance', 'formCustom'].forEach(f => $(f).classList.add('hidden'));
+            renderShareMethodCards();
+            onShareAmountChange();
+            shareGoStep(1);
             $('shareModal').classList.remove('hidden');
         }
 
-        function togglePaymentSection() {
-            const show = $('chkIncludePayment').checked;
-            $('paymentSection').className = show ? "block p-3 bg-white border-t border-gray-100 space-y-3" : "hidden";
-            if (show) {
-                // Si abrimos, cargamos el último método usado o reseteamos
-                $('paymentMethodSelect').value = "";
-                renderPaymentInputs();
+        function getShareAmount() {
+            const mode = document.querySelector('input[name=shareAmtMode]:checked').value;
+            return mode === 'FULL' ? shareDraft.debt : parseFloat($('shareOtherAmount').value);
+        }
+
+        function onShareOtherInput() {
+            document.querySelector('input[name=shareAmtMode][value=OTHER]').checked = true;
+            onShareAmountChange();
+        }
+
+        function onShareAmountChange() {
+            const rate = shareDraft.rate;
+            const bsOf = (usd) => (rate > 0 && usd > 0) ? `≈ ${formatBsText(calcBs(usd, rate))} a tasa ${shareDraft.rateName} ${rate}` : '';
+            $('shareFullBs').textContent = bsOf(shareDraft.debt);
+            const other = parseFloat($('shareOtherAmount').value);
+            $('shareOtherBs').textContent = Number.isFinite(other) ? bsOf(other) : '';
+            const amount = getShareAmount();
+            let err = '';
+            if (!(rate > 0)) err = 'No hay tasa de cambio configurada.';
+            else if (!isValidShareAmount(amount, shareDraft.debt)) err = shareDraft.debt > 0 ? 'El monto debe ser mayor que 0 y no mayor que la deuda pendiente.' : 'Este fiado no tiene deuda pendiente.';
+            const showErr = err && (document.querySelector('input[name=shareAmtMode]:checked').value === 'FULL' || $('shareOtherAmount').value !== '');
+            $('shareAmtError').textContent = err;
+            $('shareAmtError').classList.toggle('hidden', !showErr);
+            $('btnShareNext').disabled = !!err;
+        }
+
+        function isShareMethodConfigured(k) {
+            const d = getPaymentMethods()[k];
+            const f = (v) => String(v || '').trim() !== '';
+            if (k === 'PAGO_MOVIL') return f(d.bank) && f(d.phone) && f(d.id);
+            if (k === 'TRANSFER') return f(d.bank) && f(d.account) && f(d.id);
+            if (k === 'BINANCE') return f(d.email);
+            return f(d.text);
+        }
+
+        function renderShareMethodCards() {
+            const pm = getPaymentMethods();
+            SHARE_METHOD_KEYS.forEach(k => {
+                const ok = isShareMethodConfigured(k);
+                const d = pm[k];
+                const chk = $('chkM_' + k);
+                chk.disabled = !ok;
+                if (!ok) chk.checked = false;
+                $('cfgM_' + k).textContent = ok ? 'Editar' : 'Configurar';
+                const summary = !ok ? 'Sin datos' : k === 'PAGO_MOVIL' ? `${d.bank} · ${d.phone}` : k === 'TRANSFER' ? `${d.bank} · ${d.account}` : k === 'BINANCE' ? d.email : d.text;
+                $('sumM_' + k).textContent = summary;
+            });
+            onShareMethodToggle();
+        }
+
+        function getSelectedShareMethods() { return SHARE_METHOD_KEYS.filter(k => $('chkM_' + k).checked); }
+
+        function onShareMethodToggle() {
+            if (shareDraft.step === 2) $('btnShareNext').disabled = getSelectedShareMethods().length === 0;
+        }
+
+        function toggleMethodForm(k) {
+            const formId = { PAGO_MOVIL: 'formMobile', TRANSFER: 'formTransfer', BINANCE: 'formBinance', CUSTOM: 'formCustom' }[k];
+            const form = $(formId);
+            const show = form.classList.contains('hidden');
+            ['formTransfer', 'formMobile', 'formBinance', 'formCustom'].forEach(f => $(f).classList.add('hidden'));
+            if (!show) return;
+            const d = getPaymentMethods()[k];
+            if (k === 'TRANSFER') { $('inputTransBank').value = d.bank || ''; $('inputTransAccount').value = d.account || ''; $('inputTransId').value = d.id || ''; }
+            else if (k === 'PAGO_MOVIL') { $('inputMobBank').value = d.bank || ''; $('inputMobPhone').value = d.phone || ''; $('inputMobId').value = d.id || ''; }
+            else if (k === 'BINANCE') $('inputBinanceEmail').value = d.email || '';
+            else $('inputCustomText').value = d.text || '';
+            form.classList.remove('hidden');
+        }
+
+        function savePaymentDetails(method) {
+            if (!SHARE_METHOD_KEYS.includes(method)) return;
+            const pm = getPaymentMethods();
+            if (method === 'TRANSFER') pm.TRANSFER = { bank: $('inputTransBank').value, account: $('inputTransAccount').value, id: $('inputTransId').value };
+            else if (method === 'PAGO_MOVIL') pm.PAGO_MOVIL = { bank: $('inputMobBank').value, phone: $('inputMobPhone').value, id: $('inputMobId').value };
+            else if (method === 'BINANCE') pm.BINANCE = { email: $('inputBinanceEmail').value };
+            else pm.CUSTOM = { text: $('inputCustomText').value };
+
+            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+            saveData();
+            alert('Datos de pago guardados y sincronizados.');
+            ['formTransfer', 'formMobile', 'formBinance', 'formCustom'].forEach(f => $(f).classList.add('hidden'));
+            renderShareMethodCards();
+            if (isShareMethodConfigured(method)) { $('chkM_' + method).checked = true; onShareMethodToggle(); }
+        }
+
+        function onShareWhatsappChange() {
+            const v = normalizeCatalogWhatsapp($('shareWhatsapp').value);
+            const ok = isValidCatalogWhatsapp(v);
+            $('shareWaError').classList.toggle('hidden', ok || v === '');
+            if (ok) {
+                getPaymentMethods().WHATSAPP = { phone: v };
+                localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                saveData();
             }
             regenerateShareMessage();
         }
 
-        function renderPaymentInputs() {
-            const method = $('paymentMethodSelect').value;
-            $('payFormContainer').className = method ? "block space-y-2 animate-fade-in" : "hidden";
-            
-            // Ocultar todos primero
-            $('formTransfer').classList.add('hidden');
-            $('formMobile').classList.add('hidden');
-            $('formBinance').classList.add('hidden');
-            $('formCustom').classList.add('hidden');
-
-            // Mostrar el seleccionado y llenar datos
-            if (method === 'TRANSFER') {
-                $('formTransfer').classList.remove('hidden');
-                $('inputTransBank').value = state.paymentMethods.TRANSFER.bank || '';
-                $('inputTransAccount').value = state.paymentMethods.TRANSFER.account || '';
-                $('inputTransId').value = state.paymentMethods.TRANSFER.id || '';
-            } else if (method === 'PAGO_MOVIL') {
-                $('formMobile').classList.remove('hidden');
-                $('inputMobBank').value = state.paymentMethods.PAGO_MOVIL.bank || '';
-                $('inputMobPhone').value = state.paymentMethods.PAGO_MOVIL.phone || '';
-                $('inputMobId').value = state.paymentMethods.PAGO_MOVIL.id || '';
-            } else if (method === 'BINANCE') {
-                $('formBinance').classList.remove('hidden');
-                $('inputBinanceEmail').value = state.paymentMethods.BINANCE.email || '';
-            } else if (method === 'CUSTOM') {
-                $('formCustom').classList.remove('hidden');
-                $('inputCustomText').value = state.paymentMethods.CUSTOM.text || '';
+        function shareGoStep(n) {
+            n = Math.min(3, Math.max(1, n));
+            if (n === 2 && $('btnShareNext').disabled) return;
+            shareDraft.step = n;
+            [1, 2, 3].forEach(i => $('shareStep' + i).classList.toggle('hidden', i !== n));
+            document.querySelectorAll('#shareStepper [data-step]').forEach(s => {
+                const on = Number(s.dataset.step) === n;
+                s.classList.toggle('text-blue-600', on);
+                s.classList.toggle('text-gray-400', !on);
+            });
+            const setFlex = (id, show) => { $(id).classList.toggle('hidden', !show); $(id).classList.toggle('flex', show); };
+            $('btnShareBack').classList.toggle('hidden', n === 1);
+            $('btnShareNext').classList.toggle('hidden', n === 3);
+            setFlex('btnShareCopy', n === 3);
+            setFlex('btnShareSend', n === 3);
+            if (n === 1) onShareAmountChange();
+            if (n === 2) onShareMethodToggle();
+            if (n === 3) {
+                const wa = getShareWhatsapp();
+                $('shareWaBox').classList.toggle('hidden', !!wa);
+                if (!wa) $('shareWhatsapp').value = '';
+                try { localStorage.setItem(SHARE_LAST_METHODS_KEY, JSON.stringify(getSelectedShareMethods())); } catch (e) { /* sin almacenamiento */ }
+                regenerateShareMessage();
             }
-            
-            regenerateShareMessage(); // Actualizar mensaje al cambiar método
-        }
-
-        function savePaymentDetails() {
-            const method = $('paymentMethodSelect').value;
-            if (!method) return;
-
-            // 1. Guardar en el Estado
-            if (method === 'TRANSFER') {
-                state.paymentMethods.TRANSFER = {
-                    bank: $('inputTransBank').value,
-                    account: $('inputTransAccount').value,
-                    id: $('inputTransId').value
-                };
-            } else if (method === 'PAGO_MOVIL') {
-                state.paymentMethods.PAGO_MOVIL = {
-                    bank: $('inputMobBank').value,
-                    phone: $('inputMobPhone').value,
-                    id: $('inputMobId').value
-                };
-            } else if (method === 'BINANCE') {
-                state.paymentMethods.BINANCE = { email: $('inputBinanceEmail').value };
-            } else if (method === 'CUSTOM') {
-                state.paymentMethods.CUSTOM = { text: $('inputCustomText').value };
-            }
-
-            // 2. Guardar en Disco Local
-            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-
-            // 3. Sincronizar con la Nube
-            saveData();
-
-            // 4. Feedback
-            alert('Datos de pago guardados y sincronizados.');
-            regenerateShareMessage(); // Actualizar mensaje con los nuevos datos guardados
         }
 
         function regenerateShareMessage() {
-            if (!state.currentShareId) return;
-            const c = state.credits.find(x => x.id == state.currentShareId);
-            if (!c) return;
-            
-            // --- CORRECCIÓN CRÍTICA AQUÍ ---
-            // 1. Calcular Deuda REAL (Usando precios actuales si es dinámico)
-            // Usamos la función auxiliar que ya existe en tu sistema
-            const currentTotalDebt = calculateRealDebt(c);
-
-            // 2. Restar lo pagado
-            const debt = currentTotalDebt - c.paid;
-
-            // Protección: Evitar negativos visuales
-            const finalDebt = debt > 0 ? debt : 0;
-            // -------------------------------
-            
-            const moneyText = formatMoney(debt); 
-            
-            // 2. Texto de Tasa y Bs
-            let rateText = "";
-            if ($('chkIncludeBs').checked) {
-                const rate = getFiadosActiveRate();
-                const debtBsValue = debt * rate;
-                // Formato Bs Venezolano
-                const debtBs = new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(debtBsValue);
-                
-                // Determinar nombre de la tasa
-                let rateName = "del día de hoy";
-                if (state.fiadosRateMode === 'USD' || (state.fiadosRateMode === 'DEFAULT' && state.rateMode === 'USD')) rateName = "BCV del día de hoy";
-                else if (state.fiadosRateMode === 'EUR' || (state.fiadosRateMode === 'DEFAULT' && state.rateMode === 'EUR')) rateName = "Euro BCV del día de hoy";
-                
-                rateText = ` (Equivalente a Bs. ${debtBs} a la tasa ${rateName})`;
+            const c = getShareCredit();
+            if (!c || shareDraft.step !== 3) return;
+            const amount = roundMoney(getShareAmount());
+            const methods = buildShareMethodList(getSelectedShareMethods());
+            const now = new Date();
+            const opts = { debt: shareDraft.debt, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now, link: '' };
+            if ($('chkIncludeLink').checked) {
+                const cfg = state.catalogConfig || {};
+                opts.link = buildPaymentLink({
+                    v: 1,
+                    shop: clipText(cfg.title) || 'Mi tienda',
+                    wa: getShareWhatsapp() || normalizeCatalogWhatsapp($('shareWhatsapp').value),
+                    usd: amount,
+                    bs: calcBs(amount, shareDraft.rate),
+                    rate: shareDraft.rate,
+                    rateName: shareDraft.rateName,
+                    date: formatShareDate(now),
+                    methods
+                });
             }
-            
-            // 3. Productos
-            const consolidated = {};
-            c.items.forEach(i => {
-                if (consolidated[i.name]) consolidated[i.name].qty += i.qty;
-                else consolidated[i.name] = { qty: i.qty, price: i.price };
-            });
-            let itemsList = "";
-            Object.entries(consolidated).forEach(([name, data]) => {
-                itemsList += `- ${data.qty}x ${name}\n`;
-            });
-            
-            // 4. Bloque de Pago
-            let paymentBlock = "";
-            if ($('chkIncludePayment').checked) {
-                const method = $('paymentMethodSelect').value;
-                if (method) {
-                    let methodTitle = "";
-                    let details = "";
-                    
-                    if (method === 'TRANSFER') {
-                        methodTitle = "Transferencia Bancaria";
-                        details = `Banco: ${$('inputTransBank').value}\nCuenta: ${$('inputTransAccount').value}\nC.I./RIF: ${$('inputTransId').value}`;
-                    } else if (method === 'PAGO_MOVIL') {
-                        methodTitle = "Pago Móvil";
-                        details = `Banco: ${$('inputMobBank').value}\nTeléfono: ${$('inputMobPhone').value}\nC.I./RIF: ${$('inputMobId').value}`;
-                    } else if (method === 'BINANCE') {
-                        methodTitle = "Binance Pay";
-                        details = `Correo/ID: ${$('inputBinanceEmail').value}`;
-                    } else if (method === 'CUSTOM') {
-                        methodTitle = "este medio";
-                        details = $('inputCustomText').value;
-                    }
-                    
-                    if (methodTitle && details) {
-                        paymentBlock = `\nPuedes hacer el pago a través de ${methodTitle}:\n${details}\n`;
-                    }
-                }
-            }
-
-            // 5. Ensamblar Mensaje Final
-            const message = `Hola ${c.customer},\n\nTe recuerdo que tienes una deuda pendiente de ${moneyText}${rateText}.\n\nPor los siguientes productos:\n${itemsList}${paymentBlock}\nEstamos en contacto, saludos. ¡Gracias por tu compra!`;
-            
-            $('shareMessageInput').value = message;
+            $('shareMessageInput').value = buildShareMessage(c, amount, methods, opts);
         }
 
         function closeShareModal() {
             $('shareModal').classList.add('hidden');
         }
 
-        function copyShareMessage() {
+        function copyShareMessage(btn) {
             const text = $('shareMessageInput');
+            const original = btn.innerHTML;
+            const done = () => {
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
+                setTimeout(() => btn.innerHTML = original, 2000);
+            };
             text.select();
             text.setSelectionRange(0, 99999); // Para móviles
-            
-            try {
-                navigator.clipboard.writeText(text.value).then(() => {
-                    const originalBtn = event.currentTarget.innerHTML;
-                    event.currentTarget.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
-                    setTimeout(() => event.currentTarget.innerHTML = originalBtn, 2000);
-                });
-            } catch (err) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text.value).then(done).catch(() => { document.execCommand('copy'); done(); });
+            } else {
                 document.execCommand('copy'); // Fallback antiguo
-                alert('Mensaje copiado.');
+                done();
             }
         }
 
         function nativeShareMessage() {
             const text = $('shareMessageInput').value;
-            
+
             // Detectamos si es un dispositivo móvil
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
@@ -254,6 +363,34 @@
                 const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
                 window.open(url, '_blank');
             }
+        }
+
+        // Autoprueba (datos ficticios). Ejecutar en consola: selfTestPaymentRequest()
+        function selfTestPaymentRequest() {
+            let fails = 0;
+            const t = (cond, msg) => { console.assert(cond, msg); if (!cond) { fails++; console.error('FALLA: ' + msg); } };
+            t(pendingDebtOf(10, 15) === 0, 'deuda negativa debe quedar en 0');
+            t(pendingDebtOf(100, 40.5) === 59.5, 'deuda pendiente');
+            t(!isValidShareAmount(0, 50) && !isValidShareAmount(-1, 50) && !isValidShareAmount(NaN, 50), 'monto 0, negativo o vacío no es válido');
+            t(!isValidShareAmount(50.01, 50), 'monto mayor que la deuda no es válido');
+            t(isValidShareAmount(50, 50) && isValidShareAmount(0.01, 50), 'montos válidos');
+            t(formatBsPlain(39795.49) === '39795,49' && formatBsPlain(0.5) === '0,50' && formatBsPlain(1234.5) === '1234,50', 'formatBsPlain');
+            t(calcBs(10, 36.123) === 361.23 && calcBs(1, 0.005) === 0.01, 'Bs = USD x tasa a 2 decimales');
+            t(phoneDigits('0424-222-1919') === '04242221919', 'teléfono solo dígitos');
+            const p = { v: 1, shop: 'Bodega Ñandú Café ñ', wa: '584140000000', usd: 12.5, bs: 450.25, rate: 36.02, rateName: 'BCV', date: '26/10/2026',
+                methods: [{ t: 'PAGO_MOVIL', bank: 'Banco Zeta áéí', phone: '04140000000', id: 'V12345678' }, { t: 'CUSTOM', text: 'Pagar en tienda ñ' }] };
+            t(JSON.stringify(decodePaymentPayload(buildPaymentLink(p))) === JSON.stringify(p), 'enlace de ida y vuelta con acentos y ñ');
+            t(decodePaymentPayload('#d=' + encodePaymentPayload({ v: 2 })) === null, 'v distinta da null');
+            t(decodePaymentPayload('#d=xxx') === null && decodePaymentPayload('') === null && decodePaymentPayload('#d=e30') === null, 'JSON roto o vacío da null');
+            const credit = { customer: 'Cliente Ficticio', items: [{ name: 'Producto A', qty: 2 }, { name: 'Producto A', qty: 1 }] };
+            const methods = [{ t: 'PAGO_MOVIL', bank: 'Banco Zeta', phone: '0414-000-0000', id: 'V1' }, { t: 'TRANSFER', bank: 'Banco Eta', account: '0102', id: 'V1' }];
+            const msg = buildShareMessage(credit, 10, methods, { debt: 20, rate: 40, rateName: 'BCV', date: new Date(2026, 9, 26), link: 'https://x/pagar.html#d=a' });
+            t(msg.includes('Datos para Pago Móvil:') && msg.includes('Datos para Transferencia:'), 'mensaje con dos métodos');
+            t(msg.includes('Monto: 400,00') && msg.includes('Teléfono: 04140000000') && msg.includes('Monto a pagar: $10.00') && msg.includes('- 3x Producto A') && msg.includes('26/10/2026'), 'formato del mensaje');
+            const msgFull = buildShareMessage(credit, 20, methods.slice(0, 1), { debt: 20, rate: 40, rateName: 'BCV', date: new Date(2026, 9, 26), link: '' });
+            t(!msgFull.includes('Monto a pagar') && !msgFull.includes('Paga y copia'), 'deuda completa sin línea de monto ni enlace');
+            console.log(fails ? `selfTestPaymentRequest: ${fails} fallas` : 'selfTestPaymentRequest: OK');
+            return fails;
         }
 
         // ==========================================

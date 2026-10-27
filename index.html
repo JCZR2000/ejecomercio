@@ -303,79 +303,106 @@
             <button onclick="closeShareModal()" class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 z-10 p-2">
                 <i class="fa-solid fa-times text-lg"></i>
             </button>
-            
-            <div class="p-5 overflow-y-auto">
-                <div class="text-center mb-4">
-                    <div class="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fa-solid fa-share-nodes text-green-600 text-xl"></i>
-                    </div>
-                    <h3 class="text-lg font-bold text-gray-800">Recordatorio de Cobro</h3>
-                    <p class="text-xs text-gray-500">Personaliza el mensaje antes de enviar</p>
-                </div>
-                
-                <textarea id="shareMessageInput" class="w-full h-32 border border-gray-300 rounded-lg p-3 text-xs text-gray-700 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none resize-none mb-3 font-mono leading-relaxed shadow-inner"></textarea>
 
-                <div class="space-y-2 mb-4">
-                    <label class="flex items-center gap-2 cursor-pointer select-none group bg-gray-50 p-2 rounded border border-gray-100 hover:bg-gray-100 transition">
-                        <input type="checkbox" id="chkIncludeBs" class="form-checkbox h-4 w-4 text-green-600 rounded border-gray-300 focus:ring-green-500" onchange="regenerateShareMessage()">
-                        <span class="text-xs font-bold text-gray-600 group-hover:text-green-700 transition flex items-center gap-1">
-                            <i class="fa-solid fa-money-bill-1-wave text-green-500"></i>
-                            Incluir monto en Bolívares
+            <div class="p-5 overflow-y-auto">
+                <div class="text-center mb-3">
+                    <h3 class="text-lg font-bold text-gray-800">Recordatorio de Cobro</h3>
+                    <div id="shareStepper" class="flex justify-center gap-4 mt-2 text-[10px] font-bold text-gray-400">
+                        <span data-step="1">1 · Monto</span><span data-step="2">2 · Método</span><span data-step="3">3 · Enviar</span>
+                    </div>
+                </div>
+
+                <div id="shareStep1" class="space-y-2">
+                    <p class="text-xs font-bold text-gray-600">¿Cuánto va a pagar?</p>
+                    <label class="flex items-start gap-2 p-2 border rounded-lg cursor-pointer">
+                        <input type="radio" name="shareAmtMode" value="FULL" class="mt-1" onchange="onShareAmountChange()">
+                        <span class="text-xs"><b>Deuda completa <span id="shareFullUsd"></span></b><br><span id="shareFullBs" class="text-gray-500"></span></span>
+                    </label>
+                    <label class="flex items-start gap-2 p-2 border rounded-lg cursor-pointer">
+                        <input type="radio" name="shareAmtMode" value="OTHER" class="mt-1" onchange="onShareAmountChange()">
+                        <span class="text-xs flex-1"><b>Otro monto ($)</b>
+                            <input type="number" id="shareOtherAmount" min="0" step="0.01" inputmode="decimal" class="w-full border rounded p-1.5 text-xs mt-1" placeholder="0.00" oninput="onShareOtherInput()">
+                            <span id="shareOtherBs" class="text-gray-500 block mt-1"></span>
                         </span>
                     </label>
+                    <p id="shareAmtError" class="text-[11px] text-red-500 hidden"></p>
+                </div>
 
-                    <div class="border border-gray-200 rounded-lg overflow-hidden transition-all">
-                        <label class="flex items-center gap-2 cursor-pointer select-none p-2 bg-gray-50 hover:bg-gray-100 transition">
-                            <input type="checkbox" id="chkIncludePayment" class="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500" onchange="togglePaymentSection()">
-                            <span class="text-xs font-bold text-gray-600 group-hover:text-blue-700 transition flex items-center gap-1">
-                                <i class="fa-solid fa-circle-dollar-to-slot text-blue-500"></i>
-                                Añadir datos de pago al mensaje
-                            </span>
-                        </label>
-
-                        <div id="paymentSection" class="hidden p-3 bg-white border-t border-gray-100 space-y-3">
-                            <div>
-                                <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Método de Pago</label>
-                                <select id="paymentMethodSelect" class="w-full border rounded p-1.5 text-xs bg-white outline-none focus:border-blue-500" onchange="renderPaymentInputs()">
-                                    <option value="">Seleccione...</option>
-                                    <option value="TRANSFER">Transferencia Bancaria</option>
-                                    <option value="PAGO_MOVIL">Pago Móvil</option>
-                                    <option value="BINANCE">Binance Pay</option>
-                                    <option value="CUSTOM">Personalizado</option>
-                                </select>
-                            </div>
-
-                            <div id="payFormContainer" class="hidden space-y-2">
-                                <div id="formTransfer" class="hidden space-y-2">
-                                    <input type="text" id="inputTransBank" list="bankListTransfer" class="w-full border rounded p-1.5 text-xs" placeholder="Banco (Ej: Banco de Venezuela)">
-                                    <input type="text" id="inputTransAccount" class="w-full border rounded p-1.5 text-xs" placeholder="Número de Cuenta">
-                                    <input type="text" id="inputTransId" class="w-full border rounded p-1.5 text-xs" placeholder="Cédula / RIF">
-                                </div>
-                                <div id="formMobile" class="hidden space-y-2">
-                                    <input type="text" id="inputMobBank" list="bankListMobile" class="w-full border rounded p-1.5 text-xs" placeholder="Banco (Ej: Venezuela 0102)">
-                                    <input type="text" id="inputMobPhone" class="w-full border rounded p-1.5 text-xs" placeholder="Teléfono (Ej: 04141234567)">
-                                    <input type="text" id="inputMobId" class="w-full border rounded p-1.5 text-xs" placeholder="Cédula / RIF">
-                                </div>
-                                <div id="formBinance" class="hidden">
-                                    <input type="text" id="inputBinanceEmail" class="w-full border rounded p-1.5 text-xs" placeholder="Correo / ID de Binance">
-                                </div>
-                                <div id="formCustom" class="hidden">
-                                    <textarea id="inputCustomText" class="w-full border rounded p-1.5 text-xs h-16 resize-none" placeholder="Escribe tus instrucciones de pago aquí..."></textarea>
-                                </div>
-
-                                <button onclick="savePaymentDetails()" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-1.5 rounded text-xs font-bold hover:bg-blue-100 flex items-center justify-center gap-1 transition">
-                                    <i class="fa-solid fa-floppy-disk"></i> Guardar Datos
-                                </button>
-                            </div>
+                <div id="shareStep2" class="space-y-2 hidden">
+                    <p class="text-xs font-bold text-gray-600">¿Cómo va a pagar? <span class="font-normal text-gray-400">(puedes marcar varios)</span></p>
+                    <div class="border rounded-lg">
+                        <div class="flex items-center gap-2 p-2">
+                            <input type="checkbox" id="chkM_PAGO_MOVIL" onchange="onShareMethodToggle()">
+                            <i class="fa-solid fa-mobile-screen text-blue-500"></i>
+                            <div class="flex-1 min-w-0"><div class="text-xs font-bold">Pago Móvil</div><div id="sumM_PAGO_MOVIL" class="text-[10px] text-gray-500 truncate"></div></div>
+                            <button onclick="toggleMethodForm('PAGO_MOVIL')" id="cfgM_PAGO_MOVIL" class="text-[11px] text-blue-600 font-bold px-1">Configurar</button>
+                        </div>
+                        <div id="formMobile" class="hidden p-2 space-y-2 border-t">
+                            <input type="text" id="inputMobBank" list="bankListMobile" class="w-full border rounded p-1.5 text-xs" placeholder="Banco (Ej: Venezuela 0102)">
+                            <input type="text" id="inputMobPhone" class="w-full border rounded p-1.5 text-xs" placeholder="Teléfono (Ej: 04141234567)">
+                            <input type="text" id="inputMobId" class="w-full border rounded p-1.5 text-xs" placeholder="Cédula / RIF">
+                            <button onclick="savePaymentDetails('PAGO_MOVIL')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-1.5 rounded text-xs font-bold"><i class="fa-solid fa-floppy-disk"></i> Guardar Datos</button>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg">
+                        <div class="flex items-center gap-2 p-2">
+                            <input type="checkbox" id="chkM_TRANSFER" onchange="onShareMethodToggle()">
+                            <i class="fa-solid fa-building-columns text-blue-500"></i>
+                            <div class="flex-1 min-w-0"><div class="text-xs font-bold">Transferencia Bancaria</div><div id="sumM_TRANSFER" class="text-[10px] text-gray-500 truncate"></div></div>
+                            <button onclick="toggleMethodForm('TRANSFER')" id="cfgM_TRANSFER" class="text-[11px] text-blue-600 font-bold px-1">Configurar</button>
+                        </div>
+                        <div id="formTransfer" class="hidden p-2 space-y-2 border-t">
+                            <input type="text" id="inputTransBank" list="bankListTransfer" class="w-full border rounded p-1.5 text-xs" placeholder="Banco (Ej: Banco de Venezuela)">
+                            <input type="text" id="inputTransAccount" class="w-full border rounded p-1.5 text-xs" placeholder="Número de Cuenta">
+                            <input type="text" id="inputTransId" class="w-full border rounded p-1.5 text-xs" placeholder="Cédula / RIF">
+                            <button onclick="savePaymentDetails('TRANSFER')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-1.5 rounded text-xs font-bold"><i class="fa-solid fa-floppy-disk"></i> Guardar Datos</button>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg">
+                        <div class="flex items-center gap-2 p-2">
+                            <input type="checkbox" id="chkM_BINANCE" onchange="onShareMethodToggle()">
+                            <i class="fa-brands fa-bitcoin text-yellow-500"></i>
+                            <div class="flex-1 min-w-0"><div class="text-xs font-bold">Binance Pay</div><div id="sumM_BINANCE" class="text-[10px] text-gray-500 truncate"></div></div>
+                            <button onclick="toggleMethodForm('BINANCE')" id="cfgM_BINANCE" class="text-[11px] text-blue-600 font-bold px-1">Configurar</button>
+                        </div>
+                        <div id="formBinance" class="hidden p-2 space-y-2 border-t">
+                            <input type="text" id="inputBinanceEmail" class="w-full border rounded p-1.5 text-xs" placeholder="Correo / ID de Binance">
+                            <button onclick="savePaymentDetails('BINANCE')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-1.5 rounded text-xs font-bold"><i class="fa-solid fa-floppy-disk"></i> Guardar Datos</button>
+                        </div>
+                    </div>
+                    <div class="border rounded-lg">
+                        <div class="flex items-center gap-2 p-2">
+                            <input type="checkbox" id="chkM_CUSTOM" onchange="onShareMethodToggle()">
+                            <i class="fa-solid fa-pen text-gray-500"></i>
+                            <div class="flex-1 min-w-0"><div class="text-xs font-bold">Personalizado</div><div id="sumM_CUSTOM" class="text-[10px] text-gray-500 truncate"></div></div>
+                            <button onclick="toggleMethodForm('CUSTOM')" id="cfgM_CUSTOM" class="text-[11px] text-blue-600 font-bold px-1">Configurar</button>
+                        </div>
+                        <div id="formCustom" class="hidden p-2 space-y-2 border-t">
+                            <textarea id="inputCustomText" class="w-full border rounded p-1.5 text-xs h-16 resize-none" placeholder="Escribe tus instrucciones de pago aquí..."></textarea>
+                            <button onclick="savePaymentDetails('CUSTOM')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-1.5 rounded text-xs font-bold"><i class="fa-solid fa-floppy-disk"></i> Guardar Datos</button>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex gap-2">
-                    <button onclick="copyShareMessage()" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm hover:bg-gray-300 font-bold flex items-center justify-center gap-2 transition">
+                <div id="shareStep3" class="hidden">
+                    <textarea id="shareMessageInput" class="w-full h-40 border border-gray-300 rounded-lg p-3 text-xs text-gray-700 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none resize-none mb-3 font-mono leading-relaxed shadow-inner"></textarea>
+                    <label class="flex items-center gap-2 text-xs font-bold text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 mb-2">
+                        <input type="checkbox" id="chkIncludeLink" checked onchange="regenerateShareMessage()"> Incluir enlace de pago
+                    </label>
+                    <div id="shareWaBox" class="hidden mb-2">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Tu WhatsApp (para recibir el «Ya pagué»)</label>
+                        <input type="tel" id="shareWhatsapp" class="w-full border rounded p-1.5 text-xs" placeholder="Ej: 584141234567" onchange="onShareWhatsappChange()">
+                        <p id="shareWaError" class="text-[11px] text-red-500 hidden">Número no válido (10 a 15 dígitos con código de país).</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-2 mt-4">
+                    <button id="btnShareBack" onclick="shareGoStep(shareDraft.step - 1)" class="bg-gray-200 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-bold hidden">Atrás</button>
+                    <button id="btnShareNext" onclick="shareGoStep(shareDraft.step + 1)" class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-bold disabled:opacity-40">Siguiente</button>
+                    <button id="btnShareCopy" onclick="copyShareMessage(this)" class="flex-1 bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm hover:bg-gray-300 font-bold items-center justify-center gap-2 hidden">
                         <i class="fa-regular fa-copy"></i> Copiar
                     </button>
-                    <button onclick="nativeShareMessage()" class="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm hover:bg-green-700 font-bold flex items-center justify-center gap-2 shadow-lg transition transform active:scale-95">
+                    <button id="btnShareSend" onclick="nativeShareMessage()" class="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm hover:bg-green-700 font-bold items-center justify-center gap-2 shadow-lg hidden">
                         <i class="fa-solid fa-share-nodes text-lg"></i> Compartir
                     </button>
                 </div>
