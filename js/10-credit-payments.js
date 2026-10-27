@@ -3,7 +3,8 @@
         // ==========================================
 
         // Aplica un abono ya validado. Sin DOM, sin guardar, sin alertas.
-        function applyCreditPayment(credit, amount, rate, saleId) {
+        // amount va a la deuda; received (por defecto igual) es lo que entró a la caja: la diferencia es saldo a favor (Fase 13).
+        function applyCreditPayment(credit, amount, rate, saleId, received = amount) {
             // Antes de cobrar, guardamos la deuda real calculada (incluyendo aumentos)
             credit.totalDebt = roundMoney(calculateRealDebt(credit));
             credit.paid = roundMoney(credit.paid + amount);
@@ -15,8 +16,8 @@
                 id: saleId,
                 date: new Date().toISOString(),
                 type: 'payment',
-                description: `Abono: ${credit.customer}`,
-                total: amount,
+                description: `Abono: ${credit.customer}` + (received > amount ? ` (incluye ${formatMoney(roundMoney(received - amount))} a saldo a favor)` : ''),
+                total: received,
                 rate: rate
             });
             return { settled };
@@ -26,14 +27,27 @@
         function validateCreditPayments(entries) {
             return entries.map(e => {
                 const c = state.credits.find(x => x.id == e.id);
-                const r = { id: e.id, customer: c ? c.customer : '', amount: e.amount, debt: 0, remaining: 0, error: '' };
+                const r = { id: e.id, customer: c ? c.customer : '', amount: e.amount, debt: 0, remaining: 0, excess: 0, error: '' };
                 if (!c) { r.error = 'Fiado no encontrado'; return r; }
                 r.debt = roundMoney(calculateRealDebt(c) - c.paid);
                 r.remaining = roundMoney(r.debt - e.amount);
                 if (!e.amount || e.amount <= 0) r.error = 'Monto inválido';
-                else if (e.amount > r.debt + 0.01) r.error = `Excede la deuda (${formatMoney(r.debt)})`;
+                else if (e.amount > r.debt + 0.01) {
+                    // Con cliente, lo que sobra puede quedar como saldo a favor
+                    if (getClient(c.clientId)) { r.excess = roundMoney(e.amount - r.debt); r.remaining = 0; }
+                    else r.error = `Excede la deuda (${formatMoney(r.debt)})`;
+                }
                 return r;
             });
+        }
+
+        // Valida y aplica un abono; el sobrante (solo con cliente) va a su saldo a favor. Sin DOM ni guardar.
+        function registerCreditPayment(credit, amount, rate, saleId) {
+            const [v] = validateCreditPayments([{ id: credit.id, amount }]);
+            if (v.error) return { error: v.error };
+            const { settled } = applyCreditPayment(credit, roundMoney(amount - v.excess), rate, saleId, amount);
+            if (v.excess > 0) addClientMove(getClient(credit.clientId), { amount: v.excess, kind: 'OVERPAY', creditId: credit.id });
+            return { settled, excess: v.excess };
         }
 
         function payCredit(id) {
@@ -47,17 +61,23 @@
             if (v.error) return alert(v.error);
 
             const c = state.credits.find(x => x.id == id);
-            const { settled } = applyCreditPayment(c, amount, getFiadosActiveRate(), Date.now());
-            if (settled) setTimeout(autoPruneCredits, 500);
+            const finish = () => {
+                const { settled } = registerCreditPayment(c, amount, getFiadosActiveRate(), Date.now());
+                if (settled) setTimeout(autoPruneCredits, 500);
 
-            saveData();
-            renderAll();
+                saveData();
+                renderAll();
 
-            // Pequeño delay para que la UI se actualice antes de la alerta
-            setTimeout(() => {
-                if (settled) alert(`¡Deuda de ${c.customer} saldada! Se ha movido al historial.`);
-                else alert('Abono registrado.');
-            }, 100);
+                // Pequeño delay para que la UI se actualice antes de la alerta
+                setTimeout(() => {
+                    if (settled) alert(`¡Deuda de ${c.customer} saldada! Se ha movido al historial.`);
+                    else alert('Abono registrado.');
+                }, 100);
+            };
+            if (v.excess > 0) {
+                return customConfirm('Pago de más', `Pagó ${formatMoney(amount)} y debe ${formatMoney(v.debt)}. ¿Guardar ${formatMoney(v.excess)} como saldo a favor de ${c.customer}?`, 'warning', finish);
+            }
+            finish();
         }
 
         // --- Pagos múltiples ---
@@ -86,7 +106,8 @@
             let total = 0;
             $('multiPayBody').innerHTML = rows.map(r => {
                 total += r.amount;
-                const err = r.error ? `<div class="text-[10px] text-red-600 font-bold">${escapeHtml(r.error)}</div>` : '';
+                const err = r.error ? `<div class="text-[10px] text-red-600 font-bold">${escapeHtml(r.error)}</div>`
+                    : r.excess > 0 ? `<div class="text-[10px] text-green-700 font-bold">+${formatMoney(r.excess)} a saldo a favor</div>` : '';
                 return `<tr class="${r.error ? 'bg-red-50 text-red-700' : ''} border-b">
                     <td class="py-1 pr-1">${escapeHtml(r.customer)}${err}</td>
                     <td class="py-1 text-right">${formatMoney(r.amount)}</td>
@@ -114,11 +135,12 @@
             const rate = getFiadosActiveRate();
             const base = Date.now();
             const settledNames = [];
-            let total = 0;
+            let total = 0, toBalance = 0;
             rows.forEach((r, i) => {
                 const c = state.credits.find(x => x.id == r.id);
-                const { settled } = applyCreditPayment(c, r.amount, rate, base + i);
+                const { settled, excess } = registerCreditPayment(c, r.amount, rate, base + i);
                 total += r.amount;
+                toBalance += excess;
                 if (settled) settledNames.push(c.customer);
             });
             if (settledNames.length) setTimeout(autoPruneCredits, 500);
@@ -127,7 +149,8 @@
             saveData();
             renderAll();
             setTimeout(() => alert(`${rows.length} abonos registrados por ${formatMoney(roundMoney(total))}.` +
-                (settledNames.length ? ` Saldados: ${settledNames.join(', ')}` : '')), 100);
+                (settledNames.length ? ` Saldados: ${settledNames.join(', ')}` : '') +
+                (toBalance > 0 ? ` A saldo a favor: ${formatMoney(roundMoney(toBalance))}.` : '')), 100);
         }
 
         function selfTestCreditPayments() {

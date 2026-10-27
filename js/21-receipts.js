@@ -273,7 +273,10 @@
                 $('printCreditInfo').classList.remove('hidden');
                 $('printPaid').textContent = formatMoney(data.paid);
                 // Si es venta nueva a crédito: Total - Pagado = Restante
-                const remaining = data.total - data.paid;
+                const balanceUsed = data.balanceUsed || 0;
+                $('printBalanceRow').classList.toggle('hidden', !(balanceUsed > 0));
+                $('printBalanceUsed').textContent = formatMoney(balanceUsed);
+                const remaining = data.total - data.paid - balanceUsed;
                 $('printRemaining').textContent = formatMoney(remaining);
             } else {
                 $('printCreditInfo').classList.add('hidden');

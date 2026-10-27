@@ -72,6 +72,8 @@
                 btn.className = 'w-full h-14 bg-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:bg-orange-700 active:scale-95 transition flex items-center justify-center gap-2';
                 btn.disabled = false;
 
+                updatePosBalanceRow();
+
                 // 6. ¡ABRIR EL MODAL!
                 toggleCartModal(true);
             });
@@ -303,8 +305,23 @@
                 if (isCredit && !state.activeCreditId && !customerName) return alert('Escribe el nombre del cliente');
                 if (!confirm('¿Confirmar transacción?')) return;
 
+                // Fase 13b: un abono inicial mayor que lo que se debe deja el sobrante como saldo a favor (pide confirmación)
+                const current = isCredit && state.activeCreditId ? state.credits.find(c => c.id == state.activeCreditId) : null;
+                const debtNow = roundMoney(totalUSD + (current ? creditPending(current) : 0));
+                const overpaid = isCredit && initialPay > 0 ? splitOverpayment(debtNow, initialPay).excess : 0;
+                if (overpaid > 0) {
+                    customConfirm('Abono mayor que la deuda', `Pagó ${formatMoney(initialPay)} y debe ${formatMoney(debtNow)}. ¿Guardar ${formatMoney(overpaid)} como saldo a favor de ${current ? current.customer : customerName}?`, 'warning', () => runCheckout(overpaid));
+                    return;
+                }
+                runCheckout(0);
+            }
+
+            // excess: parte del abono inicial que va al saldo a favor del cliente
+            function runCheckout(excess) {
                 // Cliente del fiado nuevo (Fase 13): el elegido, uno con ese nombre o uno nuevo solo con nombre
                 const clientId = isCredit && !state.activeCreditId ? resolvePosClient(customerName).id : null;
+                let payName = customerName;
+                const useBalance = !!($('chkUseBalance') && $('chkUseBalance').checked); // exitEditMode lo desmarca
 
                 // B. DESCUENTO DE INVENTARIO (CRÍTICO: Hacerlo primero)
                 state.cart.forEach(item => {
@@ -325,9 +342,11 @@
                         const idx = state.credits.findIndex(c => c.id == state.activeCreditId);
                         if (idx !== -1) {
                             receiptFiscalNum = state.credits[idx].fiscalNum;
+                            payName = state.credits[idx].customer;
+                            if (!getClient(state.credits[idx].clientId)) state.credits[idx].clientId = resolvePosClient(payName).id;
                             state.credits[idx].items.push(...state.cart);
                             state.credits[idx].totalDebt = roundMoney(state.credits[idx].totalDebt + totalUSD);
-                            state.credits[idx].paid = roundMoney(state.credits[idx].paid + initialPay);
+                            state.credits[idx].paid = roundMoney(state.credits[idx].paid + initialPay - excess);
                             if (nextPaymentDate) state.credits[idx].nextPaymentDate = nextPaymentDate;
                         }
                         exitEditMode(); // <--- Ahora esta función ya no fallará
@@ -339,10 +358,25 @@
                             clientId,
                             items: [...state.cart],
                             totalDebt: totalUSD,
-                            paid: initialPay,
+                            paid: roundMoney(initialPay - excess),
                             date: new Date().toISOString(),
                             nextPaymentDate: nextPaymentDate
                         });
+                    }
+                    // Saldo a favor (Fase 13b): el sobrante entra al saldo; si el cliente pidió usar su saldo, se aplica
+                    const creditRef = state.credits.find(c => c.id == receiptId);
+                    const client = creditRef && getClient(creditRef.clientId);
+                    let balanceUsed = 0;
+                    if (creditRef && client && excess > 0) {
+                        addClientMove(client, { amount: excess, kind: 'OVERPAY', creditId: creditRef.id });
+                        creditRef.paidDate = new Date().toISOString(); // quedó pagado al momento
+                    } else if (creditRef && client && useBalance && client.balance > 0.01) {
+                        const amt = roundMoney(Math.min(client.balance, creditPending(creditRef)));
+                        const used = amt > 0 ? useClientBalance(client.id, creditRef.id, amt) : { error: true };
+                        if (!used.error) {
+                            balanceUsed = amt;
+                            if (used.settled) setTimeout(autoPruneCredits, 500);
+                        }
                     }
                     // Abono inicial
                     if (initialPay > 0) {
@@ -350,7 +384,7 @@
                             id: Date.now() + 1,
                             date: new Date().toISOString(),
                             type: 'payment',
-                            description: `Abono Inicial: ${state.activeCreditId ? state.credits.find(c=>c.id==state.activeCreditId).customer : customerName}`,
+                            description: `Abono Inicial: ${payName}` + (excess > 0 ? ` (incluye ${formatMoney(excess)} a saldo a favor)` : ''),
                             total: initialPay,
                             rate: activeRate
                         });
@@ -359,9 +393,10 @@
                     tempReceiptData = {
                         items: [...state.cart],
                         total: totalUSD,
-                        paid: initialPay,
+                        paid: roundMoney(initialPay - excess),
+                        balanceUsed,
                         date: new Date().toISOString(),
-                        customer: customerName,
+                        customer: payName,
                         isCredit: true,
                         id: receiptId,
                         fiscalNum: receiptFiscalNum
@@ -396,6 +431,7 @@
                 // Limpieza de inputs (Con seguridad "Anti-Crash")
                 if($('customerName')) $('customerName').value = '';
                 state.posClientId = null;
+                updatePosBalanceRow();
                 if($('initialPayUSD')) $('initialPayUSD').value = '';
                 if($('initialPayBS')) $('initialPayBS').value = '';
                 if($('posSearchInput')) $('posSearchInput').value = '';

@@ -160,6 +160,7 @@
             if($('customerName')) $('customerName').value = '';
             state.posClientId = null;
             hideClientPicker();
+            updatePosBalanceRow();
             if($('initialPayUSD')) $('initialPayUSD').value = '';
             if($('initialPayBS')) $('initialPayBS').value = '';
             if($('paymentScheduleSelect')) $('paymentScheduleSelect').value = '';

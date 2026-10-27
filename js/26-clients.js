@@ -137,6 +137,40 @@
             return { ok: true };
         }
 
+        // ---------- Saldo a favor (Fase 13b) ----------
+        // Sin DOM y sin guardar. amount de un movimiento: + entra al saldo, - sale. Rechaza dejar el saldo negativo.
+        function addClientMove(client, move) {
+            const next = roundMoney((client.balance || 0) + move.amount);
+            if (next < 0) return false;
+            client.balance = next;
+            client.moves = [{ date: new Date().toISOString(), ...move }, ...(client.moves || [])].slice(0, 50);
+            return true;
+        }
+
+        // Cuánto de lo recibido va a la deuda y cuánto sobra (≤ 0.01 no cuenta como sobrante)
+        function splitOverpayment(debt, amount) {
+            const toDebt = roundMoney(Math.min(amount, debt));
+            const excess = roundMoney(amount - toDebt);
+            return { toDebt, excess: excess <= 0.01 ? 0 : excess };
+        }
+
+        // Paga parte de un fiado con el saldo a favor. No registra ingreso: el dinero ya entró cuando se pagó de más.
+        function useClientBalance(clientId, creditId, amount) {
+            const client = getClient(clientId), credit = state.credits.find(c => c.id == creditId);
+            if (!client || !credit || credit.clientId !== clientId) return { error: 'Cliente o fiado no encontrado.' };
+            amount = roundMoney(amount);
+            if (!(amount > 0)) return { error: 'Monto inválido.' };
+            if (amount > (client.balance || 0)) return { error: `El saldo a favor es ${formatMoney(client.balance || 0)}.` };
+            const pending = creditPending(credit);
+            if (amount > pending) return { error: `El fiado debe ${formatMoney(pending)}.` };
+            credit.totalDebt = roundMoney(calculateRealDebt(credit)); // igual que un abono: fija la deuda real primero
+            credit.paid = roundMoney(credit.paid + amount);
+            const settled = roundMoney(credit.totalDebt - credit.paid) <= 0.01;
+            if (settled) credit.paidDate = new Date().toISOString();
+            addClientMove(client, { amount: -amount, kind: 'USE', creditId: credit.id });
+            return { settled };
+        }
+
         // Cliente de la caja: el elegido de la lista, uno con el mismo nombre, o uno nuevo solo con nombre
         function resolvePosClient(name) {
             const key = normalizeClientName(name);
@@ -173,7 +207,14 @@
             if (clients) renderClientsList(); else renderCreditsList();
         }
 
+        // Total de saldos a favor (lo que se les debe a los clientes), junto al total por cobrar
+        function updateBalanceTotal() {
+            const total = roundMoney(state.clients.reduce((sum, c) => sum + (c.balance || 0), 0));
+            $('totalClientBalances').textContent = formatMoney(total);
+        }
+
         function renderClientsList() {
+            updateBalanceTotal();
             const panel = $('clientsPanel');
             if (!panel || panel.classList.contains('hidden')) return;
             const rate = getFiadosActiveRate();
@@ -192,6 +233,7 @@
                     </div>
                     <div class="text-right shrink-0">
                         ${s.debt > 0.01 ? `<div class="font-bold text-red-600">${formatMoney(s.debt)}</div><div class="text-[10px] text-blue-600 font-bold">Bs ${(s.debt * rate).toFixed(2)}</div>` : ''}
+                        ${s.balance > 0.01 ? `<div class="font-bold text-green-600 text-xs">Saldo ${formatMoney(s.balance)}</div>` : ''}
                     </div>
                 </button>`;
             }).join('');
@@ -293,11 +335,16 @@
             const openRows = s.open.map(cr => `<div class="flex justify-between items-center text-xs border-b py-1.5">
                     <span>${escapeHtml(day(cr.date))}</span>
                     <span class="font-bold text-red-600">${formatMoney(creditPending(cr))}</span>
-                    <button onclick="viewClientCredits('${id}')" class="text-blue-600 font-bold hover:underline">Ver</button></div>`).join('')
+                    <span>${s.balance > 0.01 ? `<button onclick="requestUseBalance('${id}', '${safeClientId(cr.id)}')" class="text-green-700 font-bold hover:underline mr-2">Usar saldo</button>` : ''}<button onclick="viewClientCredits('${id}')" class="text-blue-600 font-bold hover:underline">Ver</button></span></div>`).join('')
                 || '<div class="text-xs text-gray-400">Sin fiados abiertos.</div>';
             const closedRows = s.closed.slice(0, 5).map(cr => `<div class="flex justify-between text-xs border-b py-1.5 text-gray-500">
                     <span>${escapeHtml(day(cr.date))}</span><span>${formatMoney(cr.totalDebt)}</span><span>Pagado</span></div>`).join('')
                 || '<div class="text-xs text-gray-400">Ninguno guardado.</div>';
+            const MOVE_LABELS = { OVERPAY: 'Pagó de más', USE: 'Usado en un fiado', ADJUST: 'Ajuste', MERGE: 'Unión de clientes' };
+            const movesRows = (c.moves || []).slice(0, 10).map(m => `<div class="flex justify-between gap-2 text-xs border-b py-1.5">
+                    <span class="min-w-0">${escapeHtml(day(m.date))} · ${escapeHtml(MOVE_LABELS[m.kind] || m.kind)}${m.note ? ` <span class="text-gray-400">(${escapeHtml(m.note)})</span>` : ''}</span>
+                    <span class="font-bold shrink-0 ${m.amount < 0 ? 'text-red-600' : 'text-green-600'}">${m.amount < 0 ? '-' : '+'}${formatMoney(Math.abs(m.amount))}</span></div>`).join('')
+                || '<div class="text-xs text-gray-400">Sin movimientos.</div>';
             $('clientModalBody').innerHTML = `
                 <div class="flex justify-between items-start gap-2">
                     <div class="min-w-0">
@@ -311,9 +358,15 @@
                     <span class="text-[10px] font-bold text-red-400 uppercase">Deuda pendiente</span>
                     <span class="text-right"><span class="font-bold text-red-600 text-lg">${formatMoney(s.debt)}</span><br><span class="text-[11px] text-blue-600 font-bold">Bs ${(s.debt * rate).toFixed(2)}</span></span>
                 </div>
+                <div class="bg-green-50 border border-green-100 rounded-lg p-3 mb-3 flex justify-between items-center">
+                    <span class="text-[10px] font-bold text-green-600 uppercase">Saldo a favor</span>
+                    <span class="text-right"><span class="font-bold text-green-600 text-lg">${formatMoney(s.balance)}</span><br><span class="text-[11px] text-blue-600 font-bold">Bs ${(s.balance * rate).toFixed(2)}</span></span>
+                </div>
                 <h4 class="text-[10px] font-bold text-gray-500 uppercase mb-1">Fiados abiertos</h4>${openRows}
                 <h4 class="text-[10px] font-bold text-gray-500 uppercase mt-3 mb-1">Pagados (últimos guardados)</h4>${closedRows}
+                <h4 class="text-[10px] font-bold text-gray-500 uppercase mt-3 mb-1">Movimientos del saldo</h4>${movesRows}
                 <div class="grid grid-cols-2 gap-2 mt-4">
+                    <button onclick="requestAdjustBalance('${id}')" class="col-span-2 bg-green-50 border border-green-200 text-green-700 py-2 rounded text-xs font-bold">Ajustar saldo</button>
                     ${wa ? `<button onclick="openClientWhatsapp('${id}')" class="bg-green-600 text-white py-2 rounded text-xs font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</button>` : ''}
                     <button onclick="newCreditForClient('${id}')" class="bg-orange-600 text-white py-2 rounded text-xs font-bold">Nuevo fiado</button>
                     <button onclick="startMergeClient('${id}')" class="bg-gray-100 border border-gray-200 text-gray-700 py-2 rounded text-xs font-bold">Unir con…</button>
@@ -373,6 +426,100 @@
             });
         }
 
+        // ---------- Usar y ajustar el saldo (pantalla) ----------
+        let clientAmountOnOk = null;
+
+        // Cuadro con un monto (y un motivo si withNote). onOk(amount, note) devuelve un texto de error o nada.
+        function openClientAmount({ title, hint, value = '', withNote = false, onOk }) {
+            $('clientAmountTitle').textContent = title;
+            $('clientAmountHint').textContent = hint;
+            $('clientAmountInput').value = value;
+            $('clientAmountNote').value = '';
+            $('clientAmountNote').classList.toggle('hidden', !withNote);
+            $('clientAmountError').classList.add('hidden');
+            clientAmountOnOk = onOk;
+            $('clientAmountModal').classList.remove('hidden');
+            $('clientAmountInput').focus();
+        }
+
+        function closeClientAmount() {
+            $('clientAmountModal').classList.add('hidden');
+            clientAmountOnOk = null;
+        }
+
+        function submitClientAmount() {
+            const amount = roundMoney(parseFloat($('clientAmountInput').value));
+            const err = clientAmountOnOk && clientAmountOnOk(amount, $('clientAmountNote').value.trim());
+            if (!err) return closeClientAmount();
+            $('clientAmountError').textContent = err;
+            $('clientAmountError').classList.remove('hidden');
+        }
+
+        function requestUseBalance(clientId, creditId) {
+            const client = getClient(clientId), credit = state.credits.find(c => c.id == creditId);
+            if (!client || !credit) return;
+            checkAuth('credit_pay', () => {
+                const max = Math.min(client.balance || 0, creditPending(credit));
+                openClientAmount({
+                    title: 'Usar saldo a favor',
+                    hint: `${client.name}: saldo ${formatMoney(client.balance || 0)}, fiado ${formatMoney(creditPending(credit))}.`,
+                    value: max > 0 ? String(roundMoney(max)) : '',
+                    onOk: (amount) => {
+                        const r = useClientBalance(clientId, creditId, amount);
+                        if (r.error) return r.error;
+                        if (r.settled) setTimeout(autoPruneCredits, 500);
+                        saveData();
+                        renderAll();
+                        renderClientCard();
+                    }
+                });
+            });
+        }
+
+        function requestAdjustBalance(clientId) {
+            const client = getClient(clientId);
+            if (!client) return;
+            checkAuth('credit_pay', () => openClientAmount({
+                title: 'Ajustar saldo a favor',
+                hint: `Saldo actual: ${formatMoney(client.balance || 0)}. Usa un número negativo para restar. No registra salida de caja.`,
+                withNote: true,
+                onOk: (amount, note) => {
+                    if (!amount) return 'Escribe un monto distinto de 0.';
+                    if (!note) return 'El motivo es obligatorio (por ejemplo: Devolución en efectivo).';
+                    if (!addClientMove(client, { amount, kind: 'ADJUST', note: note.slice(0, 60) })) return 'El saldo no puede quedar negativo.';
+                    saveData();
+                    renderAll();
+                    renderClientCard();
+                }
+            }));
+        }
+
+        // Tarjeta de fiado: saldo del cliente (etiqueta y botón)
+        function clientBalanceTagHtml(c) {
+            const cl = getClient(c.clientId);
+            return cl && cl.balance > 0.01 ? `<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">Saldo ${formatMoney(cl.balance)}</span>` : '';
+        }
+        function clientUseBalanceBtnHtml(c) {
+            const cl = getClient(c.clientId);
+            return cl && cl.balance > 0.01 ? `<button onclick="requestUseBalance('${safeClientId(cl.id)}', '${safeClientId(c.id)}')" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs hover:bg-green-200 border border-green-200 font-bold">Usar saldo</button>` : '';
+        }
+
+        // Caja: casilla «Usar saldo a favor» cuando el cliente (elegido o del fiado que se edita) tiene saldo
+        function posClientForBalance() {
+            const credit = state.activeCreditId && state.credits.find(c => c.id == state.activeCreditId);
+            return credit ? getClient(credit.clientId) : getClient(state.posClientId);
+        }
+
+        function updatePosBalanceRow() {
+            const row = $('posBalanceRow');
+            if (!row) return;
+            const cl = posClientForBalance();
+            const show = !!cl && (cl.balance || 0) > 0.01;
+            row.classList.toggle('hidden', !show);
+            if (!show) $('chkUseBalance').checked = false;
+            else $('posBalanceText').textContent = `${formatMoney(cl.balance)} (Bs ${(cl.balance * getFiadosActiveRate()).toFixed(2)})`;
+        }
+
         // ---------- Buscador de la caja ----------
         function hideClientPicker() { const b = $('clientPickerList'); if (b) b.classList.add('hidden'); }
         function hideClientPickerDelayed() { setTimeout(hideClientPicker, 200); }
@@ -383,6 +530,7 @@
                 const c = getClient(state.posClientId);
                 if (c && c.name === input.value) return hideClientPicker();
                 state.posClientId = null; // escribió otra cosa: ya no es el cliente elegido
+                updatePosBalanceRow();
             }
             const q = input.value.trim(), box = $('clientPickerList');
             box.innerHTML = '';
@@ -391,7 +539,7 @@
                 const row = document.createElement('div');
                 row.className = 'p-2 text-xs border-b hover:bg-orange-50 cursor-pointer flex justify-between gap-2';
                 row.innerHTML = `<span class="min-w-0 truncate"><span class="font-bold">${escapeHtml(c.name)}</span> <span class="text-gray-400">${escapeHtml(c.phone)}</span></span>
-                    <span class="shrink-0 font-bold text-red-600">${s.debt > 0.01 ? formatMoney(s.debt) : ''}</span>`;
+                    <span class="shrink-0 font-bold text-red-600">${s.debt > 0.01 ? formatMoney(s.debt) : ''}${s.balance > 0.01 ? ` <span class="text-green-600">Saldo ${formatMoney(s.balance)}</span>` : ''}</span>`;
                 row.onmousedown = (e) => { e.preventDefault(); pickClient(c.id); };
                 box.appendChild(row);
             });
@@ -415,6 +563,7 @@
             state.posClientId = id;
             $('customerName').value = c.name;
             hideClientPicker();
+            updatePosBalanceRow();
             const open = clientSummary(id).open[0];
             if (askOpen && open && !state.activeCreditId) {
                 customConfirm('Fiado abierto', `${c.name} tiene un fiado abierto de ${formatMoney(creditPending(open))}. ¿Sumar esta compra a ese fiado?`, 'warning', () => editCredit(open.id));
@@ -476,6 +625,68 @@
                 state.credits = bak.credits; state.clients = bak.clients; state.products = bak.products; state.sales = bak.sales; state.creditMode = bak.creditMode;
             }
             console.log(fails ? `selfTestClients: ${fails} fallas` : 'selfTestClients: OK');
+            return fails;
+        }
+
+        // Autoprueba del saldo a favor (datos ficticios). Ejecutar en consola: selfTestClientBalance()
+        function selfTestClientBalance() {
+            const bak = structuredClone({ credits: state.credits, clients: state.clients, products: state.products, sales: state.sales, creditMode: state.creditMode });
+            let fails = 0;
+            const t = (cond, msg) => { console.assert(cond, msg); if (!cond) { fails++; console.error('FALLA: ' + msg); } };
+            try {
+                state.creditMode = 'FIXED';
+                state.products = [];
+                const setup = (debt, balance, withClient = true) => {
+                    state.sales = [];
+                    state.clients = [{ id: 'cl_t', name: 'Cliente T', phone: '', doc: '', notes: '', balance, moves: [], createdAt: '' }];
+                    const c = { id: 1, customer: 'Cliente T', items: [], totalDebt: debt, paid: 0, date: '' };
+                    if (withClient) c.clientId = 'cl_t';
+                    state.credits = [c];
+                    return c;
+                };
+                // Paga 15 de una deuda de 10 con cliente
+                let c = setup(10, 0);
+                let r = registerCreditPayment(c, 15, 1, 111);
+                t(r.settled && r.excess === 5 && c.paid === 10 && c.paidDate, 'pagar de más con cliente deja el fiado pagado');
+                t(state.clients[0].balance === 5 && state.clients[0].moves[0].kind === 'OVERPAY' && state.clients[0].moves[0].amount === 5, 'el sobrante va al saldo con su movimiento');
+                t(state.sales.length === 1 && state.sales[0].total === 15 && state.sales[0].type === 'payment', 'un solo abono por todo lo recibido');
+                // Sin cliente: error y nada cambia
+                c = setup(10, 0, false);
+                r = registerCreditPayment(c, 15, 1, 112);
+                t(r.error && r.error.startsWith('Excede la deuda') && c.paid === 0 && state.sales.length === 0 && state.clients[0].balance === 0, 'sin cliente sigue el error y no cambia nada');
+                // Usar 5 de saldo en una deuda de 8
+                c = setup(8, 5);
+                r = useClientBalance('cl_t', 1, 5);
+                t(!r.error && c.paid === 5 && state.clients[0].balance === 0 && state.sales.length === 0 && state.clients[0].moves[0].kind === 'USE', 'usar saldo suma a paid, resta del saldo y no crea abono');
+                // Más que el saldo o más que la deuda
+                c = setup(8, 2);
+                t(useClientBalance('cl_t', 1, 3).error && c.paid === 0 && state.clients[0].balance === 2, 'usar más que el saldo se rechaza');
+                c = setup(8, 9);
+                t(useClientBalance('cl_t', 1, 8.5).error && c.paid === 0 && state.clients[0].balance === 9, 'usar más que la deuda se rechaza');
+                t(useClientBalance('cl_t', 1, 8).settled && c.paidDate && state.clients[0].balance === 1, 'usar justo la deuda la salda');
+                // Ajuste que dejaría el saldo negativo
+                setup(1, 2);
+                t(addClientMove(state.clients[0], { amount: -3, kind: 'ADJUST', note: 'x' }) === false && state.clients[0].balance === 2 && state.clients[0].moves.length === 0, 'un ajuste no deja el saldo negativo');
+                t(addClientMove(state.clients[0], { amount: -0.1, kind: 'ADJUST', note: 'x' }) && state.clients[0].balance === 1.9, 'ajuste válido');
+                // Modo dinámico con el precio subido: se fija totalDebt primero
+                state.creditMode = 'DYNAMIC';
+                state.products = [{ id: 'p', name: 'P', price: 12, qty: 1 }];
+                c = setup(10, 5);
+                c.items = [{ id: 'p', name: 'P', price: 10, qty: 1 }];
+                useClientBalance('cl_t', 1, 5);
+                t(c.totalDebt === 12 && c.paid === 5, 'modo dinámico: usar saldo fija la deuda real primero');
+                state.creditMode = 'FIXED';
+                // Sobrante
+                t(splitOverpayment(10, 10.004).excess === 0 && splitOverpayment(10, 10.004).toDebt === 10, 'sobrante de 0.004 no cuenta');
+                t(splitOverpayment(0.3, 0.1 + 0.2 + 1).excess === 1 && splitOverpayment(0.3, 0.1 + 0.2 + 1).toDebt === 0.3, 'sobrante de 1 con decimales de coma flotante');
+                // Máximo 50 movimientos
+                setup(1, 0);
+                for (let i = 0; i < 60; i++) addClientMove(state.clients[0], { amount: 1, kind: 'ADJUST', note: 'm' + i });
+                t(state.clients[0].moves.length === 50 && state.clients[0].balance === 60, 'moves nunca pasa de 50');
+            } finally {
+                state.credits = bak.credits; state.clients = bak.clients; state.products = bak.products; state.sales = bak.sales; state.creditMode = bak.creditMode;
+            }
+            console.log(fails ? `selfTestClientBalance: ${fails} fallas` : 'selfTestClientBalance: OK');
             return fails;
         }
 
