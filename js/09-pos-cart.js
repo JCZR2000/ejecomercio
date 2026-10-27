@@ -113,7 +113,8 @@
                     name: p.name,
                     price: p.price,
                     qty,
-                    subtotal: roundMoney(qty * p.price)
+                    subtotal: roundMoney(qty * p.price),
+                    ...(p.cost > 0 && { cost: p.cost })
                 });
             }
             renderCart();
@@ -147,7 +148,8 @@
                     name: p.name,
                     price: p.price,
                     qty: 1,
-                    subtotal: p.price
+                    subtotal: p.price,
+                    ...(p.cost > 0 && { cost: p.cost })
                 });
             }
             renderCart();
@@ -344,7 +346,7 @@
                             receiptFiscalNum = state.credits[idx].fiscalNum;
                             payName = state.credits[idx].customer;
                             if (!getClient(state.credits[idx].clientId)) state.credits[idx].clientId = resolvePosClient(payName).id;
-                            state.credits[idx].items.push(...state.cart);
+                            state.credits[idx].items.push(...state.cart.map(i => ({ ...i, at: new Date().toISOString() }))); // 'at': día en que se fiaron (Fase 14)
                             state.credits[idx].totalDebt = roundMoney(state.credits[idx].totalDebt + totalUSD);
                             state.credits[idx].paid = roundMoney(state.credits[idx].paid + initialPay - excess);
                             if (nextPaymentDate) state.credits[idx].nextPaymentDate = nextPaymentDate;
@@ -356,7 +358,7 @@
                             id: receiptId,
                             customer: customerName,
                             clientId,
-                            items: [...state.cart],
+                            items: state.cart.map(i => ({ ...i, at: new Date().toISOString() })),
                             totalDebt: totalUSD,
                             paid: roundMoney(initialPay - excess),
                             date: new Date().toISOString(),

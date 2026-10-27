@@ -25,7 +25,10 @@
 
                 const qty = parseInt(qtyVal);
                 const price = parseFloat(priceVal);
-                
+                // Costo opcional (viene de la calculadora de precios); vacío no toca el que ya tenía
+                const costVal = parseFloat($('prodCost').value);
+                const cost = costVal > 0 ? roundMoney(costVal) : null;
+
                 // 3. Procesar datos
                 if (state.editingId) {
                     // MODO EDICIÓN
@@ -33,6 +36,7 @@
                     if (idx !== -1) {
                         const prod = { ...state.products[idx], name, qty, price, barcode };
                         if (category) prod.category = category; else delete prod.category;
+                        if (cost) prod.cost = cost;
                         // Foto nueva o quitada: se olvida la de Storage (el archivo lo borra pruneStorageImages)
                         if (state.tempImg || state.isImageDeleted) {
                             delete prod.imgUrl;
@@ -50,6 +54,7 @@
                         img: state.tempImg || null
                     };
                     if (category) prod.category = category;
+                    if (cost) prod.cost = cost;
                     state.products.unshift(prod);
                 }
 
@@ -78,6 +83,7 @@
             $('prodName').value = p.name;
             $('prodQty').value = p.qty;
             $('prodPrice').value = p.price;
+            $('prodCost').value = p.cost ?? '';
             $('prodCategory').value = p.category || '';
 
             // Imagen
@@ -127,6 +133,7 @@
             $('prodBarcode').value = '';
             $('prodQty').value = '';
             $('prodPrice').value = '';
+            $('prodCost').value = '';
             $('prodCategory').value = '';
             $('prodImg').value = '';
             $('productId').value = '';

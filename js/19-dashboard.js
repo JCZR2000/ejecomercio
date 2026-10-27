@@ -46,6 +46,7 @@
 
         function openDashboard() {
             $('dashboardModal').classList.remove('hidden');
+            showDashTab('sales'); // Ganancias pide PIN cada vez
             // Por defecto cargamos 7 días al abrir
             updateChart('7d');
         }

@@ -129,6 +129,7 @@
             
             // Guardamos el resultado limpio (solo el número en divisa fuerte) para el botón "Usar"
             document.getElementById('displayFinalPrice').dataset.value = sellingPrice.toFixed(2);
+            document.getElementById('displayUnitCost').dataset.value = unitCost.toFixed(2);
         }
 
         function formatCalcNumber(num) {
@@ -140,7 +141,20 @@
             const price = document.getElementById('displayFinalPrice').dataset.value;
             if (price && parseFloat(price) > 0) {
                 $('prodPrice').value = price;
-                
+                // El costo unitario de la calculadora se guarda con el producto (aviso corto junto al precio)
+                const unitCost = parseFloat(document.getElementById('displayUnitCost').dataset.value);
+                $('prodCost').value = unitCost > 0 ? unitCost : '';
+                if (unitCost > 0) {
+                    let note = $('prodCostNote');
+                    if (!note) {
+                        note = document.createElement('p');
+                        note.id = 'prodCostNote';
+                        note.className = 'text-[10px] text-green-700 font-bold mt-1';
+                        $('prodPrice').parentElement.appendChild(note);
+                    }
+                    note.textContent = `Costo guardado: ${formatMoney(unitCost)}`;
+                }
+
                 // Feedback visual en el input de precio
                 $('prodPrice').classList.add('bg-green-100', 'transition-colors');
                 setTimeout(() => $('prodPrice').classList.remove('bg-green-100'), 1000);

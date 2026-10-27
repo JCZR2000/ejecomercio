@@ -40,6 +40,7 @@
             sales: JSON.parse(localStorage.getItem('inv_sales')) || [],
             credits: JSON.parse(localStorage.getItem('inv_credits')) || [],
             clients: JSON.parse(localStorage.getItem('inv_clients')) || [], // Fase 13: base de clientes
+            profitArchive: JSON.parse(localStorage.getItem('inv_profitArchive')) || {}, // Fase 14: resumen por mes de fiados ya borrados
             paymentMethods: JSON.parse(localStorage.getItem('inv_payment_methods')) || { TRANSFER: {}, PAGO_MOVIL: {}, BINANCE: {}, CUSTOM: {} },
             security: JSON.parse(localStorage.getItem('inv_security')) || { pin: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false },
 

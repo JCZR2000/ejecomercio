@@ -708,7 +708,10 @@
              if (finalData) {
                 // Fase 13: una versión vieja sube sin 'clients'; se conserva la lista local y se vuelve a subir
                 const cloudLacksClients = !Array.isArray(finalData.clients) && state.clients.length > 0;
+                // Fase 14: igual con 'profitArchive'
+                const cloudLacksArchive = (!finalData.profitArchive || typeof finalData.profitArchive !== 'object') && Object.keys(state.profitArchive || {}).length > 0;
                 state = { ...state, ...finalData };
+                if (!state.profitArchive || typeof state.profitArchive !== 'object' || Array.isArray(state.profitArchive)) state.profitArchive = {};
                 state.isCloudSynced = true;
                 migrateLegacyPin(); // un dispositivo viejo pudo subir el PIN en claro
                 if (!Array.isArray(state.clients)) state.clients = [];
@@ -719,6 +722,7 @@
                     localStorage.setItem('inv_sales', JSON.stringify(state.sales));
                     localStorage.setItem('inv_credits', JSON.stringify(state.credits));
                     localStorage.setItem('inv_clients', JSON.stringify(state.clients));
+                    localStorage.setItem('inv_profitArchive', JSON.stringify(state.profitArchive));
                     localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
                     localStorage.setItem('inv_security', JSON.stringify(state.security));
                     localStorage.setItem('inv_custom_rate', state.customRate);
@@ -739,7 +743,7 @@
                     if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
-                    if (cloudLacksClients || clientsMigrated) saveData(); // sube 'clients' (y los clientId nuevos) a la nube
+                    if (cloudLacksClients || clientsMigrated || cloudLacksArchive) saveData(); // sube 'clients' (y los clientId nuevos) a la nube
 
                     // Solo actualizamos tasas si es la primera vez y ya terminamos de cargar datos
                     if (!hasInitialRatesUpdate) {

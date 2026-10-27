@@ -103,7 +103,9 @@
             if (creditsToDelete.length > 0) {
                 console.log(`🧹 Limpieza: Borrando ${creditsToDelete.length} fiados antiguos para ahorrar espacio.`);
                 
-                // Filtramos el estado principal: 
+                creditsToDelete.forEach(archiveCredit); // Fase 14: su ganancia queda en el resumen mensual
+
+                // Filtramos el estado principal:
                 // Mantenemos si NO está pagado O si está en la lista de los 5 a salvar
                 state.credits = state.credits.filter(c => {
                     const isPaid = (c.totalDebt - c.paid) <= 0.01;

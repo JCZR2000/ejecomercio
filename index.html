@@ -1050,8 +1050,26 @@
                         class="fa-solid fa-times text-xl"></i></button>
             </div>
     
-            <div class="p-4 overflow-y-auto space-y-4">
-    
+            <div class="p-4 pb-0 shrink-0">
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="showDashTab('sales')" id="tabDashSales" class="flex-1 py-2 text-xs font-bold rounded shadow bg-white text-indigo-600 transition">Ventas</button>
+                    <button onclick="openProfitTab()" id="tabDashProfit" class="flex-1 py-2 text-xs font-bold rounded text-gray-500 hover:bg-gray-200 transition">Ganancias</button>
+                </div>
+            </div>
+
+            <div id="dashProfit" class="p-4 overflow-y-auto space-y-3 hidden">
+                <div class="flex bg-gray-100 p-1 rounded-lg">
+                    <button onclick="setProfitPeriod('today')" id="profPer_today" class="flex-1 py-1 text-[11px] font-bold rounded">Hoy</button>
+                    <button onclick="setProfitPeriod('month')" id="profPer_month" class="flex-1 py-1 text-[11px] font-bold rounded">Este mes</button>
+                    <button onclick="setProfitPeriod('last')" id="profPer_last" class="flex-1 py-1 text-[11px] font-bold rounded">Mes pasado</button>
+                    <button onclick="setProfitPeriod('12m')" id="profPer_12m" class="flex-1 py-1 text-[11px] font-bold rounded">12 meses</button>
+                </div>
+                <div id="profitBody" class="space-y-3"></div>
+                <button onclick="openCosts()" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700"><i class="fa-solid fa-tags mr-2"></i>Costos de los productos</button>
+            </div>
+
+            <div id="dashSales" class="p-4 overflow-y-auto space-y-4">
+
                 <div class="flex bg-gray-100 p-1 rounded-lg">
                     <button onclick="updateChart('7d')" id="btnChart7d"
                         class="flex-1 py-1 text-xs font-bold rounded shadow bg-white text-indigo-600 transition">7
@@ -1086,6 +1104,20 @@
                     <i class="fa-solid fa-download"></i> Descargar Gráfico
                 </button>
             </div>
+        </div>
+    </div>
+
+    <div id="costsModal" class="fixed inset-0 modal-bg z-[95] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
+                <h3 class="font-bold"><i class="fa-solid fa-tags mr-2"></i>Costos</h3>
+                <button onclick="closeCosts()" class="text-white hover:text-indigo-200"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-4 pb-2 shrink-0 space-y-2">
+                <input type="search" id="costsSearch" oninput="renderCosts()" placeholder="Buscar por nombre o código" class="w-full h-10 rounded-lg border border-gray-300 px-3 text-sm">
+                <label class="flex items-center gap-2 text-xs text-gray-600"><input type="checkbox" id="costsOnlyMissing" onchange="renderCosts()"> Solo sin costo</label>
+            </div>
+            <div id="costsList" class="px-4 pb-4 overflow-y-auto"></div>
         </div>
     </div>
 
@@ -1614,6 +1646,7 @@
                                 <label
                                     class="absolute left-3 top-1 text-[10px] text-gray-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 font-bold">Stock</label>
                             </div>
+                            <input type="hidden" id="prodCost">
                             <div class="relative flex-1">
                                 <input type="number" id="prodPrice" required step="0.01" placeholder=" "
                                     class="peer w-full h-12 rounded-xl border border-green-200 px-3 pt-3 text-sm focus:border-green-500 outline-none bg-green-50 text-green-800 font-bold">
@@ -2115,5 +2148,6 @@
     <script src="js/24-fiscal.js"></script>
     <script src="js/25-catalog.js"></script>
     <script src="js/26-clients.js"></script>
+    <script src="js/27-profit.js"></script>
 </body>
 </html>

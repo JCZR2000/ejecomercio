@@ -81,7 +81,7 @@
         function checkAuth(actionType, callback) {
             if (!hasPin()) return callback();
             let isLocked = false;
-            if (actionType === 'admin') isLocked = true;
+            if (actionType === 'admin' || actionType === 'profit') isLocked = true;
             if (actionType === 'wipe') isLocked = true;
             if (actionType === 'add' && state.security.lockAdd) isLocked = true;
             if (actionType === 'edit' && state.security.lockEdit) isLocked = true;

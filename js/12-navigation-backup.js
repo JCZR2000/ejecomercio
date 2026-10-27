@@ -132,6 +132,7 @@
                         if (finalData.sales) state.sales = finalData.sales;
                         if (finalData.credits) state.credits = finalData.credits;
                         if (Array.isArray(finalData.clients)) state.clients = finalData.clients;
+                        state.profitArchive = (finalData.profitArchive && typeof finalData.profitArchive === 'object') ? finalData.profitArchive : {};
                         migrateClients(); // un respaldo viejo (sin clients) arma la lista desde los fiados
                         if (finalData.security) { state.security = finalData.security; migrateLegacyPin(); }
                 

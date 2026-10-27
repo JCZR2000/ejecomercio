@@ -13,6 +13,7 @@
                 sales: state.sales,
                 credits: state.credits,
                 clients: state.clients,
+                profitArchive: state.profitArchive,
                 paymentMethods: state.paymentMethods,
                 security: state.security,
                 receiptConfig: state.receiptConfig,
@@ -54,6 +55,7 @@
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
             localStorage.setItem('inv_clients', JSON.stringify(state.clients));
+            localStorage.setItem('inv_profitArchive', JSON.stringify(state.profitArchive));
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
             localStorage.setItem('inv_security', JSON.stringify(state.security));
             localStorage.setItem('inv_custom_rate', state.customRate);

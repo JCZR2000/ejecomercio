@@ -299,6 +299,7 @@
                     ensureCloudBackup('Antes de borrar el historial').then(ok => {
                         if (!ok) return;
                         state.sales = [];
+                        state.profitArchive = {};
                         localStorage.setItem('inv_sales', '[]');
                         forceClearCloud('sales');
                         renderAll();
