@@ -256,6 +256,7 @@
                             products: [],
                             sales: [],
                             credits: [],
+                            clients: [],
                             paymentMethods: {},
                             security: { pin: null },
                             lastUpdated: new Date().toISOString()
@@ -309,7 +310,7 @@
 
             // 4. BORRAR SOLO FIADOS
             else if (action === 'clean_credits') {
-                if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nEsta acción no se puede deshacer.')) {
+                if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nLos clientes (agenda) no se borran.\nEsta acción no se puede deshacer.')) {
                     ensureCloudBackup('Antes de borrar los fiados').then(ok => {
                         if (!ok) return;
                         state.credits = [];

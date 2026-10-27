@@ -38,6 +38,7 @@ const STATIC_ASSETS = [
   './js/23-inventory-pdf.js',
   './js/24-fiscal.js',
   './js/25-catalog.js',
+  './js/26-clients.js',
   './icon-192.png',
   './icon-512.png'
   // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos

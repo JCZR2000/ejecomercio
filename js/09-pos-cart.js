@@ -303,6 +303,9 @@
                 if (isCredit && !state.activeCreditId && !customerName) return alert('Escribe el nombre del cliente');
                 if (!confirm('¿Confirmar transacción?')) return;
 
+                // Cliente del fiado nuevo (Fase 13): el elegido, uno con ese nombre o uno nuevo solo con nombre
+                const clientId = isCredit && !state.activeCreditId ? resolvePosClient(customerName).id : null;
+
                 // B. DESCUENTO DE INVENTARIO (CRÍTICO: Hacerlo primero)
                 state.cart.forEach(item => {
                     if (!item.isStub) { 
@@ -333,6 +336,7 @@
                         state.credits.push({
                             id: receiptId,
                             customer: customerName,
+                            clientId,
                             items: [...state.cart],
                             totalDebt: totalUSD,
                             paid: initialPay,
@@ -391,6 +395,7 @@
                 
                 // Limpieza de inputs (Con seguridad "Anti-Crash")
                 if($('customerName')) $('customerName').value = '';
+                state.posClientId = null;
                 if($('initialPayUSD')) $('initialPayUSD').value = '';
                 if($('initialPayBS')) $('initialPayBS').value = '';
                 if($('posSearchInput')) $('posSearchInput').value = '';

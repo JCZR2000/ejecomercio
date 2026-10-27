@@ -82,7 +82,7 @@
         }
 
         function cloudCounts(d) {
-            return { products: (d.products || []).length, sales: (d.sales || []).length, credits: (d.credits || []).length };
+            return { products: (d.products || []).length, sales: (d.sales || []).length, credits: (d.credits || []).length, clients: (d.clients || []).length };
         }
 
         // base: ficha de la última versión de la nube aceptada (null = dispositivo de una versión vieja).
@@ -95,7 +95,7 @@
         // Tipos que bajan a 0 desde más de 0, o a menos de la mitad desde 5 o más.
         function bigLoss(baseCounts, nowCounts) {
             if (!baseCounts) return [];
-            return ['products', 'sales', 'credits'].filter(t => {
+            return ['products', 'sales', 'credits', 'clients'].filter(t => {
                 const b = baseCounts[t] || 0, n = (nowCounts && nowCounts[t]) || 0;
                 return (b > 0 && n === 0) || (b >= 5 && n < b / 2);
             });

@@ -298,6 +298,7 @@
                 if (!wa) $('shareWhatsapp').value = '';
                 try { localStorage.setItem(SHARE_LAST_METHODS_KEY, JSON.stringify(getSelectedShareMethods())); } catch (e) { /* sin almacenamiento */ }
                 regenerateShareMessage();
+                updateShareClientWa();
             }
         }
 

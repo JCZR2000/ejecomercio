@@ -12,6 +12,7 @@
                 products: state.products,
                 sales: state.sales,
                 credits: state.credits,
+                clients: state.clients,
                 paymentMethods: state.paymentMethods,
                 security: state.security,
                 receiptConfig: state.receiptConfig,
@@ -52,6 +53,7 @@
             persistProducts(); // inv_products sin el base64 de las fotos ya guardadas en IndexedDB (Fase 7)
             localStorage.setItem('inv_sales', JSON.stringify(state.sales));
             localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+            localStorage.setItem('inv_clients', JSON.stringify(state.clients));
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
             localStorage.setItem('inv_security', JSON.stringify(state.security));
             localStorage.setItem('inv_custom_rate', state.customRate);
@@ -121,7 +123,7 @@
             }
         }
 
-        const LOSS_LABELS = { products: 'Productos', sales: 'Ventas', credits: 'Fiados' };
+        const LOSS_LABELS = { products: 'Productos', sales: 'Ventas', credits: 'Fiados', clients: 'Clientes' };
 
         // Capa 3: pérdida grande de datos. Sí = copia y subida; No = se descartan los cambios locales.
         function askBigLoss(loss) {

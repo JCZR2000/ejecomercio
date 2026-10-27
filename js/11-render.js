@@ -89,6 +89,7 @@
             renderHistoryTable();
             calculateTotals();
             renderCreditsList();
+            renderClientsList();
             renderCart();
         }
 
@@ -165,7 +166,7 @@
             }
 
             // 5. FILTRAR la lista para mostrar (Según búsqueda)
-            const filteredList = allPending.filter(c => c.customer.toLowerCase().includes(searchText));
+            const filteredList = allPending.filter(c => creditMatchesSearch(c, searchText));
 
             // Manejo de mensaje "No encontrado" o "No hay deudas"
             if (allPending.length === 0) {
@@ -250,7 +251,7 @@
 
                     <div class="flex justify-between items-start mb-2 pr-6"> <div class="flex flex-col space-y-1 w-2/3"> 
                             <h4 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                                <i class="fa-solid fa-user text-gray-400 text-xs"></i> ${escapeHtml(c.customer)}
+                                <i class="fa-solid fa-user text-gray-400 text-xs"></i> ${clientNameHtml(c)}
                             </h4>
                             <p class="text-[10px] text-gray-500">Venta: ${date}</p>
                             ${dateDisplay}

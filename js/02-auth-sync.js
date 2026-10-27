@@ -692,6 +692,9 @@
             const cloudCreditsLen = cloud.credits ? cloud.credits.length : 0;
             tbody.innerHTML += createRow("Cuentas por Cobrar", localCreditsLen, cloudCreditsLen);
 
+            // 7. CLIENTES (Fase 13)
+            tbody.innerHTML += createRow("Clientes", (local.clients || []).length, (cloud.clients || []).length);
+
             // Mostrar el modal
             document.getElementById('diffModal').classList.remove('hidden');
         }
@@ -703,14 +706,19 @@
         // Función auxiliar para continuar la carga (Extraída para reutilizarla)
         function finishLoadingData(finalData, doc) {
              if (finalData) {
+                // Fase 13: una versión vieja sube sin 'clients'; se conserva la lista local y se vuelve a subir
+                const cloudLacksClients = !Array.isArray(finalData.clients) && state.clients.length > 0;
                 state = { ...state, ...finalData };
-                state.isCloudSynced = true; 
+                state.isCloudSynced = true;
                 migrateLegacyPin(); // un dispositivo viejo pudo subir el PIN en claro
+                if (!Array.isArray(state.clients)) state.clients = [];
+                const clientsMigrated = migrateClients(); // fiados de una versión vieja sin clientId
 
                 if (!doc.metadata.hasPendingWrites) {
                     writeLocalProducts();
                     localStorage.setItem('inv_sales', JSON.stringify(state.sales));
                     localStorage.setItem('inv_credits', JSON.stringify(state.credits));
+                    localStorage.setItem('inv_clients', JSON.stringify(state.clients));
                     localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
                     localStorage.setItem('inv_security', JSON.stringify(state.security));
                     localStorage.setItem('inv_custom_rate', state.customRate);
@@ -731,6 +739,7 @@
                     if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
+                    if (cloudLacksClients || clientsMigrated) saveData(); // sube 'clients' (y los clientId nuevos) a la nube
 
                     // Solo actualizamos tasas si es la primera vez y ya terminamos de cargar datos
                     if (!hasInitialRatesUpdate) {

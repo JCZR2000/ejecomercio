@@ -131,6 +131,8 @@
                         if (finalData.products) state.products = finalData.products;
                         if (finalData.sales) state.sales = finalData.sales;
                         if (finalData.credits) state.credits = finalData.credits;
+                        if (Array.isArray(finalData.clients)) state.clients = finalData.clients;
+                        migrateClients(); // un respaldo viejo (sin clients) arma la lista desde los fiados
                         if (finalData.security) { state.security = finalData.security; migrateLegacyPin(); }
                 
                         // [RECUPERADO] Métodos de pago (¡Faltaba esto!)

@@ -158,6 +158,8 @@
             // 2. Limpiar Inputs (CON SEGURIDAD)
             // Usamos 'if' para asegurar que el input existe antes de limpiarlo
             if($('customerName')) $('customerName').value = '';
+            state.posClientId = null;
+            hideClientPicker();
             if($('initialPayUSD')) $('initialPayUSD').value = '';
             if($('initialPayBS')) $('initialPayBS').value = '';
             if($('paymentScheduleSelect')) $('paymentScheduleSelect').value = '';
