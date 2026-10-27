@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="robots" content="noindex">
+    <title>Pagar</title>
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-28 antialiased">
+    <header class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white px-4 pt-6 pb-6 shadow-lg">
+        <div class="max-w-md mx-auto text-center">
+            <p id="shopName" class="text-xs uppercase tracking-wide text-slate-300 truncate"></p>
+            <p class="text-xs text-slate-400 mt-3">Total a pagar</p>
+            <p id="totalBs" class="text-3xl font-extrabold"></p>
+            <p id="totalUsd" class="text-sm text-slate-300"></p>
+            <p id="rateInfo" class="text-[11px] text-slate-400 mt-2"></p>
+        </div>
+    </header>
+
+    <main class="max-w-md mx-auto px-4 py-4">
+        <div id="errorBox" class="hidden text-center py-16">
+            <i class="fa-solid fa-link-slash text-4xl text-slate-300"></i>
+            <p class="font-bold mt-3">Enlace de pago no válido</p>
+            <p class="text-xs text-slate-500 mt-1">Pídele a la tienda que te envíe el enlace de nuevo.</p>
+        </div>
+
+        <section id="chooser" class="hidden space-y-2">
+            <h2 class="font-bold text-sm">¿Cómo vas a pagar?</h2>
+            <div id="chooserList" class="space-y-2"></div>
+        </section>
+
+        <section id="detail" class="hidden">
+            <button id="backBtn" class="hidden text-xs text-indigo-600 font-bold mb-2"><i class="fa-solid fa-arrow-left"></i> Cambiar método</button>
+            <h2 class="font-bold text-sm mb-2">Paga a la tienda <span id="detailTitle" class="text-slate-500 font-normal"></span></h2>
+            <div id="rows" class="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100"></div>
+            <button id="copyAllBtn" class="w-full mt-3 bg-slate-200 text-slate-700 font-bold text-sm py-2.5 rounded-xl"><i class="fa-regular fa-copy"></i> Copiar todos</button>
+            <p class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-3"><i class="fa-solid fa-triangle-exclamation"></i> Verifica que estos datos sean de tu comercio antes de pagar.</p>
+        </section>
+    </main>
+
+    <div id="payBar" class="hidden fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 p-3">
+        <button id="paidBtn" class="max-w-md mx-auto block w-full bg-green-600 text-white font-bold py-3 rounded-xl shadow">Ya pagué</button>
+    </div>
+
+    <div id="paidModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-3">
+            <h3 class="font-bold">Confirmar pago</h3>
+            <label class="block text-xs font-bold text-slate-500">Referencia (opcional)
+                <input id="refInput" type="text" maxlength="40" class="w-full border rounded-lg p-2 text-sm mt-1 font-normal text-slate-800">
+            </label>
+            <label class="block text-xs font-bold text-slate-500">Adjuntar comprobante
+                <input id="proofInput" type="file" accept="image/*,application/pdf" class="w-full text-xs mt-1 font-normal">
+            </label>
+            <p class="text-[11px] text-slate-500">El archivo no se sube a ningún servidor: lo compartes tú por WhatsApp.</p>
+            <p id="paidNote" class="hidden text-xs text-indigo-700 bg-indigo-50 rounded-lg p-2"></p>
+            <div class="flex gap-2">
+                <button id="paidCancel" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-sm">Cancelar</button>
+                <button id="paidSend" class="flex-1 bg-green-600 text-white font-bold py-2.5 rounded-xl text-sm"><i class="fa-brands fa-whatsapp"></i> Enviar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Todo el contenido viene del hash y lo puede escribir cualquiera: se pinta solo con textContent.
+    const $ = (id) => document.getElementById(id);
+    const METHOD_NAMES = { PAGO_MOVIL: 'Pago Móvil', TRANSFER: 'Transferencia', BINANCE: 'Binance Pay', CUSTOM: 'Otro medio' };
+    const METHOD_FIELDS = { PAGO_MOVIL: ['bank', 'phone', 'id'], TRANSFER: ['bank', 'account', 'id'], BINANCE: ['email'], CUSTOM: ['text'] };
+    let payload = null;
+    let current = null;
+
+    // Misma lógica que decodePaymentPayload de js/15-credits.js (más la validación de tipos y largos)
+    function decodePaymentPayload(hash) {
+        try {
+            const m = /(?:^|[#&])d=([A-Za-z0-9_-]+)/.exec(String(hash || ''));
+            if (!m) return null;
+            let b64 = m[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4) b64 += '=';
+            const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+            const p = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+            return (p && typeof p === 'object' && p.v === 1) ? p : null;
+        } catch (e) { return null; }
+    }
+
+    function validatePayload(p) {
+        const str = (v, max) => typeof v === 'string' && v.length <= max;
+        const num = (v) => typeof v === 'number' && Number.isFinite(v) && v > 0;
+        if (!p || !str(p.shop, 120) || !str(p.wa, 20) || !num(p.usd) || !num(p.bs) || !num(p.rate) || !str(p.rateName, 60) || !str(p.date, 20)) return null;
+        if (!Array.isArray(p.methods) || p.methods.length < 1 || p.methods.length > 4) return null;
+        const methods = [];
+        for (const m of p.methods) {
+            const fields = m && METHOD_FIELDS[m.t];
+            if (!fields) return null;
+            const clean = { t: m.t };
+            for (const f of fields) {
+                if (!str(m[f], 400)) return null;
+                clean[f] = m[f];
+            }
+            methods.push(clean);
+        }
+        return { shop: p.shop, wa: p.wa.replace(/\D/g, ''), usd: p.usd, bs: p.bs, rate: p.rate, rateName: p.rateName, date: p.date, methods };
+    }
+
+    const digits = (s) => String(s || '').replace(/\D/g, '');
+    const bsPlain = (n) => n.toFixed(2).replace('.', ','); // para pegar en el banco
+    const bsText = (n) => 'Bs ' + new Intl.NumberFormat('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+    const usdText = (n) => '$' + new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+    // Filas { label, shown, copy } de un método
+    function methodRows(m) {
+        if (m.t === 'PAGO_MOVIL') return [['Banco', m.bank, m.bank], ['Cédula / RIF', m.id, digits(m.id)], ['Teléfono', m.phone, digits(m.phone)], ['Monto', bsText(payload.bs), bsPlain(payload.bs)]];
+        if (m.t === 'TRANSFER') return [['Banco', m.bank, m.bank], ['Cuenta', m.account, m.account], ['Cédula / RIF', m.id, digits(m.id)], ['Monto', bsText(payload.bs), bsPlain(payload.bs)]];
+        if (m.t === 'BINANCE') return [['Correo / ID', m.email, m.email], ['Monto', usdText(payload.usd), payload.usd.toFixed(2)]];
+        return [['Instrucciones', m.text, m.text]];
+    }
+
+    function copyText(text, btn) {
+        btn.dataset.label = btn.dataset.label || btn.innerHTML;
+        const done = () => { btn.textContent = '¡Copiado!'; setTimeout(() => btn.innerHTML = btn.dataset.label, 2000); };
+        const fallback = () => {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } catch (e) { /* sin portapapeles */ }
+            ta.remove(); done();
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
+        else fallback();
+    }
+
+    function showMethod(m) {
+        current = m;
+        $('chooser').classList.add('hidden');
+        $('detail').classList.remove('hidden');
+        $('payBar').classList.remove('hidden');
+        $('backBtn').classList.toggle('hidden', payload.methods.length < 2);
+        $('detailTitle').textContent = '· ' + METHOD_NAMES[m.t];
+        const rows = $('rows');
+        rows.replaceChildren();
+        const data = methodRows(m);
+        data.forEach(([label, shown, copy]) => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-3 p-3';
+            const box = document.createElement('div');
+            box.className = 'flex-1 min-w-0';
+            const l = document.createElement('p'); l.className = 'text-[11px] text-slate-500'; l.textContent = label;
+            const v = document.createElement('p'); v.className = 'text-sm font-bold break-words whitespace-pre-line'; v.textContent = shown;
+            box.append(l, v);
+            const b = document.createElement('button');
+            b.className = 'text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5 shrink-0';
+            b.textContent = 'Copiar';
+            b.onclick = () => copyText(copy, b);
+            row.append(box, b);
+            rows.appendChild(row);
+        });
+        $('copyAllBtn').onclick = () => copyText(data.map(([l, , c]) => `${l}: ${c}`).join('\n'), $('copyAllBtn'));
+    }
+
+    function showChooser() {
+        $('detail').classList.add('hidden');
+        $('payBar').classList.add('hidden');
+        $('chooser').classList.remove('hidden');
+        const list = $('chooserList');
+        list.replaceChildren();
+        payload.methods.forEach(m => {
+            const b = document.createElement('button');
+            b.className = 'w-full bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between text-left';
+            const t = document.createElement('span'); t.className = 'font-bold text-sm'; t.textContent = METHOD_NAMES[m.t];
+            const i = document.createElement('i'); i.className = 'fa-solid fa-chevron-right text-slate-400';
+            b.append(t, i);
+            b.onclick = () => showMethod(m);
+            list.appendChild(b);
+        });
+    }
+
+    function paidText() {
+        const ref = $('refInput').value.trim();
+        return `Hola, ya pagué ${bsText(payload.bs)} (${usdText(payload.usd)}) por ${METHOD_NAMES[current.t]}. Referencia: ${ref || 'sin referencia'}`;
+    }
+
+    async function sendPaid() {
+        const text = paidText();
+        const file = $('proofInput').files[0];
+        const note = $('paidNote');
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {}); // por si WhatsApp no usa el texto como pie de foto
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], text }); } catch (e) { /* cancelado */ }
+            return;
+        }
+        if (!file && navigator.share && /Android|iPhone|iPad/i.test(navigator.userAgent) && !payload.wa) {
+            try { await navigator.share({ text }); } catch (e) { /* cancelado */ }
+            return;
+        }
+        window.open(`https://wa.me/${payload.wa}?text=${encodeURIComponent(text)}`, '_blank');
+        if (file) { note.textContent = 'Adjunta la captura en el chat de WhatsApp.'; note.classList.remove('hidden'); }
+    }
+
+    function init() {
+        payload = validatePayload(decodePaymentPayload(location.hash));
+        if (!payload) { $('errorBox').classList.remove('hidden'); $('totalBs').textContent = '—'; return; }
+        document.title = 'Pagar a ' + payload.shop;
+        $('shopName').textContent = payload.shop;
+        $('totalBs').textContent = bsText(payload.bs);
+        $('totalUsd').textContent = usdText(payload.usd);
+        $('rateInfo').textContent = `Monto calculado el ${payload.date} a tasa ${payload.rate} (${payload.rateName})`;
+        $('backBtn').onclick = showChooser;
+        $('paidBtn').onclick = () => { $('paidNote').classList.add('hidden'); $('paidModal').classList.remove('hidden'); };
+        $('paidCancel').onclick = () => $('paidModal').classList.add('hidden');
+        $('paidSend').onclick = sendPaid;
+        if (payload.methods.length === 1) showMethod(payload.methods[0]); else showChooser();
+    }
+    init();
+    </script>
+</body>
+</html>
