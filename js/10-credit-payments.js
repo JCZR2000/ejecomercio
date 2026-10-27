@@ -18,6 +18,7 @@
                 type: 'payment',
                 description: `Abono: ${credit.customer}` + (received > amount ? ` (incluye ${formatMoney(roundMoney(received - amount))} a saldo a favor)` : ''),
                 total: received,
+                ...(received > amount ? { toBalance: roundMoney(received - amount) } : {}),
                 rate: rate
             });
             return { settled };

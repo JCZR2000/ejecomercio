@@ -584,6 +584,18 @@
             if (num) window.open(`https://wa.me/${num}?text=${encodeURIComponent($('shareMessageInput').value)}`, '_blank');
         }
 
+        // Un abono de la lista de ventas: nombre limpio para el recibo y cuánto de lo recibido fue a saldo a favor.
+        // El texto «(incluye $X a saldo a favor)» no debe ir en la razón social; los abonos viejos no tienen toBalance, se lee del texto.
+        function parseSaleBalanceNote(sale) {
+            const desc = String(sale.description || '');
+            const m = desc.match(/ \(incluye (.+?) a saldo a favor\)$/);
+            const fromText = m ? parseFloat((m[1].match(/[\d,]+\.\d{2}/) || [''])[0].replace(/,/g, '')) : 0;
+            return {
+                customer: desc.replace(/ \(incluye .+? a saldo a favor\)$/, '').replace(/^Abono( Inicial)?: /, ''),
+                toBalance: sale.toBalance > 0 ? sale.toBalance : (fromText > 0 ? fromText : 0)
+            };
+        }
+
         // ---------- Autoprueba (datos ficticios). Ejecutar en consola: selfTestClients() ----------
         function selfTestClients() {
             const bak = structuredClone({ credits: state.credits, clients: state.clients, products: state.products, sales: state.sales, creditMode: state.creditMode });
@@ -624,6 +636,9 @@
             } finally {
                 state.credits = bak.credits; state.clients = bak.clients; state.products = bak.products; state.sales = bak.sales; state.creditMode = bak.creditMode;
             }
+            const n = parseSaleBalanceNote({ description: 'Abono: Alexander (incluye $0.26 a saldo a favor)' });
+            t(n.customer === 'Alexander' && n.toBalance === 0.26, 'razón social sin la nota de saldo a favor');
+            t(parseSaleBalanceNote({ description: 'Abono Inicial: Ana', toBalance: 4 }).customer === 'Ana' && parseSaleBalanceNote({ description: 'Abono: Ana' }).toBalance === 0, 'sin nota no hay saldo');
             console.log(fails ? `selfTestClients: ${fails} fallas` : 'selfTestClients: OK');
             return fails;
         }

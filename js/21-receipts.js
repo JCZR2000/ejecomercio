@@ -124,12 +124,14 @@
         function openReceiptFromHistory(saleId) {
             const sale = state.sales.find(s => s.id == saleId);
             if (!sale) return;
+            const note = parseSaleBalanceNote(sale);
             routeReceipt({
                 id: sale.id,
                 items: sale.items,
                 total: sale.total,
                 date: sale.date,
-                customer: sale.description ? sale.description.replace('Abono: ', '') : '',
+                customer: note.customer,
+                toBalance: note.toBalance,
                 type: sale.type,
                 isHistory: true,
                 fiscalNum: sale.fiscalNum
@@ -267,6 +269,10 @@
                     $('printTotalBsRow').classList.add('hidden');
                 }
             }
+
+            // Nota de saldo a favor (abonos que incluyen un sobrante)
+            $('printBalanceNote').classList.toggle('hidden', !(data.toBalance > 0));
+            if (data.toBalance > 0) $('printBalanceNote').textContent = `Esta factura incluye ${formatMoney(data.toBalance)} de saldo a favor del cliente.`;
 
             // 5. Sección de Crédito
             if (data.isCredit) {

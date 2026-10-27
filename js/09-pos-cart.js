@@ -386,6 +386,7 @@
                             type: 'payment',
                             description: `Abono Inicial: ${payName}` + (excess > 0 ? ` (incluye ${formatMoney(excess)} a saldo a favor)` : ''),
                             total: initialPay,
+                            ...(excess > 0 ? { toBalance: excess } : {}),
                             rate: activeRate
                         });
                     }

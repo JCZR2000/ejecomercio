@@ -260,6 +260,10 @@
 
             const fmt = (num) => num.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits:2});
 
+            // Nota de saldo a favor (abonos que incluyen un sobrante)
+            $('printFiscNote').classList.toggle('hidden', !(data.toBalance > 0));
+            if (data.toBalance > 0) $('printFiscNote').textContent = `Esta factura incluye Bs ${fmt(data.toBalance * rate)} de saldo a favor del cliente.`;
+
             $('printFiscSubtotal').textContent = `Bs ${fmt(BI)}`;
             $('printFiscBI').textContent = `Bs ${fmt(BI)}`;
             $('printFiscIVA').textContent = `Bs ${fmt(IVA)}`;
