@@ -86,9 +86,10 @@
         }
 
         // base: ficha de la última versión de la nube aceptada (null = dispositivo de una versión vieja).
-        function decideSync(base, cloudToken, dirty) {
+        // partial (Fase 15): los datos locales quedaron incompletos (almacenamiento lleno): nunca se suben solos.
+        function decideSync(base, cloudToken, dirty, partial = false) {
             if (base === null) return 'LEGACY';
-            if (cloudToken === base) return dirty ? 'UPLOAD' : 'NONE';
+            if (cloudToken === base) return dirty ? (partial ? 'CONFLICT' : 'UPLOAD') : 'NONE';
             return dirty ? 'CONFLICT' : 'LOAD';
         }
 
@@ -117,6 +118,18 @@
             console.assert(t('1|a', '1|a', true) === 'UPLOAD', 'selfTestSync: UPLOAD');
             console.assert(t('1|a', '2|b', false) === 'LOAD', 'selfTestSync: LOAD');
             console.assert(t('1|a', '2|b', true) === 'CONFLICT', 'selfTestSync: CONFLICT');
+            console.assert(t('a', 'a', true, true) === 'CONFLICT', 'selfTestSync: local incompleto no sube solo');
+            console.assert(t('a', 'a', true, false) === 'UPLOAD', 'selfTestSync: sin marca sube');
+            console.assert(t('a', 'a', false, true) === 'NONE', 'selfTestSync: sin cambios carga la nube');
+            console.assert(t('a', 'b', false, true) === 'LOAD', 'selfTestSync: nube nueva se carga');
+            console.assert(t(null, 'a', true, true) === 'LEGACY', 'selfTestSync: dispositivo viejo sigue igual');
+            // safeSetItem: guarda, y devuelve false (sin lanzar) si el almacenamiento falla. No llena el almacenamiento real.
+            console.assert(safeSetItem('inv__selftest', '1') === true, 'selfTestSync: safeSetItem guarda');
+            try { localStorage.removeItem('inv__selftest'); } catch (e) { /* sin almacenamiento */ }
+            const realSet = Storage.prototype.setItem;
+            Storage.prototype.setItem = () => { throw new DOMException('lleno', 'QuotaExceededError'); };
+            try { console.assert(safeSetItem('inv__selftest', '1') === false, 'selfTestSync: safeSetItem con almacenamiento lleno'); }
+            finally { Storage.prototype.setItem = realSet; }
             const c = (b, n) => bigLoss({ products: b, sales: 0, credits: 0 }, { products: n, sales: 0, credits: 0 }).length;
             console.assert(c(0, 0) === 0, 'selfTestSync: 0 a 0');
             console.assert(c(10, 4) === 1, 'selfTestSync: 10 a 4 es pérdida');

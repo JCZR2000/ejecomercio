@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v54.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v54.1'; // Actualizado para forzar la recarga
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
@@ -47,7 +47,7 @@ const STATIC_ASSETS = [
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
-  console.log('[Service Worker] Instalando v48.0...');
+  console.log('[Service Worker] Instalando ' + CACHE_NAME + '...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);

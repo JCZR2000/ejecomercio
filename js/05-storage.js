@@ -34,8 +34,36 @@
         let saveSeq = 0;
         const getCloudBase = () => localStorage.getItem('inv_cloud_base');
         function setCloudBase(token, counts) {
-            localStorage.setItem('inv_cloud_base', token);
-            localStorage.setItem('inv_cloud_base_counts', JSON.stringify(counts || {}));
+            safeSetItem('inv_cloud_base', token);
+            safeSetItem('inv_cloud_base_counts', JSON.stringify(counts || {}));
+        }
+
+        // Fase 15: devuelve false si el almacenamiento está lleno (o no disponible); nunca lanza.
+        function safeSetItem(key, value) {
+            try { localStorage.setItem(key, value); return true; }
+            catch (e) { console.error('No se pudo guardar en el dispositivo:', key, e); return false; }
+        }
+
+        // 'inv_local_partial' = '1': el último guardado local quedó a medias. La sincronización no sube sola (decideSync).
+        const isLocalPartial = () => { try { return localStorage.getItem('inv_local_partial') === '1'; } catch (e) { return false; } };
+
+        // Aviso una vez por sesión, sin pisar otro aviso abierto (comparten la ventana dialogModal).
+        let storageFullWarned = false;
+        function warnStorageFull() {
+            if (storageFullWarned) return;
+            const msg = auth.currentUser
+                ? 'El almacenamiento de este dispositivo está lleno. Tus cambios se guardan en la nube, pero este dispositivo no puede guardarlos todos. Descarga un respaldo y avisa a soporte.'
+                : 'El almacenamiento de este dispositivo está lleno y tus últimos cambios NO se guardaron. Descarga un respaldo ahora e inicia sesión para guardarlos en la nube.';
+            setTimeout(function show() {
+                if (storageFullWarned) return;
+                if (!document.getElementById('dialogModal').classList.contains('hidden')) {
+                    const prev = window.dialogCallback;
+                    window.dialogCallback = () => { if (prev) prev(); setTimeout(show, 0); };
+                    return; // si este encadenado se pierde, el siguiente guardado fallido lo vuelve a intentar
+                }
+                storageFullWarned = true;
+                customAlert('Almacenamiento lleno', msg, 'error');
+            }, 0);
         }
         const getCloudBaseCounts = () => { try { return JSON.parse(localStorage.getItem('inv_cloud_base_counts')); } catch (e) { return null; } };
         const isCloudDirty = () => localStorage.getItem('inv_cloud_dirty') === '1';
@@ -43,35 +71,48 @@
         // background: guardado que no es un cambio del usuario (tasas): no marca cambios pendientes ni pregunta en conflictos.
         // skipLossCheck: el usuario ya confirmó un borrado grande.
         function saveData({ allowEmpty = false, background = false, skipLossCheck = false } = {}) {
-            if (!background) { saveSeq++; localStorage.setItem('inv_cloud_dirty', '1'); }
+            // Fase 15: si un guardado local falla, se sigue (la subida a la nube guarda todo) y se marca el dispositivo.
+            // La marca se pone antes de los guardados grandes (después quizá ya no quepa) y se quita si todo salió bien.
+            safeSetItem('inv_local_partial', '1');
+            let localOk = true;
+            const put = (key, value) => { localOk = safeSetItem(key, value) && localOk; };
+            if (!background) { saveSeq++; put('inv_cloud_dirty', '1'); }
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
 
             // Guardar timestamp en el disco para que no se pierda al recargar
-            localStorage.setItem('inv_last_updated', state.lastUpdated);
+            put('inv_last_updated', state.lastUpdated);
 
             // 1. Guardado Local (Mantenemos tu lógica original de LocalStorage)
-            persistProducts(); // inv_products sin el base64 de las fotos ya guardadas en IndexedDB (Fase 7)
-            localStorage.setItem('inv_sales', JSON.stringify(state.sales));
-            localStorage.setItem('inv_credits', JSON.stringify(state.credits));
-            localStorage.setItem('inv_clients', JSON.stringify(state.clients));
-            localStorage.setItem('inv_profitArchive', JSON.stringify(state.profitArchive));
-            localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-            localStorage.setItem('inv_security', JSON.stringify(state.security));
-            localStorage.setItem('inv_custom_rate', state.customRate);
-            localStorage.setItem('inv_rate_mode', state.rateMode);
-            localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
-            localStorage.setItem('inv_bcv_usd', state.bcvUsd);
-            localStorage.setItem('inv_bcv_eur', state.bcvEur);
-            localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
-            if (state.receiptType) localStorage.setItem('inv_receipt_type', state.receiptType);
-            localStorage.setItem('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
-            localStorage.setItem('inv_credit_mode', state.creditMode);
-            localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
-            scheduleCatalogPublish(); // funciona sin conexión: solo agenda la cola del dispositivo
+            localOk = persistProducts() && localOk; // inv_products sin el base64 de las fotos ya guardadas en IndexedDB (Fase 7)
+            put('inv_sales', JSON.stringify(state.sales));
+            put('inv_credits', JSON.stringify(state.credits));
+            put('inv_clients', JSON.stringify(state.clients));
+            put('inv_profitArchive', JSON.stringify(state.profitArchive));
+            put('inv_payment_methods', JSON.stringify(state.paymentMethods));
+            put('inv_security', JSON.stringify(state.security));
+            put('inv_custom_rate', state.customRate);
+            put('inv_rate_mode', state.rateMode);
+            put('inv_fiados_rate_mode', state.fiadosRateMode);
+            put('inv_bcv_usd', state.bcvUsd);
+            put('inv_bcv_eur', state.bcvEur);
+            put('inv_receipt_config', JSON.stringify(state.receiptConfig));
+            if (state.receiptType) put('inv_receipt_type', state.receiptType);
+            put('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
+            put('inv_credit_mode', state.creditMode);
+            put('inv_catalog_config', JSON.stringify(state.catalogConfig));
+            // funciona sin conexión: solo agenda la cola del dispositivo. Un fallo aquí no debe frenar la subida.
+            try { scheduleCatalogPublish(); } catch (e) { console.error('No se pudo agendar la vitrina:', e); }
 
             // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
-            if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
+            if(encryptionKey) put('inv_enc_key', encryptionKey);
+
+            if (localOk) {
+                try { localStorage.removeItem('inv_local_partial'); } catch (e) { /* sin almacenamiento */ }
+            } else {
+                safeSetItem('inv_local_partial', '1');
+                warnStorageFull();
+            }
 
             // -----------------------------------------------------
             // ZONA DE SEGURIDAD (Tus protecciones originales)
@@ -147,7 +188,7 @@
                 try {
                     const full = await readCloudFull({ photos: true });
                     if (full) { setCloudManifest(full.manifest); finishLoadingData(full.data, full.snap); }
-                    else localStorage.setItem('inv_cloud_dirty', '');
+                    else safeSetItem('inv_cloud_dirty', '');
                 } catch (e) {
                     console.error('No se pudo recargar la nube:', e);
                     customAlert('Sin conexión', 'No se pudo recargar la nube. Los cambios de este dispositivo siguen sin subir.', 'error');
@@ -233,13 +274,13 @@
             kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
             setCloudManifest(manifest);
             setCloudBase(newToken, upCounts);
-            if (seq === saveSeq) localStorage.setItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
+            if (seq === saveSeq) safeSetItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
             return true;
         }
 
         function setCloudManifest(m) {
             state.cloudManifest = m;
-            localStorage.setItem('inv_cloud_manifest', JSON.stringify(m));
+            safeSetItem('inv_cloud_manifest', JSON.stringify(m));
         }
 
         // Función para limpiar valores 'undefined' que rompen Firestore

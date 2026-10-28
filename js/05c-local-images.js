@@ -107,8 +107,9 @@
 
         // Primero se confirma en IndexedDB y después se quita de localStorage (nunca al revés)
         function persistProducts() {
-            writeLocalProducts();
+            const ok = writeLocalProducts();
             if (localImagesReady) syncLocalImages().then(() => writeLocalProducts());
+            return ok; // Fase 15: saveData lo usa para saber si el guardado local quedó completo
         }
 
         // Reinicio de fábrica / cierre con borrado

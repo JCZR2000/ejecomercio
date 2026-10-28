@@ -58,7 +58,9 @@
         }
 
         // 5. Monitor de Firebase (La Verdad Absoluta)
-        auth.onAuthStateChanged(user => {
+        // Fase 15: se registra cuando ya cargaron todos los scripts; antes, con red lenta, Firebase respondía
+        // sin que existieran funciones de archivos posteriores (fetchAllRates, askForMasterKey...).
+        document.addEventListener('DOMContentLoaded', () => auth.onAuthStateChanged(user => {
             const loginOverlay = document.getElementById('loginOverlay');
             const loginStatus = document.getElementById('loginStatus');
 
@@ -89,7 +91,7 @@
                 }
                 if (unsubscribe) unsubscribe();
             }
-        });
+        }));
 
         // 6. Botón Inteligente
         function handleAuthAction() {
@@ -411,7 +413,7 @@
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
 
             // Fase 6: decisión por versión base. Solo un dispositivo sin base (LEGACY) usa la lógica antigua de abajo.
-            const decision = decideSync(getCloudBase(), cloudTokenOf(doc.data()), isCloudDirty());
+            const decision = decideSync(getCloudBase(), cloudTokenOf(doc.data()), isCloudDirty(), isLocalPartial());
             if (decision !== 'LEGACY') {
                 isFirstSyncCheck = false;
                 if (decision === 'NONE' || decision === 'LOAD') {
@@ -718,28 +720,33 @@
                 const clientsMigrated = migrateClients(); // fiados de una versión vieja sin clientId
 
                 if (!doc.metadata.hasPendingWrites) {
-                    writeLocalProducts();
-                    localStorage.setItem('inv_sales', JSON.stringify(state.sales));
-                    localStorage.setItem('inv_credits', JSON.stringify(state.credits));
-                    localStorage.setItem('inv_clients', JSON.stringify(state.clients));
-                    localStorage.setItem('inv_profitArchive', JSON.stringify(state.profitArchive));
-                    localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
-                    localStorage.setItem('inv_security', JSON.stringify(state.security));
-                    localStorage.setItem('inv_custom_rate', state.customRate);
-                    localStorage.setItem('inv_rate_mode', state.rateMode);
-                    localStorage.setItem('inv_fiados_rate_mode', state.fiadosRateMode);
-                    localStorage.setItem('inv_bcv_usd', state.bcvUsd);
-                    localStorage.setItem('inv_bcv_eur', state.bcvEur);
-                    localStorage.setItem('inv_receipt_config', JSON.stringify(state.receiptConfig));
-                    localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
+                    // Fase 15: con el almacenamiento lleno no se corta la carga; se marca el dispositivo y se avisa
+                    safeSetItem('inv_local_partial', '1'); // se quita abajo si todo se guardó
+                    let localOk = writeLocalProducts();
+                    const put = (key, value) => { localOk = safeSetItem(key, value) && localOk; };
+                    put('inv_sales', JSON.stringify(state.sales));
+                    put('inv_credits', JSON.stringify(state.credits));
+                    put('inv_clients', JSON.stringify(state.clients));
+                    put('inv_profitArchive', JSON.stringify(state.profitArchive));
+                    put('inv_payment_methods', JSON.stringify(state.paymentMethods));
+                    put('inv_security', JSON.stringify(state.security));
+                    put('inv_custom_rate', state.customRate);
+                    put('inv_rate_mode', state.rateMode);
+                    put('inv_fiados_rate_mode', state.fiadosRateMode);
+                    put('inv_bcv_usd', state.bcvUsd);
+                    put('inv_bcv_eur', state.bcvEur);
+                    put('inv_receipt_config', JSON.stringify(state.receiptConfig));
+                    put('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
 
-                    if(encryptionKey) localStorage.setItem('inv_enc_key', encryptionKey);
-            
+                    if(encryptionKey) put('inv_enc_key', encryptionKey);
+                    if (localOk) { try { localStorage.removeItem('inv_local_partial'); } catch (e) { /* sin almacenamiento */ } }
+                    else { safeSetItem('inv_local_partial', '1'); warnStorageFull(); }
+
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
                     // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
                     setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state));
-                    localStorage.setItem('inv_cloud_dirty', '');
+                    safeSetItem('inv_cloud_dirty', '');
                     if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
