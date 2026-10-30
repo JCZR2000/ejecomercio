@@ -4,8 +4,9 @@
         // Cola por dispositivo: localStorage inv_catalog_queue = { uid, action: 'publish'|'delete', due, qhash }.
         // ==========================================
         const CATALOG_ALLOWED_FIELDS = ['id', 'name', 'category', 'price', 'photo', 'available'];
+        const CATALOG_OPTIONAL_FIELDS = ['stock'];
         const CATALOG_PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
-        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '' };
+        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, showStock: false, askCustomer: false, allowHide: false, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '' };
 // Paletas de la vitrina (la página tiene los mismos nombres); el valor es la muestra del selector
 const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', azul: '#075985', morado: '#6b21a8', oscuro: '#262626' };
         let catalogTimer = null;
@@ -19,7 +20,10 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         function normalizeCatalogConfig() {
             const c = { ...CATALOG_DEFAULT_CONFIG, ...(state.catalogConfig || {}) };
             c.enabled = c.enabled === true;
-            c.delayMin = Math.min(10, Math.max(5, parseInt(c.delayMin) || 5));
+            c.delayMin = Math.min(10, Math.max(3, parseInt(c.delayMin) || 5));
+            c.showStock = c.showStock === true;
+            c.askCustomer = c.askCustomer === true;
+            c.allowHide = c.allowHide === true;
             c.whatsapp = normalizeCatalogWhatsapp(c.whatsapp);
             c.title = String(c.title || '');
             c.slogan = String(c.slogan || '').slice(0, 80);
@@ -36,22 +40,27 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 const name = String((p && p.name) || '').trim();
                 const price = roundMoney(p && p.price);
                 if (!name || !(price > 0)) continue;
+                if (config.allowHide && p.hideInCatalog === true) continue;
                 // Con img y imgUrl a la vez (copias viejas de la nube) vale imgUrl si su hash es el de img; si no, img es una foto
                 // nueva aún sin subir y sale sin foto hasta que uploadPendingImages la sube
                 const uploaded = typeof p.imgUrl === 'string' && p.imgUrl.startsWith(CATALOG_PHOTO_PREFIX);
                 const photo = uploaded && (!p.img || (p.imgHash && p.imgHash === hashText(p.img))) ? p.imgUrl : null;
-                list.push({ id: String(p.id), name, category: String(p.category || '').trim(), price, photo, available: Number(p.qty) > 0 });
+                const item = { id: String(p.id), name, category: String(p.category || '').trim(), price, photo, available: Number(p.qty) > 0 };
+                if (config.showStock) item.stock = Math.max(0, Math.floor(Number(p.qty) || 0));
+                list.push(item);
             }
-            return {
-                v: 1,
-                updatedAt: new Date().toISOString(),
-                shop: {
+            const shop = {
                     title: String(config.title || 'Catálogo'),
                     whatsapp: String(config.whatsapp || ''),
                     slogan: String(config.slogan || '').slice(0, 80),
                     color: CATALOG_COLORS[config.color] ? config.color : 'indigo',
                     logo: typeof config.logoUrl === 'string' && config.logoUrl.startsWith(CATALOG_PHOTO_PREFIX) ? config.logoUrl : ''
-                },
+            };
+            if (config.askCustomer) shop.askCustomer = true; // solo con la opción: el hash de quien no la usa no cambia
+            return {
+                v: 1,
+                updatedAt: new Date().toISOString(),
+                shop,
                 currency: money.currency,
                 rate: money.rate > 0 ? money.rate : null,
                 products: list
@@ -135,7 +144,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             let same = false;
             try { const m = await ref.getMetadata(); same = !!(m.customMetadata && m.customMetadata.hash === hash); }
             catch (e) { if (e.code !== 'storage/object-not-found') throw e; }
-            if (!same) await ref.putString(JSON.stringify(catalog), 'raw', { contentType: 'application/json', cacheControl: 'public, max-age=300', customMetadata: { hash } });
+            if (!same) await ref.putString(JSON.stringify(catalog), 'raw', { contentType: 'application/json', cacheControl: 'public, max-age=60', customMetadata: { hash } });
             localStorage.setItem('inv_catalog_hash', hash);
             localStorage.setItem('inv_catalog_published_at', String(Date.now()));
         }
@@ -210,6 +219,10 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             if (document.activeElement !== $('catalogWhatsapp')) $('catalogWhatsapp').value = c.whatsapp;
             if (document.activeElement !== $('catalogSlogan')) $('catalogSlogan').value = c.slogan;
             $('catalogDelay').value = String(c.delayMin);
+            $('catalogShowStock').checked = c.showStock;
+            $('catalogAskCustomer').checked = c.askCustomer;
+            $('catalogAllowHide').checked = c.allowHide;
+            if ($('prodHideBox') && state.editingId === null) $('prodHideBox').classList.toggle('hidden', !c.allowHide);
             $('catalogColors').innerHTML = Object.entries(CATALOG_COLORS).map(([k, hex]) =>
                 `<button type="button" onclick="setCatalogColor('${k}')" title="${k}" class="w-7 h-7 rounded-full border-2 ${c.color === k ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-white'} shadow" style="background:${hex}"></button>`).join('');
             $('catalogLogoPreview').src = c.logoUrl;
@@ -221,6 +234,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             renderCatalogBadge();
         }
 
+        const catalogOptionsFromUI = () => ({ showStock: $('catalogShowStock').checked, askCustomer: $('catalogAskCustomer').checked, allowHide: $('catalogAllowHide').checked });
+
         function saveCatalogConfig() {
             const c = normalizeCatalogConfig();
             const whatsapp = normalizeCatalogWhatsapp($('catalogWhatsapp').value);
@@ -229,7 +244,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 renderCatalogConfigUI();
                 return;
             }
-            state.catalogConfig = { ...c, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
+            state.catalogConfig = { ...c, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5, ...catalogOptionsFromUI() };
             localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
             saveData(); // sincroniza la configuración y agenda la subida
             renderCatalogConfigUI();
@@ -244,7 +259,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                     return;
                 }
                 if (!auth.currentUser) { customAlert('Inicia sesión', 'La vitrina necesita una sesión iniciada.', 'error'); return; }
-                state.catalogConfig = { ...c, enabled: true, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5 };
+                state.catalogConfig = { ...c, enabled: true, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5, ...catalogOptionsFromUI() };
                 localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
                 saveData();
                 // Al activar se publica de inmediato, sin espera
@@ -367,6 +382,21 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             console.assert(JSON.stringify(products) === snapshot, 'selfTestCatalog: modificó los productos');
             console.assert(cat.products.length === 3, 'selfTestCatalog: precio 0 o sin nombre no debe salir');
             cat.products.forEach(p => console.assert(Object.keys(p).join() === CATALOG_ALLOWED_FIELDS.join(), 'selfTestCatalog: campos distintos a la lista blanca'));
+            console.assert(!('askCustomer' in cat.shop), 'selfTestCatalog: sin opciones no debe haber askCustomer');
+            const opt = { title: 'T', showStock: true, askCustomer: true, allowHide: true };
+            const stockCat = buildPublicCatalog([
+                { id: 1, name: 'A', qty: '3', price: 1 }, { id: 2, name: 'B', qty: 0, price: 1 }, { id: 3, name: 'C', qty: -2, price: 1 },
+                { id: 4, name: 'D', qty: 2.7, price: 1 }, { id: 5, name: 'E', qty: 4, price: 1, hideInCatalog: true, cost: 9, notes: 'interna' }
+            ], opt, { currency: '$', rate: 0 });
+            console.assert(stockCat.products.map(p => p.stock).join() === '3,0,0,2' && stockCat.shop.askCustomer === true, 'selfTestCatalog: stock / askCustomer');
+            stockCat.products.forEach(p => Object.keys(p).forEach(k => console.assert(CATALOG_ALLOWED_FIELDS.includes(k) || CATALOG_OPTIONAL_FIELDS.includes(k), 'selfTestCatalog: campo no permitido ' + k)));
+            ['"cost"', '"notes"', '"hideInCatalog"'].forEach(s => console.assert(!JSON.stringify(stockCat).includes(s), 'selfTestCatalog: con opciones apareció ' + s));
+            const hid = [{ id: 1, name: 'A', qty: 1, price: 1, hideInCatalog: true }];
+            console.assert(buildPublicCatalog(hid, { title: 'T', allowHide: true }, { currency: '$', rate: 0 }).products.length === 0, 'selfTestCatalog: oculto debe salir de la vitrina');
+            console.assert(buildPublicCatalog(hid, { title: 'T' }, { currency: '$', rate: 0 }).products.length === 1, 'selfTestCatalog: sin allowHide el producto sale');
+            const keep = state.catalogConfig;
+            [[3, 3], [1, 3], [20, 10]].forEach(([i, o]) => { state.catalogConfig = { delayMin: i }; console.assert(normalizeCatalogConfig().delayMin === o, 'selfTestCatalog: delayMin ' + i); });
+            state.catalogConfig = keep;
             const txt = JSON.stringify(cat);
             ['"qty"', '"cost"', '"notes"', '"barcode"', '"supplier"', 'data:image', 'interna', 'Cliente Ficticio Zeta', 'paymentMethods', 'security', 'credits', 'sales', 'fiado']
                 .forEach(s => console.assert(!txt.includes(s), 'selfTestCatalog: apareció ' + s));

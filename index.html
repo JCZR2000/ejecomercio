@@ -603,9 +603,27 @@
                         </div>
                         <label class="flex items-center justify-between text-xs text-gray-600">Espera antes de publicar
                             <select id="catalogDelay" onchange="saveCatalogConfig()" class="border rounded px-2 py-1 text-xs bg-white">
-                                <option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>
+                                <option value="3">3 min</option><option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>
                             </select>
                         </label>
+                        <div>
+                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Mostrar existencias a los clientes
+                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogShowStock" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                            </label>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Tus clientes verán cuántas unidades quedan. Se actualiza con cada publicación.</p>
+                        </div>
+                        <div>
+                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Pedir nombre y entrega al cliente
+                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAskCustomer" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                            </label>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Antes de enviar el pedido por WhatsApp se piden nombre y retiro o delivery.</p>
+                        </div>
+                        <div>
+                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Permitir ocultar productos
+                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAllowHide" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                            </label>
+                            <p class="text-[10px] text-gray-500 mt-0.5">Cada producto tendrá la casilla «No mostrar en la vitrina».</p>
+                        </div>
                         <div id="catalogLinkBox" class="hidden space-y-2">
                             <div class="flex gap-2">
                                 <input type="text" id="catalogLinkInput" readonly class="flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white">
@@ -1662,6 +1680,12 @@
                             <label
                                 class="absolute left-3 top-1 text-[10px] text-gray-400 peer-placeholder-shown:top-3.5 peer-focus:top-1 font-bold">Categoría (opcional)</label>
                             <datalist id="categoryOptions"></datalist>
+                        </div>
+
+                        <div id="prodHideBox" class="hidden">
+                            <label class="flex items-center justify-between h-12 rounded-xl border border-gray-300 px-3 text-sm bg-gray-50 text-gray-700 cursor-pointer"><span><i class="fa-solid fa-eye-slash text-gray-400 mr-2"></i>No mostrar en la vitrina</span>
+                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="prodHideCatalog" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-indigo-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                            </label>
                         </div>
 
                         <div class="flex gap-2">

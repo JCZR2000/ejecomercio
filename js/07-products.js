@@ -37,6 +37,8 @@
                         const prod = { ...state.products[idx], name, qty, price, barcode };
                         if (category) prod.category = category; else delete prod.category;
                         if (cost) prod.cost = cost;
+                        // La casilla solo se ve con la opción activa; oculta, no se toca la marca guardada
+                        if (!$('prodHideBox').classList.contains('hidden')) { if ($('prodHideCatalog').checked) prod.hideInCatalog = true; else delete prod.hideInCatalog; }
                         // Foto nueva o quitada: se olvida la de Storage (el archivo lo borra pruneStorageImages)
                         if (state.tempImg || state.isImageDeleted) {
                             delete prod.imgUrl;
@@ -55,6 +57,7 @@
                     };
                     if (category) prod.category = category;
                     if (cost) prod.cost = cost;
+                    if ($('prodHideCatalog').checked && !$('prodHideBox').classList.contains('hidden')) prod.hideInCatalog = true;
                     state.products.unshift(prod);
                 }
 
@@ -85,6 +88,8 @@
             $('prodPrice').value = p.price;
             $('prodCost').value = p.cost ?? '';
             $('prodCategory').value = p.category || '';
+            $('prodHideBox').classList.toggle('hidden', !normalizeCatalogConfig().allowHide);
+            $('prodHideCatalog').checked = p.hideInCatalog === true;
 
             // Imagen
             if (productImageSrc(p)) {
@@ -135,6 +140,8 @@
             $('prodPrice').value = '';
             $('prodCost').value = '';
             $('prodCategory').value = '';
+            $('prodHideCatalog').checked = false;
+            $('prodHideBox').classList.toggle('hidden', !normalizeCatalogConfig().allowHide);
             $('prodImg').value = '';
             $('productId').value = '';
 

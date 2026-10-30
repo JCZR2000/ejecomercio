@@ -27,6 +27,7 @@
                 <div class="min-w-0">
                     <h1 id="shopTitle" class="font-extrabold text-xl leading-tight truncate">Catálogo</h1>
                     <p id="shopSlogan" class="text-xs text-slate-300">Haz tu pedido y te lo confirmamos por WhatsApp</p>
+                    <p id="updatedAt" class="text-[10px] text-slate-400"></p>
                 </div>
             </div>
             <div id="controls" class="hidden mt-4 space-y-3">
@@ -59,11 +60,29 @@
                         <span id="cartTotal" class="block font-extrabold text-lg leading-tight"></span>
                     </span>
                 </button>
-                <a id="orderBtn" target="_blank" rel="noopener" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow">
+                <button id="orderBtn" type="button" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow">
                     <i class="fa-brands fa-whatsapp mr-1"></i> Pedir
-                </a>
+                </button>
             </div>
-            <p class="text-[10px] text-slate-400 text-center pb-2 -mt-1">El negocio confirmará disponibilidad y precio</p>
+            <p id="cartNote" class="text-[10px] text-slate-400 text-center pb-2 -mt-1">El negocio confirmará disponibilidad y precio</p>
+        </div>
+    </div>
+
+    <div id="custModal" class="hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center p-3">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl">
+            <h2 class="font-extrabold text-lg">Tus datos</h2>
+            <input id="custName" maxlength="60" placeholder="Nombre" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <div class="flex gap-4 text-sm">
+                <label class="flex items-center gap-1"><input type="radio" name="custDelivery" value="retiro" checked> Retiro en tienda</label>
+                <label class="flex items-center gap-1"><input type="radio" name="custDelivery" value="delivery"> Delivery</label>
+            </div>
+            <input id="custAddress" maxlength="200" placeholder="Dirección" class="hidden w-full border rounded-lg px-3 py-2 text-sm">
+            <input id="custNote" maxlength="200" placeholder="Nota (opcional)" class="w-full border rounded-lg px-3 py-2 text-sm">
+            <p id="custError" class="text-xs text-red-600 font-bold"></p>
+            <div class="flex gap-2">
+                <button id="custCancel" type="button" class="flex-1 bg-slate-100 rounded-xl py-2.5 text-sm font-bold">Cancelar</button>
+                <button id="custSend" type="button" class="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Enviar por WhatsApp</button>
+            </div>
         </div>
     </div>
 
@@ -84,8 +103,8 @@
         morado: ['#3b0764', '#581c87', '#6b21a8', '#f0abfc', '#581c87', '#9333ea'],
         oscuro: ['#0a0a0a', '#171717', '#262626', '#facc15', '#262626', '#737373']
     };
-    let shop = { title: 'Catálogo', whatsapp: '', slogan: '', color: 'indigo', logo: '' };
-    let currency = '$', rate = null, products = [], activeCat = '';
+    let shop = { title: 'Catálogo', whatsapp: '', slogan: '', color: 'indigo', logo: '', askCustomer: false };
+    let currency = '$', rate = null, products = [], activeCat = '', updatedAt = null;
     const cart = new Map(); // id -> cantidad
 
     const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -109,8 +128,11 @@
             whatsapp: String(s.whatsapp || '').replace(/\D/g, ''),
             slogan: String(s.slogan || '').trim().slice(0, 80),
             color: THEMES[s.color] ? s.color : 'indigo',
-            logo: typeof s.logo === 'string' && s.logo.startsWith(PHOTO_PREFIX) ? s.logo : ''
+            logo: typeof s.logo === 'string' && s.logo.startsWith(PHOTO_PREFIX) ? s.logo : '',
+            askCustomer: s.askCustomer === true
         };
+        const d = new Date(data.updatedAt);
+        updatedAt = isNaN(d) ? null : d;
         currency = typeof data.currency === 'string' && data.currency ? data.currency : '$';
         rate = Number(data.rate) > 0 ? Number(data.rate) : null;
         products = (Array.isArray(data.products) ? data.products : [])
@@ -120,9 +142,24 @@
                 name: String(p.name),
                 category: String(p.category || '').trim() || 'Otros',
                 price: Number(p.price),
-                photo: typeof p.photo === 'string' && p.photo.startsWith(PHOTO_PREFIX) ? p.photo : ''
+                photo: typeof p.photo === 'string' && p.photo.startsWith(PHOTO_PREFIX) ? p.photo : '',
+                stock: Number.isInteger(p.stock) && p.stock >= 0 ? p.stock : null
             }));
     }
+
+    function renderUpdated() {
+        const el = $('updatedAt');
+        if (!updatedAt) { el.textContent = ''; return; }
+        const min = Math.floor((Date.now() - updatedAt) / 60000);
+        const time = updatedAt.toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit', hour12: true });
+        let t;
+        if (min < 1) t = 'hace un momento';
+        else if (min < 60) t = `hace ${min} min`;
+        else if (updatedAt.toDateString() === new Date().toDateString()) t = `hoy a las ${time}`;
+        else t = `el ${String(updatedAt.getDate()).padStart(2, '0')}/${String(updatedAt.getMonth() + 1).padStart(2, '0')} a las ${time}`;
+        el.textContent = 'Actualizada ' + t;
+    }
+    setInterval(renderUpdated, 60000);
 
     async function load() {
         const uid = new URLSearchParams(location.search).get('u') || '';
@@ -130,8 +167,8 @@
         showMessage('Cargando...');
         $('message').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
         try {
-            // El parámetro t cambia cada 5 minutos: evita que una caché vieja (de una versión anterior) sirva un catálogo desactualizado
-            const t = Math.floor(Date.now() / 300000);
+            // El parámetro t cambia cada minuto (igual que max-age del archivo): evita que una caché vieja sirva un catálogo desactualizado
+            const t = Math.floor(Date.now() / 60000);
             const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/catalogo%2F${uid}.json?alt=media&t=${t}`);
             if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible');
             if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -142,6 +179,7 @@
         }
         $('shopTitle').textContent = shop.title;
         applyTheme();
+        renderUpdated();
         document.title = shop.title;
         if (!products.length) return showMessage('No hay productos disponibles por ahora');
         $('message').classList.add('hidden');
@@ -182,18 +220,19 @@
         const q = $('search').value.trim().toLowerCase();
         const shown = products.filter(p => (!activeCat || p.category === activeCat) && (!q || p.name.toLowerCase().includes(q)));
         $('list').innerHTML = shown.length ? shown.map(p => {
-            const qty = cart.get(p.id) || 0, id = escapeHtml(p.id);
+            const qty = cart.get(p.id) || 0, id = escapeHtml(p.id), full = p.stock !== null && qty >= p.stock;
+            const left = p.stock !== null ? `<div class="text-[11px] font-bold ${p.stock <= 5 ? 'text-amber-600' : 'text-slate-400'}">Quedan ${p.stock}</div>` : '';
             const bs = rate ? `<div class="text-[11px] text-slate-400">Bs ${fmt(p.price * rate)}</div>` : '';
             const img = p.photo
                 ? `<img src="${escapeHtml(p.photo)}" loading="lazy" alt="" class="card-img w-full object-cover bg-slate-100">`
                 : '<div class="card-img w-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-300 text-4xl"><i class="fa-solid fa-box-open"></i></div>';
             const action = qty
-                ? `<div class="flex items-center justify-between bg-slate-100 rounded-xl p-1"><button data-act="dec" data-id="${id}" class="w-9 h-9 rounded-lg bg-white shadow-sm font-bold text-lg active:scale-95">−</button><span class="font-extrabold">${qty}</span><button data-act="inc" data-id="${id}" class="w-9 h-9 rounded-lg bg-green-600 text-white shadow-sm font-bold text-lg active:scale-95">+</button></div>`
+                ? `<div class="flex items-center justify-between bg-slate-100 rounded-xl p-1"><button data-act="dec" data-id="${id}" class="w-9 h-9 rounded-lg bg-white shadow-sm font-bold text-lg active:scale-95">−</button><span class="font-extrabold">${qty}</span><button data-act="inc" data-id="${id}" ${full ? 'disabled' : ''} class="w-9 h-9 rounded-lg bg-green-600 text-white shadow-sm font-bold text-lg active:scale-95 disabled:opacity-40">+</button></div>`
                 : `<button data-act="inc" data-id="${id}" class="btn-add w-full hover:opacity-90 text-white rounded-xl py-2.5 text-sm font-bold active:scale-95 transition"><i class="fa-solid fa-plus mr-1 text-xs"></i>Añadir</button>`;
             return `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">${img}
                 <div class="p-3 flex-1 flex flex-col gap-0.5"><div class="text-[10px] uppercase tracking-wide cat-label font-bold truncate">${escapeHtml(p.category)}</div>
                 <div class="text-sm font-bold leading-snug line-clamp-2">${escapeHtml(p.name)}</div>
-                <div class="mt-1 text-lg font-extrabold text-slate-900">${escapeHtml(currency)} ${fmt(p.price)}</div>${bs}
+                <div class="mt-1 text-lg font-extrabold text-slate-900">${escapeHtml(currency)} ${fmt(p.price)}</div>${bs}${left}
                 <div class="mt-auto pt-2">${action}</div></div></div>`;
         }).join('') : '<p class="col-span-full text-center text-slate-500 py-16">Sin resultados</p>';
         renderCart();
@@ -207,17 +246,47 @@
         $('cartCount').textContent = items.reduce((s, x) => s + x.n, 0);
         $('cartDetail').innerHTML = items.map(x => `<div class="flex justify-between gap-3 px-4 py-2"><span class="min-w-0 truncate">${x.n}× ${escapeHtml(x.p.name)}</span><span class="font-bold shrink-0">${escapeHtml(currency)}${fmt(x.p.price * x.n)}</span></div>`).join('');
         $('cartTotal').textContent = `${currency}${fmt(total)}`;
-        const text = `Hola ${shop.title}, quiero hacer este pedido:\n` +
+        orderText = `Hola ${shop.title}, quiero hacer este pedido:\n` +
             items.map(x => `- ${x.n}x ${x.p.name} (${currency}${fmt(x.p.price * x.n)})`).join('\n') +
             `\nTotal aproximado: ${currency}${fmt(total)}`;
-        if (shop.whatsapp) { $('orderBtn').href = `https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(text)}`; $('orderBtn').classList.remove('hidden'); }
-        else $('orderBtn').classList.add('hidden'); // sin WhatsApp no hay a quién pedir
+        $('cartNote').textContent = products.some(p => p.stock !== null)
+            ? 'La tienda podrá cumplir tu pedido según la disponibilidad de los productos.'
+            : 'El negocio confirmará disponibilidad y precio';
+        $('orderBtn').classList.toggle('hidden', !shop.whatsapp); // sin WhatsApp no hay a quién pedir
     }
+
+    let orderText = '';
+    const sendOrder = (extra) => window.open(`https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(orderText + extra)}`, '_blank', 'noopener');
+    const getSaved = () => { try { return JSON.parse(localStorage.getItem('vitrina_cliente')) || {}; } catch (e) { return {}; } };
+    const delivery = () => document.querySelector('input[name=custDelivery]:checked').value;
+    const syncAddress = () => $('custAddress').classList.toggle('hidden', delivery() !== 'delivery');
+
+    $('orderBtn').addEventListener('click', () => {
+        if (!shop.askCustomer) return sendOrder('');
+        const s = getSaved();
+        $('custName').value = s.name || '';
+        $('custAddress').value = s.address || '';
+        $('custError').textContent = '';
+        $('custModal').classList.remove('hidden');
+    });
+    document.querySelectorAll('input[name=custDelivery]').forEach(r => r.addEventListener('change', syncAddress));
+    $('custCancel').addEventListener('click', () => $('custModal').classList.add('hidden'));
+    $('custSend').addEventListener('click', () => {
+        const name = $('custName').value.trim(), address = $('custAddress').value.trim(), note = $('custNote').value.trim();
+        const isDelivery = delivery() === 'delivery';
+        if (!name) return $('custError').textContent = 'Escribe tu nombre';
+        if (isDelivery && !address) return $('custError').textContent = 'Escribe la dirección de entrega';
+        try { localStorage.setItem('vitrina_cliente', JSON.stringify({ name, address })); } catch (e) { /* modo privado */ }
+        sendOrder(`\nNombre: ${name}\nEntrega: ${isDelivery ? 'Delivery — Dirección: ' + address : 'Retiro en tienda'}` + (note ? `\nNota: ${note}` : ''));
+        $('custModal').classList.add('hidden');
+    });
 
     $('list').addEventListener('click', (e) => {
         const b = e.target.closest('button[data-act]');
         if (!b) return;
-        const id = b.dataset.id, n = (cart.get(id) || 0) + (b.dataset.act === 'inc' ? 1 : -1);
+        const id = b.dataset.id, p = products.find(x => x.id === id);
+        let n = (cart.get(id) || 0) + (b.dataset.act === 'inc' ? 1 : -1);
+        if (p && p.stock !== null) n = Math.min(n, p.stock);
         if (n > 0) cart.set(id, n); else cart.delete(id);
         render();
     });
