@@ -12,6 +12,15 @@
             if (!panel.classList.contains('hidden')) {
                 $('cfgCompanyName').value = state.receiptConfig.companyName || '';
                 $('cfgFooter').value = state.receiptConfig.footer || '';
+                $('cfgHeaderInfo').value = state.receiptConfig.headerInfo || '';
+                // QR de la tienda: necesita vitrina activa y sesión (enlace público)
+                const qrBox = $('cfgShowShopQr'), qrNote = $('cfgShopQrNote');
+                const cat = normalizeCatalogConfig();
+                const qrOk = cat.enabled && !!catalogPublicUrl();
+                qrBox.disabled = !qrOk;
+                qrBox.checked = qrOk && state.receiptConfig.showShopQr === true;
+                qrNote.textContent = !qrOk ? 'Activa la vitrina en Ajustes para usarlo' : (!cat.slug ? 'Ponle nombre a tu vitrina para un enlace más corto' : '');
+                qrNote.classList.toggle('hidden', !qrNote.textContent);
                 if (state.receiptConfig.logo) {
                     $('receiptLogoPreview').src = state.receiptConfig.logo;
                     $('receiptLogoPreview').classList.remove('hidden');
@@ -57,7 +66,10 @@
             // 2. Guardar en el Estado (Limpiando espacios)
             state.receiptConfig.companyName = nameInput.trim();
             state.receiptConfig.footer = footerInput.trim();
-            
+            state.receiptConfig.headerInfo = $('cfgHeaderInfo').value.trim().slice(0, 60);
+            // Si el interruptor está deshabilitado (sin vitrina) se conserva lo guardado
+            if (!$('cfgShowShopQr').disabled) state.receiptConfig.showShopQr = $('cfgShowShopQr').checked === true;
+
             // 3. Guardar preferencia de "Mostrar Bolívares"
             const chkBs = $('chkReceiptBs');
             if (chkBs) {
@@ -118,6 +130,7 @@
         function closeSuccessModal() {
             $('successModal').classList.add('hidden');
             if ($('successMsg')) $('successMsg').textContent = 'Los datos se han guardado correctamente.';
+            if ($('successTitle')) $('successTitle').textContent = '¡Operación Exitosa!';
             if ($('successOrderWa')) $('successOrderWa').classList.add('hidden');
             // tempReceiptData = null; // ¡NO LIMPIAR AQUÍ, lo necesitamos para el ruteador!
         }
@@ -126,8 +139,13 @@
         function openReceiptFromHistory(saleId) {
             const sale = state.sales.find(s => s.id == saleId);
             if (!sale) return;
+            routeReceipt(paymentReceiptData(sale));
+        }
+
+        // Datos del recibo desde una venta o abono guardado (Historial y abono recién cobrado)
+        function paymentReceiptData(sale) {
             const note = parseSaleBalanceNote(sale);
-            routeReceipt({
+            return {
                 id: sale.id,
                 items: sale.items,
                 total: sale.total,
@@ -136,8 +154,13 @@
                 toBalance: note.toBalance,
                 type: sale.type,
                 isHistory: true,
-                fiscalNum: sale.fiscalNum
-            });
+                fiscalNum: sale.fiscalNum,
+                rate: sale.rate,
+                creditId: sale.creditId,
+                debtBefore: sale.debtBefore,
+                debtTotal: sale.debtTotal,
+                debtAfter: sale.debtAfter
+            };
         }
 
         // C. Desde Fiados
@@ -153,8 +176,35 @@
                 date: credit.date,
                 customer: credit.customer,
                 isCredit: true,
+                fromList: true,
                 fiscalNum: credit.fiscalNum
             });
+        }
+
+        // Estado de cuenta del recibo. Sin DOM. Devuelve { rows: [[etiqueta, monto]], remaining, pct } o null (venta o abono viejo).
+        function receiptAccount(data) {
+            const pctOf = (total, remaining) => total > 0 ? Math.min(100, Math.max(0, Math.round((total - remaining) / total * 100))) : 100;
+            if (data.isCredit) {
+                const paidBefore = data.paidBefore || 0;
+                const balanceUsed = data.balanceUsed || 0;
+                const paid = data.paid || 0;
+                const remaining = roundMoney(data.total - paidBefore - paid - balanceUsed);
+                const today = paidBefore > 0 || data.addedToday > 0 || !data.fromList;
+                const rows = [['Total del fiado', data.total]];
+                if (data.addedToday > 0) rows.push(['Agregado hoy', data.addedToday]);
+                if (paidBefore > 0) rows.push(['Abonado antes', paidBefore]);
+                rows.push([today ? 'Abonado hoy' : 'Abonado', paid]);
+                if (balanceUsed > 0) rows.push(['Pagado con saldo a favor', balanceUsed]);
+                return { rows, remaining, pct: pctOf(data.total, remaining) };
+            }
+            if (data.type === 'payment' && typeof data.debtBefore === 'number') {
+                const toBalance = data.toBalance || 0;
+                const thisPay = roundMoney(data.total - toBalance);
+                const rows = [['Saldo anterior', data.debtBefore], ['Este abono', -thisPay]];
+                if (toBalance > 0) rows.push(['A saldo a favor', toBalance]);
+                return { rows, remaining: data.debtAfter, pct: pctOf(data.debtTotal, data.debtAfter) };
+            }
+            return null;
         }
 
         // Diferencia entre el total del fiado y la suma de sus líneas (precio de cuando se fió): { surcharge, priceAdj }
@@ -174,16 +224,45 @@
             const r = receiptAdjustments({ items, total: 10.1 }, { surcharge: 0.5 });
             console.assert(r.surcharge === 0.5 && r.priceAdj === 1, 'selfTestReceipts: recargo y precios');
             console.assert(receiptAdjustments({ items, total: 8.1 }, null).priceAdj === -0.5, 'selfTestReceipts: precio bajó');
+
+            // Estado de cuenta (Fase 20)
+            let a = receiptAccount({ isCredit: true, total: 10, paid: 2, balanceUsed: 1 });
+            console.assert(a.remaining === 7 && a.pct === 30, 'selfTestReceipts: fiado nuevo');
+            a = receiptAccount({ isCredit: true, total: 10, paidBefore: 3, paid: 2 });
+            console.assert(a.remaining === 5 && a.pct === 50, 'selfTestReceipts: fiado sobre uno abierto');
+            a = receiptAccount({ type: 'payment', total: 1, debtBefore: 5, debtTotal: 5, debtAfter: 4 });
+            console.assert(a.rows[1][1] === -1 && a.remaining === 4 && a.pct === 20, 'selfTestReceipts: abono');
+            a = receiptAccount({ type: 'payment', total: 6, toBalance: 1, debtBefore: 5, debtTotal: 5, debtAfter: 0 });
+            console.assert(a.rows[1][1] === -5 && a.remaining === 0 && a.pct === 100, 'selfTestReceipts: abono con sobrante');
+            console.assert(receiptAccount({ type: 'payment', total: 1 }) === null, 'selfTestReceipts: abono viejo');
+            console.assert(receiptAccount({ type: 'sale', total: 1, items: [] }) === null, 'selfTestReceipts: venta');
+            console.assert(receiptAccount({ isCredit: true, fromList: true, total: 10, paid: 4 }).rows[1][0] === 'Abonado', 'selfTestReceipts: etiqueta desde la lista');
+
+            // applyCreditPayment guarda el estado de cuenta igual que la ficha
+            const bak = structuredClone({ credits: state.credits, products: state.products, sales: state.sales, creditMode: state.creditMode });
+            try {
+                state.creditMode = 'FIXED';
+                state.products = [];
+                state.sales = [];
+                const c = { id: 1, customer: 'Cliente Prueba', items: [], totalDebt: 10, paid: 2, date: '' };
+                state.credits = [c];
+                applyCreditPayment(c, 3, 1, Date.now());
+                const s = state.sales[0];
+                console.assert(s.debtBefore === 8 && s.debtBefore - 3 === s.debtAfter, 'selfTestReceipts: abono guarda saldo antes/después');
+                console.assert(s.debtAfter === roundMoney(calculateRealDebt(c) - c.paid) && s.creditId === 1 && s.debtTotal === 10, 'selfTestReceipts: abono cuadra con la ficha');
+            } finally {
+                state.credits = bak.credits; state.products = bak.products; state.sales = bak.sales; state.creditMode = bak.creditMode;
+            }
             console.log('selfTestReceipts terminado');
         }
 
         // --- RENDERIZADO DEL TICKET ---
         function prepareReceiptModal(data) {
             tempReceiptData = data; // Guardamos contexto actual
-            
+
             // 1. Rellenar Inputs
             $('receiptCustomerName').value = data.customer || '';
-            
+
             // 2. Renderizar visualmente
             updateReceiptPreview();
 
@@ -195,191 +274,147 @@
             $('receiptModal').classList.add('hidden');
         }
 
+        // Bloque del QR de la tienda; '' si no corresponde. Solo codifica el enlace público de la vitrina.
+        function shopQrHtml(conf) {
+            if (conf.showShopQr !== true || !normalizeCatalogConfig().enabled || typeof qrcode === 'undefined') return '';
+            const url = catalogPublicUrl();
+            if (!url) return '';
+            let svg;
+            try {
+                const qr = qrcode(0, 'M');
+                qr.addData(url);
+                qr.make();
+                svg = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true }).replace('<svg', '<svg style="width:100%;height:100%;display:block"');
+            } catch (e) { console.error('QR del recibo:', e); return ''; }
+            const bare = url.replace(/^https?:\/\//, '');
+            const shown = normalizeCatalogConfig().slug ? bare : bare.split('?')[0];
+            return `<div class="flex items-center gap-3 rounded-2xl bg-slate-100 p-3 mt-3">
+                <div class="shrink-0 bg-white p-1.5 rounded-lg" style="width:84px;height:84px;box-sizing:border-box">${svg}</div>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-extrabold leading-tight text-slate-800">Vuelve a comprar desde tu teléfono</p>
+                    <p class="text-[9px] leading-tight text-slate-500 mt-1">Escanea el código para ver el catálogo y hacer tu pedido.</p>
+                    <p class="text-[9px] font-bold text-indigo-600 mt-1 break-all">${escapeHtml(shown)}</p>
+                </div></div>`;
+        }
+
         function updateReceiptPreview() {
             const data = tempReceiptData;
             if (!data) return;
 
             // Usar configuración de la nube
             const conf = state.receiptConfig || { companyName: "Mi Negocio", footer: "Gracias por su compra", logo: null };
-            const rate = getActiveRate();
-
-            // 1. Cabecera
-            $('printCompanyName').textContent = conf.companyName || "Mi Negocio";
-            $('printFooter').textContent = conf.footer || "Gracias por su compra";
-            
-            // 2. Manejo del Logo
-            const logoImg = $('printLogo');
-            if (conf.logo) {
-                logoImg.src = conf.logo;
-                logoImg.classList.remove('hidden');
-            } else {
-                logoImg.classList.add('hidden');
-                // CORRECCIÓN: Quitamos el atributo src para evitar errores de carga 404
-                logoImg.removeAttribute('src');
-            }
+            // Tasa: lo cobrado ese día (historial y abonos), la de fiados si es fiado o abono, la activa si es venta nueva
+            const rate = data.rate > 0 ? data.rate : (data.isCredit || data.type === 'payment') ? getFiadosActiveRate() : getActiveRate();
+            const isPayment = data.type === 'payment' && !data.isCredit;
 
             const d = new Date(data.date);
-            $('printDate').textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
-
-            // 3. Cliente y Tipo
+            const dateText = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
             const customerInput = $('receiptCustomerName').value.trim();
-            const displayCustomer = (customerInput && customerInput.toLowerCase() !== 'cliente genérico') ? customerInput : 'CONSUMIDOR FINAL';
-            $('printCustomerNameDisplay').textContent = displayCustomer;
+            const displayCustomer = (customerInput && customerInput.toLowerCase() !== 'cliente genérico') ? customerInput : 'Consumidor final';
+            const account = receiptAccount(data);
+            const settled = account && account.remaining <= 0.01;
+            const number = data.fiscalNum ? data.fiscalNum : String(data.id ?? '').slice(-6);
 
-            // Etiqueta de Tipo de Venta
-            const typeLabel = $('printTxType');
-            const typeText = typeLabel.querySelector('span:last-child');
-            
+            // Título y chip según el tipo
+            let title, chipText, chipCls, kindText, totalLabel;
             if (data.isCredit) {
-                typeLabel.classList.remove('hidden');
-                typeText.textContent = "CRÉDITO / FIADO";
-                typeText.className = "font-bold bg-black text-white px-1 text-[10px] rounded-sm";
-            } else if (data.type === 'payment') {
-                typeLabel.classList.remove('hidden');
-                typeText.textContent = "ABONO A CUENTA";
-                typeText.className = "font-bold bg-gray-200 text-black px-1 text-[10px] rounded-sm border border-black";
+                title = 'Comprobante de fiado'; kindText = 'Fiado'; totalLabel = 'Total del fiado';
+                [chipText, chipCls] = settled ? ['PAGADO', 'bg-green-100 text-green-800'] : ['FIADO', 'bg-amber-100 text-amber-800'];
+            } else if (isPayment) {
+                title = 'Recibo de abono'; kindText = 'Abono'; totalLabel = 'Monto abonado';
+                [chipText, chipCls] = ['ABONO A CUENTA', 'bg-orange-100 text-orange-800'];
             } else {
-                typeLabel.classList.add('hidden'); // Venta normal se asume contado
+                title = 'Comprobante de venta'; kindText = 'Contado'; totalLabel = 'Total a pagar';
+                [chipText, chipCls] = ['PAGADO', 'bg-green-100 text-green-800'];
             }
 
-            // 3. Items
-            const tbody = $('printItemsList');
-            tbody.innerHTML = '';
-            
-            if (data.items) {
-                data.items.forEach(item => {
-                    tbody.innerHTML += `
-                        <tr>
-                            <td class="align-top font-bold">${item.qty}</td>
-                            <td class="align-top pr-2">
-                                <div>${escapeHtml(item.name)}</div>
-                                <div class="text-[9px] text-gray-500">x ${formatMoney(item.price)}</div>
-                            </td>
-                            <td class="align-top text-right font-bold">
-                                ${formatMoney(item.qty * item.price)}
-                            </td>
-                        </tr>
-                    `;
-                });
-                // Fiado: el total puede diferir de la suma de las líneas (recargo o cambio de precios); se muestra para que cuadre
+            const money = (amount) => `${amount < 0 ? '-' : ''}${formatMoney(Math.abs(amount))}`;
+            const row = (label, amount, bold) => `<div class="flex justify-between gap-2 text-[11px] ${bold ? 'font-bold text-slate-800' : 'text-slate-500'}"><span>${escapeHtml(label)}</span><span class="font-bold text-slate-800">${money(amount)}</span></div>`;
+
+            // Productos (venta y fiado) con las líneas de recargo / ajuste del fiado
+            let itemsHtml = '';
+            if (!isPayment && data.items && data.items.length) {
+                const lines = data.items.map(item => `<div class="flex justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
+                    <div class="min-w-0"><div class="text-[11px] font-bold text-slate-800 break-words">${escapeHtml(item.name)}</div><div class="text-[10px] text-slate-400">${escapeHtml(item.qty)} × ${formatMoney(item.price)}</div></div>
+                    <div class="text-[11px] font-bold text-slate-800 shrink-0">${formatMoney(item.qty * item.price)}</div></div>`).join('');
+                let adjHtml = '';
                 if (data.isCredit) {
                     const adj = receiptAdjustments(data, state.credits.find(c => c.id == data.id));
-                    const row = (label, amount) => `<tr><td class="align-top"></td><td class="align-top pr-2 font-bold">${label}</td><td class="align-top text-right font-bold">${amount < 0 ? '-' : ''}${formatMoney(Math.abs(amount))}</td></tr>`;
-                    if (adj.surcharge) tbody.innerHTML += row('RECARGO', adj.surcharge);
-                    if (adj.priceAdj) tbody.innerHTML += row('AJUSTE POR CAMBIO DE PRECIOS', adj.priceAdj);
+                    if (adj.surcharge) adjHtml += row('Recargo', adj.surcharge, true);
+                    if (adj.priceAdj) adjHtml += row('Ajuste por cambio de precios', adj.priceAdj, true);
                 }
-            } else if (data.type === 'payment') {
-                tbody.innerHTML = `
-                    <tr>
-                        <td class="align-top font-bold">1</td>
-                        <td class="align-top">ABONO A CUENTA</td>
-                        <td class="align-top text-right font-bold">${formatMoney(data.total)}</td>
-                    </tr>`;
+                itemsHtml = `<div class="mt-3"><p class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mb-1">Productos</p>${lines}${adjHtml ? `<div class="pt-1.5 space-y-1">${adjHtml}</div>` : ''}</div>`;
             }
 
-            // 5. Totales y Bolívares (AQUÍ ESTÁ LA SINCRONIZACIÓN) 🔄
-            $('printTotalMain').textContent = formatMoney(data.total);
-
+            // Bolívares: el interruptor se sigue leyendo como antes
             const chkBs = $('chkReceiptBs');
+            let showBs = conf.showBs !== false;
             if (chkBs) {
-                // TRUCO: Si la función NO fue llamada por el evento 'change' (click manual),
-                // entonces restauramos el valor guardado en la nube.
-                // Si FUE llamada por click manual, respetamos lo que el usuario acaba de tocar.
-                if (!event || event.type !== 'change') {
-                    // Si showBs es undefined (primera vez), asumimos true por defecto
-                    chkBs.checked = (conf.showBs !== false);
-                }
+                // TRUCO: si no fue el evento 'change' (click manual) se restaura lo guardado en la nube; si fue manual, se respeta lo que se tocó
+                if (!event || event.type !== 'change') chkBs.checked = (conf.showBs !== false);
+                showBs = chkBs.checked;
+            }
+            const bsHtml = showBs ? `<div class="flex justify-between text-[11px] text-slate-500 mt-1"><span>En bolívares</span><span class="font-bold text-slate-800">Bs ${(data.total * rate).toFixed(2)}</span></div>
+                <div class="text-right text-[9px] text-slate-400">Tasa: Bs ${Number(rate).toFixed(2)} / $</div>` : '';
+            const noteHtml = data.toBalance > 0 ? `<p class="text-[10px] text-slate-500 mt-2">Esta factura incluye ${formatMoney(data.toBalance)} de saldo a favor del cliente.</p>` : '';
 
-                // Ahora sí leemos el estado (sea restaurado o manual)
-                if (chkBs.checked) {
-                    $('printTotalBsRow').classList.remove('hidden');
-                    $('printTotalBs').textContent = `Bs ${(data.total * rate).toFixed(2)}`;
-                } else {
-                    $('printTotalBsRow').classList.add('hidden');
-                }
+            let accountHtml = '';
+            if (account) {
+                accountHtml = `<div class="mt-3 rounded-2xl border border-slate-200 p-3">
+                    <p class="text-[10px] font-extrabold uppercase tracking-wide text-slate-400 mb-1.5">Estado de cuenta</p>
+                    <div class="space-y-1">${account.rows.map(r => row(r[0], r[1])).join('')}</div>
+                    <div class="border-t border-slate-200 mt-2 pt-2 flex justify-between items-end"><span class="text-[11px] font-extrabold text-slate-800">Saldo pendiente</span><span class="text-xl font-black leading-none text-slate-900">${formatMoney(account.remaining)}</span></div>
+                    <div class="mt-2 h-2 rounded-full overflow-hidden" style="background:#e2e8f0"><div style="width:${account.pct}%;height:100%;background:#166534"></div></div>
+                    <p class="text-[10px] font-bold text-green-800 mt-1">${settled ? '¡Deuda saldada!' : `Has pagado el ${account.pct} % de tu deuda.`}</p>
+                </div>`;
             }
 
-            // Nota de saldo a favor (abonos que incluyen un sobrante)
-            $('printBalanceNote').classList.toggle('hidden', !(data.toBalance > 0));
-            if (data.toBalance > 0) $('printBalanceNote').textContent = `Esta factura incluye ${formatMoney(data.toBalance)} de saldo a favor del cliente.`;
+            const logoHtml = conf.logo ? `<div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden"><img src="${escapeHtml(conf.logo)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>` : '';
+            const infoHtml = conf.headerInfo ? `<div class="text-[10px] mt-0.5 break-words" style="color:#cbd5e1">${escapeHtml(conf.headerInfo)}</div>` : '';
 
-            // 5. Sección de Crédito
-            if (data.isCredit) {
-                $('printCreditInfo').classList.remove('hidden');
-                $('printPaid').textContent = formatMoney(data.paid);
-                // Si es venta nueva a crédito: Total - Pagado = Restante
-                const balanceUsed = data.balanceUsed || 0;
-                $('printBalanceRow').classList.toggle('hidden', !(balanceUsed > 0));
-                $('printBalanceUsed').textContent = formatMoney(balanceUsed);
-                // Fiado al que se le sumaron productos: el recibo trae todo el fiado, lo agregado hoy y lo abonado antes
-                const paidBefore = data.paidBefore || 0;
-                $('printAddedRow').classList.toggle('hidden', !(data.addedToday > 0));
-                $('printAdded').textContent = formatMoney(data.addedToday || 0);
-                $('printPaidBeforeRow').classList.toggle('hidden', !(paidBefore > 0));
-                $('printPaidBefore').textContent = formatMoney(paidBefore);
-                const remaining = roundMoney(data.total - paidBefore - data.paid - balanceUsed);
-                $('printRemaining').textContent = formatMoney(remaining);
-            } else {
-                $('printCreditInfo').classList.add('hidden');
-            }
+            $('receiptCanvas').innerHTML = `<div class="bg-white rounded-2xl overflow-hidden" style="color:#1e293b">
+                <div class="flex items-center gap-3 p-4" style="background:#1e293b;color:#fff">
+                    ${logoHtml}
+                    <div class="min-w-0"><div class="text-base font-black uppercase tracking-wide leading-tight break-words">${escapeHtml(conf.companyName || 'Mi Negocio')}</div>${infoHtml}</div>
+                </div>
+                <div class="p-4">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0"><div class="text-sm font-extrabold leading-tight">${title}</div><div class="text-[10px] text-slate-400 font-bold mt-0.5">N° ${escapeHtml(number)}</div></div>
+                        <span class="text-[9px] font-extrabold px-2 py-1 rounded-full whitespace-nowrap ${chipCls}">${chipText}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-3">
+                        <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-extrabold uppercase text-slate-400">Fecha</p><p class="text-[11px] font-bold mt-0.5 leading-tight">${escapeHtml(dateText)}</p></div>
+                        <div class="rounded-xl bg-slate-50 p-2 min-w-0"><p class="text-[9px] font-extrabold uppercase text-slate-400">Cliente</p><p class="text-[11px] font-bold mt-0.5 leading-tight break-words">${escapeHtml(displayCustomer)}</p><p class="text-[9px] text-slate-400">${kindText}</p></div>
+                    </div>
+                    ${itemsHtml}
+                    <div class="mt-3 rounded-2xl border-2 border-slate-200 p-3">
+                        <div class="flex justify-between items-end"><span class="text-[11px] font-extrabold text-slate-500">${totalLabel}</span><span class="${isPayment ? 'text-2xl' : 'text-xl'} font-black leading-none">${formatMoney(data.total)}</span></div>
+                        ${bsHtml}${noteHtml}
+                    </div>
+                    ${accountHtml}
+                    ${shopQrHtml(conf)}
+                    <div class="text-center mt-4">
+                        <p class="text-[11px] font-extrabold break-words">${escapeHtml(conf.footer || 'Gracias por su compra')}</p>
+                        <p class="text-[9px] text-slate-400 mt-1">Este comprobante no sustituye la factura fiscal.</p>
+                    </div>
+                </div></div>`;
         }
 
         // --- DESCARGA Y COMPARTIR ---
+        // Los botones que la llaman (downloadReceipt y shareReceipt) ya muestran el indicador de carga
         async function generateReceiptImage() {
             const node = document.getElementById('receiptCanvas');
-            
-            // 1. Calcular dimensiones reales del contenido (incluyendo lo que no se ve)
-            const width = node.scrollWidth;
-            const height = node.scrollHeight;
-
-            const options = {
-                backgroundColor: '#ffffff',
-                pixelRatio: 3, // Calidad Alta (3x)
-                width: width,  // Forzar ancho total
-                height: height, // Forzar alto total (SOLUCIÓN AL RECORTE)
-                style: {
-                    // Estos estilos se aplican SOLO para la foto
-                    'transform': 'none',
-                    'overflow': 'visible',
-                    'max-height': 'none',
-                    'height': 'auto',
-                    'display': 'block'
-                },
-                // Filtro para reducir errores de consola (opcional)
-                filter: (n) => {
-                    // Si el elemento es el Logo y está oculto, LO SALTAMOS
-                    if (n.id === 'printLogo') {
-                        if (n.classList && n.classList.contains('hidden')) return false;
-                        if (!n.src || n.src === "") return false;
-                    }
-                    return true; // El resto se renderiza normal
-                }
-            };
-
             try {
-                // Indicador visual de carga (opcional pero recomendado)
-                const btn = event.currentTarget;
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
-                btn.disabled = true;
-
-                // 2. Generar la imagen
-                const dataUrl = await htmlToImage.toPng(node, options);
-                
-                // Restaurar botón
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-
-                return dataUrl;
-
+                // El canvas es de ancho fijo y tiene su propio margen gris: la imagen sale igual a la vista previa
+                return await htmlToImage.toPng(node, {
+                    backgroundColor: '#f1f5f9',
+                    pixelRatio: 3, // Calidad Alta (3x)
+                    width: node.scrollWidth,
+                    height: node.scrollHeight,
+                    style: { transform: 'none', margin: '0' }
+                });
             } catch (error) {
                 console.error('Error generando recibo:', error);
-                // Restaurar botón en caso de error
-                const btn = document.querySelector('button[onclick="downloadReceipt(\'img\')"]');
-                if(btn) {
-                    btn.innerHTML = '<i class="fa-solid fa-image text-lg"></i> Descargar IMG';
-                    btn.disabled = false;
-                }
                 alert('Hubo un error generando la imagen. Por favor intenta de nuevo.');
                 throw error;
             }
@@ -445,14 +480,18 @@
 
         async function shareReceipt() {
             const btn = event.currentTarget;
+            const originalContent = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
+
+            // En PC se abre la pestaña de WhatsApp ahora, con el clic: después de generar la imagen el navegador ya la bloquearía como emergente
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            const waWin = isMobile ? null : window.open('', '_blank');
 
             try {
                 const imgData = await generateReceiptImage();
                 
                 // --- DETECCIÓN DE DISPOSITIVO (LA CLAVE) ---
                 // Detectamos si es un móvil real. Si es PC, 'isMobile' será false.
-                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
                 // 1. MÓVIL: Intentar API Nativa (Envía la imagen directo a la App de WhatsApp)
                 // Solo entramos aquí si es móvil Y el navegador soporta compartir
@@ -466,7 +505,6 @@
                             title: 'Recibo de Compra',
                             text: `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`
                         });
-                        btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
                         return; // ¡Éxito en móvil! Salimos aquí.
                     }
                 }
@@ -484,13 +522,15 @@
 
                 // Paso C: Abrir WhatsApp Web (Solo ocurre después de cerrar la alerta)
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
-                window.open(`https://wa.me/${(tempReceiptData && tempReceiptData.waPhone) || ''}?text=${encodeURIComponent(text)}`, '_blank'); // waPhone: pedido en línea (Fase 19)
+                const waUrl = `https://wa.me/${(tempReceiptData && tempReceiptData.waPhone) || ''}?text=${encodeURIComponent(text)}`; // waPhone: pedido en línea (Fase 19)
+                if (waWin) waWin.location.href = waUrl; else window.open(waUrl, '_blank');
 
             } catch (e) {
                 console.error(e);
+                if (waWin) waWin.close();
                 alert('Ocurrió un error al procesar la imagen.');
             } finally {
-                btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl"></i> Compartir';
+                btn.innerHTML = originalContent;
             }
         }
 
