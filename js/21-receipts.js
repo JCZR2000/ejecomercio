@@ -113,7 +113,7 @@
         function syncReceiptRecord(data) {
             const rec = (data.isCredit ? state.credits : state.sales).find(x => x.id == data.id);
             if (!rec) return data;
-            ['fiscalNum', 'payNum', 'numAt', 'numPending', 'invoice', 'bcvRate'].forEach(k => { if (k in rec) data[k] = rec[k]; else delete data[k]; });
+            ['fiscalNum', 'payNum', 'numAt', 'numPending', 'invoice', 'bcvRate', 'method', 'methodRef', 'clientId'].forEach(k => { if (k in rec) data[k] = rec[k]; else delete data[k]; });
             return data;
         }
 
@@ -172,6 +172,9 @@
                 numPending: sale.numPending,
                 invoice: sale.invoice,
                 rate: sale.rate,
+                method: sale.method,
+                methodRef: sale.methodRef,
+                clientId: sale.clientId,
                 creditId: sale.creditId,
                 debtBefore: sale.debtBefore,
                 debtTotal: sale.debtTotal,
@@ -196,7 +199,8 @@
                 fiscalNum: credit.fiscalNum,
                 numAt: credit.numAt,
                 numPending: credit.numPending,
-                invoice: credit.invoice
+                invoice: credit.invoice,
+                clientId: credit.clientId
             });
         }
 
@@ -316,6 +320,16 @@
                 </div></div>`;
         }
 
+        // Banda oscura con logo, nombre y línea de información: la comparten el recibo y el documento no fiscal (Fase 22)
+        function receiptHeaderHtml(name, logo, info) {
+            const logoHtml = logo ? `<div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden"><img src="${escapeHtml(logo)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>` : '';
+            const infoHtml = info ? `<div class="text-[10px] mt-0.5 break-words" style="color:#cbd5e1">${escapeHtml(info)}</div>` : '';
+            return `<div class="flex items-center gap-3 p-4" style="background:#1e293b;color:#fff">
+                    ${logoHtml}
+                    <div class="min-w-0"><div class="text-base font-black uppercase tracking-wide leading-tight break-words">${escapeHtml(name)}</div>${infoHtml}</div>
+                </div>`;
+        }
+
         function updateReceiptPreview() {
             const data = tempReceiptData;
             if (!data) return;
@@ -390,14 +404,13 @@
                 </div>`;
             }
 
-            const logoHtml = conf.logo ? `<div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0 overflow-hidden"><img src="${escapeHtml(conf.logo)}" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>` : '';
-            const infoHtml = conf.headerInfo ? `<div class="text-[10px] mt-0.5 break-words" style="color:#cbd5e1">${escapeHtml(conf.headerInfo)}</div>` : '';
+            // Método de pago (Fase 22): en la tarjeta del cliente, junto al tipo; el fiado no lleva método
+            const methodText = !data.isCredit && payMethodLabel(data.method);
+            const kindLine = kindText + (methodText ? ' · ' + methodText : '');
+            const refLine = methodText && data.methodRef ? `<p class="text-[9px] text-slate-400">Ref. ${escapeHtml(data.methodRef)}</p>` : '';
 
             $('receiptCanvas').innerHTML = `<div class="bg-white rounded-2xl overflow-hidden" style="color:#1e293b">
-                <div class="flex items-center gap-3 p-4" style="background:#1e293b;color:#fff">
-                    ${logoHtml}
-                    <div class="min-w-0"><div class="text-base font-black uppercase tracking-wide leading-tight break-words">${escapeHtml(conf.companyName || 'Mi Negocio')}</div>${infoHtml}</div>
-                </div>
+                ${receiptHeaderHtml(conf.companyName || 'Mi Negocio', conf.logo, conf.headerInfo)}
                 <div class="p-4">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0"><div class="text-sm font-extrabold leading-tight">${title}</div>${number ? `<div class="text-[10px] text-slate-400 font-bold mt-0.5">N° ${escapeHtml(number)}</div>` : ''}</div>
@@ -405,7 +418,7 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2 mt-3">
                         <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-extrabold uppercase text-slate-400">Fecha</p><p class="text-[11px] font-bold mt-0.5 leading-tight">${escapeHtml(dateText)}<br>${escapeHtml(timeText)}</p></div>
-                        <div class="rounded-xl bg-slate-50 p-2 min-w-0"><p class="text-[9px] font-extrabold uppercase text-slate-400">Cliente</p><p class="text-[11px] font-bold mt-0.5 leading-tight break-words">${escapeHtml(displayCustomer)}</p><p class="text-[9px] text-slate-400">${kindText}</p></div>
+                        <div class="rounded-xl bg-slate-50 p-2 min-w-0"><p class="text-[9px] font-extrabold uppercase text-slate-400">Cliente</p><p class="text-[11px] font-bold mt-0.5 leading-tight break-words">${escapeHtml(displayCustomer)}</p><p class="text-[9px] text-slate-400">${escapeHtml(kindLine)}</p>${refLine}</div>
                     </div>
                     ${itemsHtml}
                     <div class="mt-3 rounded-2xl border-2 border-slate-200 p-3">

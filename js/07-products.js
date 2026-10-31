@@ -179,6 +179,7 @@
             if($('initialPayBS')) $('initialPayBS').value = '';
             if($('paymentScheduleSelect')) $('paymentScheduleSelect').value = '';
             toggleCustomDate();
+            updatePosPayRow();
 
             // 3. Restaurar UI del Modal
             const container = $('posContainer');

@@ -4,7 +4,7 @@
 
         // Aplica un abono ya validado. Sin DOM, sin guardar, sin alertas.
         // amount va a la deuda; received (por defecto igual) es lo que entró a la caja: la diferencia es saldo a favor (Fase 13).
-        function applyCreditPayment(credit, amount, rate, saleId, received = amount) {
+        function applyCreditPayment(credit, amount, rate, saleId, received = amount, pay = null) { // pay = { method, methodRef } (Fase 22)
             // Antes de cobrar, guardamos la deuda real calculada (incluyendo aumentos)
             credit.totalDebt = roundMoney(calculateRealDebt(credit));
             const debtBefore = roundMoney(credit.totalDebt - credit.paid); // Fase 20: estado de cuenta del recibo de abono
@@ -25,6 +25,7 @@
                 debtBefore,
                 debtTotal: credit.totalDebt,
                 debtAfter: roundMoney(credit.totalDebt - credit.paid),
+                ...payFields(pay),
                 ...numFields()
             });
             return { settled };
@@ -49,10 +50,10 @@
         }
 
         // Valida y aplica un abono; el sobrante (solo con cliente) va a su saldo a favor. Sin DOM ni guardar.
-        function registerCreditPayment(credit, amount, rate, saleId) {
+        function registerCreditPayment(credit, amount, rate, saleId, pay = null) {
             const [v] = validateCreditPayments([{ id: credit.id, amount }]);
             if (v.error) return { error: v.error };
-            const { settled } = applyCreditPayment(credit, roundMoney(amount - v.excess), rate, saleId, amount);
+            const { settled } = applyCreditPayment(credit, roundMoney(amount - v.excess), rate, saleId, amount, pay);
             if (v.excess > 0) addClientMove(getClient(credit.clientId), { amount: v.excess, kind: 'OVERPAY', creditId: credit.id });
             return { settled, excess: v.excess };
         }
@@ -69,9 +70,10 @@
 
             const c = state.credits.find(x => x.id == id);
             const finish = () => {
-                const { settled } = registerCreditPayment(c, amount, getFiadosActiveRate(), Date.now());
+                const { settled } = registerCreditPayment(c, amount, getFiadosActiveRate(), Date.now(), { method: $(`pay_method_${id}`) && $(`pay_method_${id}`).value });
                 if (settled) setTimeout(autoPruneCredits, 500);
 
+                rememberPayMethod(state.sales[0].method);
                 saveData();
                 assignPendingNumbers();
                 renderAll();
@@ -127,6 +129,8 @@
             btn.innerText = `Confirmar ${rows.length} pagos`;
             btn.disabled = rows.some(r => r.error);
             btn.classList.toggle('opacity-50', btn.disabled);
+            $('multiPayMethod').value = lastPayMethod();
+            $('multiPayRef').value = '';
             $('multiPayModal').classList.remove('hidden');
         }
 
@@ -142,17 +146,19 @@
 
             const rate = getFiadosActiveRate();
             const base = Date.now();
+            const pay = { method: $('multiPayMethod').value, methodRef: $('multiPayRef').value };
             const settledNames = [];
             let total = 0, toBalance = 0;
             rows.forEach((r, i) => {
                 const c = state.credits.find(x => x.id == r.id);
-                const { settled, excess } = registerCreditPayment(c, r.amount, rate, base + i);
+                const { settled, excess } = registerCreditPayment(c, r.amount, rate, base + i, pay);
                 total += r.amount;
                 toBalance += excess;
                 if (settled) settledNames.push(c.customer);
             });
             if (settledNames.length) setTimeout(autoPruneCredits, 500);
 
+            rememberPayMethod(payMethodKey(pay.method));
             closeMultiPayModal();
             saveData();
             assignPendingNumbers();

@@ -3,7 +3,7 @@
         // Base de clientes: nombre, teléfono, cédula, notas. El fiado guarda 'customer' (texto) y 'clientId'.
         // Las funciones de datos no tocan el DOM ni guardan: quien las llama hace saveData().
         // ==========================================
-        const CLIENT_NAME_MAX = 60, CLIENT_DOC_MAX = 20, CLIENT_NOTES_MAX = 200;
+        const CLIENT_NAME_MAX = 60, CLIENT_DOC_MAX = 20, CLIENT_NOTES_MAX = 200, CLIENT_ADDRESS_MAX = 120;
 
         const clipClientText = (v, max) => String(v || '').trim().replace(/\s+/g, ' ').slice(0, max);
         const safeClientId = (id) => /^[\w-]+$/.test(String(id || '')) ? String(id) : ''; // para onclick="..."
@@ -81,7 +81,9 @@
             if (!name) return { error: 'Escribe el nombre del cliente.' };
             const phone = normalizeClientPhone(f.phone);
             if (phone && phone.length < 7) return { error: 'El teléfono debe tener al menos 7 dígitos.' };
-            return { fields: { name, phone, doc: clipClientText(f.doc, CLIENT_DOC_MAX), notes: clipClientText(f.notes, CLIENT_NOTES_MAX) } };
+            // address solo se toca si viene en f: quien edita sin ese campo no debe borrarla
+            const address = 'address' in f ? { address: clipClientText(f.address, CLIENT_ADDRESS_MAX) } : {};
+            return { fields: { name, phone, doc: clipClientText(f.doc, CLIENT_DOC_MAX), notes: clipClientText(f.notes, CLIENT_NOTES_MAX), ...address } };
         }
 
         const findClientDup = (fields, exceptId) => state.clients.find(c => c.id !== exceptId &&
@@ -93,7 +95,7 @@
             if (r.error) return r;
             const dup = findClientDup(r.fields);
             if (dup && !f.allowDuplicate) return { dup };
-            const client = { id: newClientId(), ...r.fields, balance: 0, moves: [], createdAt: new Date().toISOString() };
+            const client = { id: newClientId(), address: '', ...r.fields, balance: 0, moves: [], createdAt: new Date().toISOString() };
             state.clients.push(client);
             return { client };
         }
@@ -250,6 +252,7 @@
             $('clientFormPhone').value = c ? c.phone : '';
             $('clientFormDoc').value = c ? c.doc : '';
             $('clientFormNotes').value = c ? c.notes : '';
+            $('clientFormAddress').value = c ? c.address || '' : '';
             clientFormOnSaved = opts.onSaved || null;
             $('clientFormModal').classList.remove('hidden');
             $('clientFormName').focus();
@@ -262,7 +265,7 @@
 
         function submitClientForm() {
             const id = $('clientFormId').value;
-            const f = { name: $('clientFormName').value, phone: $('clientFormPhone').value, doc: $('clientFormDoc').value, notes: $('clientFormNotes').value };
+            const f = { name: $('clientFormName').value, phone: $('clientFormPhone').value, doc: $('clientFormDoc').value, address: $('clientFormAddress').value, notes: $('clientFormNotes').value };
             const res = id ? updateClient(id, f) : createClient(f);
             if (res.error) return customAlert('Revisa los datos', res.error, 'error');
             const done = (client) => {
@@ -278,6 +281,14 @@
                 return customConfirm('Cliente repetido', `Ya existe «${res.dup.name}» con ese nombre o teléfono. ¿Usar ese cliente?`, 'warning', () => done(res.dup));
             }
             done(res.client);
+        }
+
+        // Factura (Fase 22): a un cliente de la base solo se le rellena la cédula/RIF o la dirección que no tenía; nunca se sobrescribe
+        function saveClientFromInvoice(clientId, { doc, address }) {
+            const c = getClient(clientId);
+            if (!c) return;
+            if (!c.doc && doc) c.doc = clipClientText(doc, CLIENT_DOC_MAX);
+            if (!c.address && address) c.address = clipClientText(address, CLIENT_ADDRESS_MAX);
         }
 
         // ---------- Elegir otro cliente (para unir) ----------
