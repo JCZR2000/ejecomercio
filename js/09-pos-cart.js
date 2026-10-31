@@ -3,6 +3,27 @@
         // ==========================================
         $('isCreditSale').addEventListener('change', (e) => toggleCreditUI(e.target.checked));
 
+        // Método de pago de la caja (Fase 22). Viene marcado el último usado en este dispositivo.
+        let posPayMethod = null;
+        function currentPosPay() {
+            const method = posPayMethod || lastPayMethod();
+            return { method, methodRef: cleanPayRef(method, $('posPayRef').value) };
+        }
+        // Contado: siempre visible. Fiado: solo si hay abono inicial (el método aplica a ese abono).
+        function updatePosPayRow() {
+            const row = $('posPayMethod');
+            if (!row) return;
+            const credit = $('isCreditSale').checked || !!state.activeCreditId;
+            row.classList.toggle('hidden', credit && !((parseFloat($('initialPayUSD').value) || 0) > 0));
+            const m = currentPosPay().method;
+            row.querySelectorAll('button').forEach(b => {
+                b.className = 'shrink-0 px-3 py-2 rounded-full text-xs font-bold border transition active:scale-95 ' + (b.dataset.pay === m ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300 text-gray-600');
+            });
+            $('posPayRef').classList.toggle('hidden', !REF_METHODS.includes(m));
+        }
+        function setPosPayMethod(key) { posPayMethod = payMethodKey(key) || 'EFECTIVO'; updatePosPayRow(); }
+        ['initialPayUSD', 'initialPayBS'].forEach(id => $(id).addEventListener('input', updatePosPayRow));
+
         function toggleCreditUI(isCredit) {
             if (state.activeCreditId) return; // Si estamos editando un fiado existente, no tocar.
 
@@ -26,6 +47,7 @@
                 $('initialPayUSD').value = '';
                 $('initialPayBS').value = '';
             }
+            updatePosPayRow();
         }
 
         window.editCredit = (id) => {
@@ -73,6 +95,7 @@
                 btn.disabled = false;
 
                 updatePosBalanceRow();
+                updatePosPayRow();
 
                 // 6. ¡ABRIR EL MODAL!
                 toggleCartModal(true);
@@ -326,6 +349,7 @@
                 // Cliente del fiado nuevo (Fase 13): el elegido, uno con ese nombre o uno nuevo solo con nombre
                 const clientId = isCredit && !state.activeCreditId ? resolvePosClient(customerName).id : null;
                 let payName = customerName;
+                const pay = currentPosPay(); // método del cobro de contado o del abono inicial
                 const useBalance = !!($('chkUseBalance') && $('chkUseBalance').checked); // exitEditMode lo desmarca
 
                 // B. DESCUENTO DE INVENTARIO (CRÍTICO: Hacerlo primero)
@@ -398,6 +422,7 @@
                             total: initialPay,
                             ...(excess > 0 ? { toBalance: excess } : {}),
                             rate: activeRate,
+                            ...payFields(pay),
                             ...numFields()
                         });
                     }
@@ -425,6 +450,8 @@
                         items: [...state.cart],
                         total: totalUSD,
                         rate: activeRate,
+                        ...payFields(pay),
+                        ...(state.posClientId && getClient(state.posClientId) ? { clientId: state.posClientId } : {}),
                         ...numFields()
                     });
                     
@@ -458,6 +485,8 @@
                 updatePosBalanceRow();
                 if($('initialPayUSD')) $('initialPayUSD').value = '';
                 if($('initialPayBS')) $('initialPayBS').value = '';
+                if (!isCredit || initialPay > 0) rememberPayMethod(pay.method);
+                if($('posPayRef')) $('posPayRef').value = '';
                 if($('posSearchInput')) $('posSearchInput').value = '';
                 if($('stockHint')) $('stockHint').textContent = ''; // <--- AQUÍ ESTABA EL ERROR (Solucionado con el if)
                 
@@ -472,6 +501,7 @@
                     if(switchCred) switchCred.checked = false;
                     toggleCreditUI(false);
                 }
+                updatePosPayRow();
 
                 // E. PERSISTENCIA Y CIERRE
                 saveData(); // Guardar en Firebase/LocalStorage

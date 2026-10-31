@@ -143,6 +143,7 @@
         function renderCreditsList() {
             const fiadosRate = getFiadosActiveRate();
             const sym = getSymbol();
+            const payDefault = lastPayMethod(); // método marcado en el selector de abonos (Fase 22)
             const container = $('creditsList');
             container.innerHTML = '';
             
@@ -299,6 +300,7 @@
                         <div class="col-span-1">
                             <button onclick="requestPayCredit('${c.id}')" class="w-full bg-green-600 text-white py-1 rounded text-xs hover:bg-green-700 font-bold shadow-sm">Pagar</button>
                         </div>
+                        <select id="pay_method_${c.id}" aria-label="Método de pago" class="col-span-5 border rounded px-1 py-1 text-[11px] bg-white text-gray-600 outline-none focus:border-green-500">${PAY_METHODS.map(m => `<option value="${m.key}"${m.key === payDefault ? ' selected' : ''}>${m.text}</option>`).join('')}</select>
                     </div>`;
                 container.appendChild(card);
             });
