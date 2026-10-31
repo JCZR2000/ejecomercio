@@ -157,6 +157,26 @@
             });
         }
 
+        // Diferencia entre el total del fiado y la suma de sus líneas (precio de cuando se fió): { surcharge, priceAdj }
+        function receiptAdjustments(data, credit) {
+            const lines = roundMoney((data.items || []).reduce((sum, i) => sum + i.qty * i.price, 0));
+            const diff = roundMoney(data.total - lines);
+            if (Math.abs(diff) < 0.01) return { surcharge: 0, priceAdj: 0 };
+            const sur = credit && credit.surcharge > 0 ? roundMoney(credit.surcharge) : 0;
+            if (sur && diff >= sur - 0.005) return { surcharge: sur, priceAdj: roundMoney(diff - sur) < 0.01 ? 0 : roundMoney(diff - sur) };
+            return { surcharge: 0, priceAdj: diff };
+        }
+
+        function selfTestReceipts() {
+            const items = [{ qty: 4, price: 1.2 }, { qty: 2, price: 1.9 }];
+            console.assert(receiptAdjustments({ items, total: 8.6 }).priceAdj === 0, 'selfTestReceipts: sin diferencia');
+            console.assert(receiptAdjustments({ items, total: 9.8 }, null).priceAdj === 1.2, 'selfTestReceipts: cambio de precios');
+            const r = receiptAdjustments({ items, total: 10.1 }, { surcharge: 0.5 });
+            console.assert(r.surcharge === 0.5 && r.priceAdj === 1, 'selfTestReceipts: recargo y precios');
+            console.assert(receiptAdjustments({ items, total: 8.1 }, null).priceAdj === -0.5, 'selfTestReceipts: precio bajó');
+            console.log('selfTestReceipts terminado');
+        }
+
         // --- RENDERIZADO DEL TICKET ---
         function prepareReceiptModal(data) {
             tempReceiptData = data; // Guardamos contexto actual
@@ -241,6 +261,13 @@
                         </tr>
                     `;
                 });
+                // Fiado: el total puede diferir de la suma de las líneas (recargo o cambio de precios); se muestra para que cuadre
+                if (data.isCredit) {
+                    const adj = receiptAdjustments(data, state.credits.find(c => c.id == data.id));
+                    const row = (label, amount) => `<tr><td class="align-top"></td><td class="align-top pr-2 font-bold">${label}</td><td class="align-top text-right font-bold">${amount < 0 ? '-' : ''}${formatMoney(Math.abs(amount))}</td></tr>`;
+                    if (adj.surcharge) tbody.innerHTML += row('RECARGO', adj.surcharge);
+                    if (adj.priceAdj) tbody.innerHTML += row('AJUSTE POR CAMBIO DE PRECIOS', adj.priceAdj);
+                }
             } else if (data.type === 'payment') {
                 tbody.innerHTML = `
                     <tr>
