@@ -24,7 +24,8 @@
                 creditId: credit.id,
                 debtBefore,
                 debtTotal: credit.totalDebt,
-                debtAfter: roundMoney(credit.totalDebt - credit.paid)
+                debtAfter: roundMoney(credit.totalDebt - credit.paid),
+                ...numFields()
             });
             return { settled };
         }
@@ -72,22 +73,14 @@
                 if (settled) setTimeout(autoPruneCredits, 500);
 
                 saveData();
+                assignPendingNumbers();
                 renderAll();
 
-                // Modo personalizado: en vez de la alerta, ventana de éxito con «Generar Recibo» (Fase 20)
-                if (state.receiptType === 'PERSONALIZED') {
-                    tempReceiptData = paymentReceiptData(state.sales[0]);
-                    $('successTitle').textContent = settled ? '¡Deuda saldada!' : 'Abono registrado';
-                    $('successMsg').textContent = settled ? `La deuda de ${c.customer} quedó saldada. Se ha movido al historial.` : 'El abono se guardó correctamente.';
-                    $('successModal').classList.remove('hidden');
-                    return;
-                }
-
-                // Pequeño delay para que la UI se actualice antes de la alerta
-                setTimeout(() => {
-                    if (settled) alert(`¡Deuda de ${c.customer} saldada! Se ha movido al historial.`);
-                    else alert('Abono registrado.');
-                }, 100);
+                // Ventana de éxito con «Generar Recibo» en cualquier modo: el recibo del abono es el personalizado (Fase 21)
+                tempReceiptData = paymentReceiptData(state.sales[0]);
+                $('successTitle').textContent = settled ? '¡Deuda saldada!' : 'Abono registrado';
+                $('successMsg').textContent = settled ? `La deuda de ${c.customer} quedó saldada. Se ha movido al historial.` : 'El abono se guardó correctamente.';
+                $('successModal').classList.remove('hidden');
             };
             if (v.excess > 0) {
                 return customConfirm('Pago de más', `Pagó ${formatMoney(amount)} y debe ${formatMoney(v.debt)}. ¿Guardar ${formatMoney(v.excess)} como saldo a favor de ${c.customer}?`, 'warning', finish);
@@ -162,6 +155,7 @@
 
             closeMultiPayModal();
             saveData();
+            assignPendingNumbers();
             renderAll();
             setTimeout(() => alert(`${rows.length} abonos registrados por ${formatMoney(roundMoney(total))}.` +
                 (settledNames.length ? ` Saldados: ${settledNames.join(', ')}` : '') +

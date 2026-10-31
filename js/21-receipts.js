@@ -101,29 +101,41 @@
         // --- APERTURA DE MODALES ---
 
         // --- RUTEADOR DE RECIBOS ---
+        // Pura: a dónde va el recibo. Los abonos nuevos (sin número de factura) siempre llevan el recibo personalizado (Fase 21).
+        function receiptTarget(data) {
+            if (data.type === 'payment' && !data.isCredit && !data.fiscalNum) return 'personalized';
+            if (!state.receiptType) return 'choose'; // nunca ha elegido: modal de elección
+            if (state.receiptType === 'FISCAL') return state.fiscalConfig.rif ? 'fiscal' : 'fiscalConfig';
+            return 'personalized';
+        }
+
+        // Trae del registro guardado (venta o fiado) el número, la fecha del número y la factura emitida, que pudieron cambiar después de armar el recibo
+        function syncReceiptRecord(data) {
+            const rec = (data.isCredit ? state.credits : state.sales).find(x => x.id == data.id);
+            if (!rec) return data;
+            ['fiscalNum', 'payNum', 'numAt', 'numPending', 'invoice', 'bcvRate'].forEach(k => { if (k in rec) data[k] = rec[k]; else delete data[k]; });
+            return data;
+        }
+
         function routeReceipt(data) {
+            syncReceiptRecord(data);
             tempReceiptData = data; // Guardamos contexto
 
-            if (!state.receiptType) {
-                // Si nunca ha elegido, mostrar el modal de elección
-                $('invoiceTypeModal').classList.remove('hidden');
-            } else if (state.receiptType === 'FISCAL') {
-                // Validar si tiene configuración fiscal
-                if (!state.fiscalConfig.rif) {
-                    $('fiscalConfigModal').classList.remove('hidden');
-                } else {
-                    prepareFiscalReceiptModal(data);
-                }
-            } else {
-                prepareReceiptModal(data);
-            }
+            const target = receiptTarget(data);
+            if (target === 'choose') $('invoiceTypeModal').classList.remove('hidden');
+            else if (target === 'fiscalConfig') $('fiscalConfigModal').classList.remove('hidden');
+            else if (target === 'fiscal') prepareFiscalReceiptModal(data);
+            else prepareReceiptModal(data);
         }
 
         // A. Desde el Modal de Éxito
-        function openReceiptFromSuccess() {
+        async function openReceiptFromSuccess() {
             const dataToUse = tempReceiptData;
             if (!dataToUse) return;
             closeSuccessModal();
+            syncReceiptRecord(dataToUse);
+            // Con red, se espera un momento a que el recibo salga ya con su número
+            if (dataToUse.numPending && navigator.onLine) await Promise.race([assignPendingNumbers(), new Promise(r => setTimeout(r, 4000))]);
             routeReceipt(dataToUse);
         }
 
@@ -155,6 +167,10 @@
                 type: sale.type,
                 isHistory: true,
                 fiscalNum: sale.fiscalNum,
+                payNum: sale.payNum,
+                numAt: sale.numAt,
+                numPending: sale.numPending,
+                invoice: sale.invoice,
                 rate: sale.rate,
                 creditId: sale.creditId,
                 debtBefore: sale.debtBefore,
@@ -177,7 +193,10 @@
                 customer: credit.customer,
                 isCredit: true,
                 fromList: true,
-                fiscalNum: credit.fiscalNum
+                fiscalNum: credit.fiscalNum,
+                numAt: credit.numAt,
+                numPending: credit.numPending,
+                invoice: credit.invoice
             });
         }
 
@@ -308,12 +327,14 @@
             const isPayment = data.type === 'payment' && !data.isCredit;
 
             const d = new Date(data.date);
-            const dateText = `${d.toLocaleDateString()} ${d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}`;
+            const dateText = d.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const timeText = d.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
             const customerInput = $('receiptCustomerName').value.trim();
             const displayCustomer = (customerInput && customerInput.toLowerCase() !== 'cliente genérico') ? customerInput : 'Consumidor final';
             const account = receiptAccount(data);
             const settled = account && account.remaining <= 0.01;
-            const number = data.fiscalNum ? data.fiscalNum : String(data.id ?? '').slice(-6);
+            // Número propio de la operación: abono A-000001, venta o fiado 000123; «Por asignar» sin conexión; sin línea si es un dato viejo sin número
+            const number = data.numPending ? 'Por asignar' : isPayment ? (data.payNum ? 'A-' + data.payNum : data.fiscalNum || '') : (data.fiscalNum || '');
 
             // Título y chip según el tipo
             let title, chipText, chipCls, kindText, totalLabel;
@@ -379,11 +400,11 @@
                 </div>
                 <div class="p-4">
                     <div class="flex items-start justify-between gap-2">
-                        <div class="min-w-0"><div class="text-sm font-extrabold leading-tight">${title}</div><div class="text-[10px] text-slate-400 font-bold mt-0.5">N° ${escapeHtml(number)}</div></div>
+                        <div class="min-w-0"><div class="text-sm font-extrabold leading-tight">${title}</div>${number ? `<div class="text-[10px] text-slate-400 font-bold mt-0.5">N° ${escapeHtml(number)}</div>` : ''}</div>
                         <span class="text-[9px] font-extrabold px-2 py-1 rounded-full whitespace-nowrap ${chipCls}">${chipText}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2 mt-3">
-                        <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-extrabold uppercase text-slate-400">Fecha</p><p class="text-[11px] font-bold mt-0.5 leading-tight">${escapeHtml(dateText)}</p></div>
+                        <div class="rounded-xl bg-slate-50 p-2"><p class="text-[9px] font-extrabold uppercase text-slate-400">Fecha</p><p class="text-[11px] font-bold mt-0.5 leading-tight">${escapeHtml(dateText)}<br>${escapeHtml(timeText)}</p></div>
                         <div class="rounded-xl bg-slate-50 p-2 min-w-0"><p class="text-[9px] font-extrabold uppercase text-slate-400">Cliente</p><p class="text-[11px] font-bold mt-0.5 leading-tight break-words">${escapeHtml(displayCustomer)}</p><p class="text-[9px] text-slate-400">${kindText}</p></div>
                     </div>
                     ${itemsHtml}

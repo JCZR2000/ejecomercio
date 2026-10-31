@@ -71,120 +71,240 @@
         }
 
         // ------------------------------------------
-        // CORRELATIVO POR BLOQUES (Fase 4)
-        // Cada dispositivo reserva 25 números en users/{uid}/counters/fiscal y los gasta aun sin conexión.
+        // NUMERACIÓN CONTINUA (Fase 21)
+        // Cada venta de contado y cada fiado nuevo recibe su número al cerrarse la venta; los abonos llevan su propia
+        // serie (A-000001) y no generan factura. Con sesión, los números salen de users/{uid}/counters/fiscal por
+        // transacción; sin conexión la operación queda «por asignar» y se numera al reconectar, en orden de fecha.
         // ------------------------------------------
-        const FISCAL_BLOCK_SIZE = 25;
-        const FISCAL_LOW_WATER = 10;
-        let reservingFiscal = false;
-        let fiscalOfflineWarned = false;
+        const BCV_HISTORY_URL = 'https://raw.githubusercontent.com/JCZR2000/ComercioPrecioAPI/main/base_datos_bcv.json';
+        let assignPromise = null, assignAgain = false;
+        let fiscalCtx = { bcvRate: null, note: '' };
+        let bcvHistoryCache = null; // solo en memoria: ni localStorage ni nube
 
-        function getFiscalBlock() {
-            try { return JSON.parse(localStorage.getItem('inv_fiscal_block')); } catch (e) { return null; }
+        // Tasa oficial BCV del momento (USD o EUR según el modo de tasa)
+        function currentBcvRate() { return (state.rateMode === 'EUR' ? state.bcvEur : state.bcvUsd) || 0; }
+
+        // Campos que lleva toda operación nueva que necesita número
+        function numFields() {
+            const b = currentBcvRate();
+            return { numPending: true, ...(b > 0 ? { bcvRate: b } : {}) };
         }
 
-        // Pura: siguiente número del bloque, o null si está gastado
-        function takeFiscalNumber(block) {
-            if (!block || block.next > block.end) return null;
-            return { number: block.next, block: { next: block.next + 1, end: block.end } };
+        // Pura: operaciones esperando número, de la más antigua a la más nueva. st = { sales, credits }
+        function pendingDocs(st) {
+            const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+            const sales = (st.credits || []).filter(c => c.numPending);
+            const payments = [];
+            (st.sales || []).forEach(s => { if (s.numPending) (s.type === 'payment' ? payments : sales).push(s); });
+            return { sales: sales.sort(byDate), payments: payments.sort(byDate) };
         }
 
-        function fiscalRemaining() {
-            const b = getFiscalBlock();
-            return b ? Math.max(0, b.end - b.next + 1) : 0;
+        // Pura: [{ ref, num }] consecutivos desde start
+        function numberPlan(list, start) {
+            return list.map((ref, i) => ({ ref, num: start + i }));
         }
 
-        async function reserveFiscalBlock() {
-            const user = auth.currentUser;
-            if (!user || reservingFiscal || !navigator.onLine) return;
-            reservingFiscal = true;
-            try {
-                const ref = db.collection('users').doc(user.uid).collection('counters').doc('fiscal');
-                const start = await db.runTransaction(async tx => {
-                    const snap = await tx.get(ref);
-                    const s = Math.max((snap.exists && snap.data().next) || 1, state.fiscalConfig.currentNumber || 1);
-                    tx.set(ref, { next: s + FISCAL_BLOCK_SIZE });
-                    return s;
-                });
-                localStorage.setItem('inv_fiscal_block', JSON.stringify({ next: start, end: start + FISCAL_BLOCK_SIZE - 1 }));
-                // Sube el contador general para que dispositivos viejos y el Modo Offline sigan por encima
-                state.fiscalConfig.currentNumber = Math.max(state.fiscalConfig.currentNumber || 1, start + FISCAL_BLOCK_SIZE);
-                saveData();
-            } catch (e) {
-                console.warn('No se pudo reservar el bloque fiscal:', e);
-            } finally {
-                reservingFiscal = false;
-            }
+        // Pura: primer número de venta a usar. Si nadie reservó después del bloque viejo de este dispositivo, se sigue desde lo que le quedaba.
+        function fiscalStart(cloudNext, block, currentNumber) {
+            if (block && block.next <= block.end && cloudNext === block.end + 1) return block.next;
+            return Math.max(cloudNext, currentNumber || 1);
         }
 
-        function selfTestFiscal() {
-            const a = takeFiscalNumber({ next: 5, end: 6 });
-            console.assert(a.number === 5 && a.block.next === 6, 'selfTestFiscal: primer número');
-            const b = takeFiscalNumber(a.block);
-            console.assert(b.number === 6, 'selfTestFiscal: último número');
-            console.assert(takeFiscalNumber(b.block) === null, 'selfTestFiscal: bloque gastado');
-            console.assert(takeFiscalNumber(null) === null, 'selfTestFiscal: sin bloque');
-            console.log('selfTestFiscal terminado');
+        function maxPayNum(st) {
+            return (st.sales || []).reduce((m, s) => Math.max(m, parseInt(s.payNum, 10) || 0), 0);
         }
 
-        // Devuelve el número fiscal a asignar y deja el contador al día
-        function allocateFiscalNumber() {
+        // Una sola asignación a la vez; si llega otra petición mientras corre, se repite al terminar
+        function assignPendingNumbers() {
+            if (assignPromise) { assignAgain = true; return assignPromise; }
+            assignPromise = runAssign().finally(() => {
+                assignPromise = null;
+                if (assignAgain) { assignAgain = false; assignPendingNumbers(); }
+            });
+            return assignPromise;
+        }
+
+        async function runAssign() {
+            const p = pendingDocs(state);
+            const N = p.sales.length, M = p.payments.length;
+            if (!N && !M) return;
             const cfg = state.fiscalConfig;
-            if (!auth.currentUser) return cfg.currentNumber++; // Modo Offline: un solo dispositivo
-            const block = getFiscalBlock();
-            const taken = takeFiscalNumber(block);
-            let n;
-            if (taken) {
-                n = taken.number;
-                localStorage.setItem('inv_fiscal_block', JSON.stringify(taken.block));
-            } else {
-                n = Math.max(cfg.currentNumber, block ? block.end + 1 : 0);
-                cfg.currentNumber = n + 1;
-                if (!fiscalOfflineWarned) {
-                    fiscalOfflineWarned = true;
-                    customAlert('Números fiscales', 'Sin conexión no quedan números reservados; este número podría repetirse en otro dispositivo. Conéctate para reservar más.', 'warning');
+            const user = auth.currentUser;
+            const wasPending = !!(tempReceiptData && tempReceiptData.numPending);
+            try {
+                let s, a, recovered = false;
+                if (!user) { // Modo sin sesión: un solo dispositivo
+                    s = cfg.currentNumber || 1;
+                    a = cfg.currentPayment || maxPayNum(state) + 1;
+                } else {
+                    if (!navigator.onLine) return;
+                    let block = null;
+                    try { block = N ? JSON.parse(localStorage.getItem('inv_fiscal_block')) : null; } catch (e) { /* sin bloque */ }
+                    const ref = db.collection('users').doc(user.uid).collection('counters').doc('fiscal');
+                    ({ s, a } = await db.runTransaction(async tx => {
+                        const d = (await tx.get(ref)).data() || {};
+                        const s = fiscalStart(d.next || 1, block, cfg.currentNumber);
+                        const a = Math.max(d.nextPayment || 1, maxPayNum(state) + 1);
+                        tx.set(ref, { ...(N ? { next: s + N } : {}), ...(M ? { nextPayment: a + M } : {}) }, { merge: true });
+                        return { s, a };
+                    }));
+                    recovered = !!block && s === block.next;
                 }
+                // El estado pudo cambiar mientras esperaba la nube: se vuelve a leer y solo se numeran los N y M reservados
+                const now = pendingDocs(state);
+                const stamp = new Date().toISOString();
+                numberPlan(now.sales.slice(0, N), s).forEach(({ ref, num }) => { ref.fiscalNum = String(num).padStart(6, '0'); ref.numAt = stamp; delete ref.numPending; });
+                numberPlan(now.payments.slice(0, M), a).forEach(({ ref, num }) => { ref.payNum = String(num).padStart(6, '0'); ref.numAt = stamp; delete ref.numPending; });
+                if (N) cfg.currentNumber = recovered ? s + N : Math.max(cfg.currentNumber || 1, s + N);
+                if (M) cfg.currentPayment = Math.max(cfg.currentPayment || 1, a + M);
+                if (N && user) { try { localStorage.removeItem('inv_fiscal_block'); } catch (e) { /* sin almacenamiento */ } }
+                saveData();
+                renderAll();
+                // Si había un recibo abierto esperando su número, se repinta
+                if (tempReceiptData) {
+                    syncReceiptRecord(tempReceiptData);
+                    if (wasPending && !$('fiscalReceiptModal').classList.contains('hidden')) prepareFiscalReceiptModal(tempReceiptData);
+                    else if (!$('receiptModal').classList.contains('hidden')) updateReceiptPreview();
+                }
+            } catch (e) {
+                console.warn('No se pudieron asignar los números:', e);
             }
-            if (fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
-            return n;
         }
 
-        function prepareFiscalReceiptModal(data) {
-            // Llenar datos de la empresa
-            $('printFiscRif').textContent = state.fiscalConfig.rif;
-            // NUEVO: Usamos el nombre fiscal (y como fallback final 'EMPRESA')
-            $('printFiscCompany').textContent = state.fiscalConfig.companyName || 'EMPRESA';
-            $('printFiscAddress').textContent = state.fiscalConfig.address;
-            $('printFiscZip').textContent = state.fiscalConfig.zip;
+        // ------------------------------------------
+        // TASA DE LA FACTURA (Fase 21)
+        // ------------------------------------------
 
-            // Datos del cliente por defecto si venían de la venta
-            if (data.customer && data.customer.toLowerCase() !== 'cliente genérico') {
-                $('fiscalClientName').value = data.customer;
+        // Pura: tasa de la mayor `fecha` <= el día (hora de Venezuela) de isoDate. currency: 'dolar' | 'euro'. null si no hay.
+        function bcvRateOn(history, isoDate, currency) {
+            if (!Array.isArray(history) || !history.length) return null;
+            const day = new Date(isoDate).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
+            let best = null;
+            history.forEach(h => { if (h.fecha <= day && h[currency] > 0 && (!best || h.fecha > best.fecha)) best = h; });
+            return best ? best[currency] : null;
+        }
+
+        // Solo se descarga cuando hace falta (factura de un registro viejo); null si falla
+        async function getBcvHistory() {
+            if (bcvHistoryCache) return bcvHistoryCache;
+            try {
+                const r = await fetch(BCV_HISTORY_URL);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                const j = await r.json();
+                if (Array.isArray(j)) bcvHistoryCache = j;
+            } catch (e) { console.warn('No se pudo leer el historial del BCV:', e); }
+            return bcvHistoryCache;
+        }
+
+        // Tasa BCV que lleva la factura de esta operación: { bcvRate, note }
+        async function invoiceRates(data) {
+            if (data.bcvRate > 0) return { bcvRate: data.bcvRate, note: '' };
+            if (!data.fiscalNum) return { bcvRate: currentBcvRate() || null, note: '' }; // se emitirá hoy
+            const hist = await getBcvHistory();
+            const r = hist ? bcvRateOn(hist, data.date, data.isCredit || state.rateMode !== 'EUR' ? 'dolar' : 'euro') : null;
+            if (r) return { bcvRate: r, note: '' };
+            return data.isCredit ? { bcvRate: state.bcvUsd || null, note: 'Tasa del día de emisión' } : { bcvRate: null, note: '' };
+        }
+
+        // Pura: lo entregado el día del fiado (los productos agregados después no entran)
+        function invoiceItems(items, creditDate) {
+            return (items || []).filter(i => !i.at || i.at <= creditDate);
+        }
+
+        const fmtBs = n => n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // Pura: todo lo que muestra la factura. rec = { kind: 'sale'|'credit'|'payment', total, items, rate, paid, toBalance, creditDate, invoice }
+        // ctx = { ivaIncluded, bcvRate, fallbackRate, method, note }. Con rec.invoice (copia fija) todo sale de ahí.
+        function invoiceModel(rec, ctx) {
+            const inv = rec.invoice;
+            const ivaIncluded = inv ? inv.ivaIncluded : ctx.ivaIncluded;
+            const rate = inv ? inv.rate : rec.kind === 'credit' ? (ctx.bcvRate || 0) : (rec.rate > 0 ? rec.rate : ctx.fallbackRate);
+            const base = inv ? inv.items
+                : rec.kind === 'payment' ? [{ qty: 1, name: 'ABONO A CUENTA', price: rec.total }]
+                : rec.kind === 'credit' ? invoiceItems(rec.items, rec.creditDate)
+                : (rec.items || []);
+            const items = base.map(i => ({ qty: i.qty, name: i.name, price: i.price, bs: roundMoney(i.qty * i.price * rate) }));
+            const sum = roundMoney(items.reduce((t, i) => t + i.bs, 0));
+            let bi, iva, total;
+            if (inv) { bi = inv.bi; iva = inv.iva; total = inv.totalBs; }
+            else if (ivaIncluded) { total = sum; bi = roundMoney(sum / 1.16); iva = roundMoney(total - bi); }
+            else { bi = sum; iva = roundMoney(sum * 0.16); total = roundMoney(bi + iva); }
+            const bcv = inv ? inv.bcvRate : ctx.bcvRate;
+            return {
+                items, rate, ivaIncluded, bi, iva, total,
+                bcvRate: bcv > 0 ? bcv : null,
+                equivUsd: inv ? inv.equivUsd : (rec.kind === 'sale' && bcv > 0 ? roundMoney(total / bcv) : null),
+                method: inv ? inv.method : rec.kind === 'credit' ? 'CREDITO' : ctx.method,
+                paidBs: inv ? inv.paidBs : roundMoney((rec.paid || 0) * rate),
+                note: inv ? inv.note : [rec.toBalance > 0 ? `Esta factura incluye Bs ${fmtBs(roundMoney(rec.toBalance * rate))} de saldo a favor del cliente.` : '', ctx.note].filter(Boolean).join(' ')
+            };
+        }
+
+        // Pura: la copia fija que se guarda en la venta o el fiado al emitir
+        function invoiceCopy(model, company, client, stamp) {
+            return {
+                emittedAt: stamp, company, client, method: model.method, rate: model.rate, ivaIncluded: model.ivaIncluded,
+                items: model.items.map(({ qty, name, price }) => ({ qty, name, price })),
+                totalBs: model.total, bi: model.bi, iva: model.iva,
+                bcvRate: model.bcvRate, equivUsd: model.equivUsd, paidBs: model.paidBs, note: model.note
+            };
+        }
+
+        function invoiceRec(data) {
+            const credit = data.isCredit ? state.credits.find(c => c.id == data.id) : null;
+            return {
+                kind: data.isCredit ? 'credit' : data.type === 'payment' ? 'payment' : 'sale',
+                total: data.total, items: data.items, rate: data.rate, paid: data.paid, toBalance: data.toBalance,
+                creditDate: credit ? credit.date : data.date, invoice: data.invoice
+            };
+        }
+
+        function fiscalModelCtx() {
+            return { ivaIncluded: state.fiscalConfig.ivaIncluded, bcvRate: fiscalCtx.bcvRate, fallbackRate: getActiveRate(), method: $('fiscalPaymentMethod').value, note: fiscalCtx.note };
+        }
+
+        const FISCAL_CLIENT_FIELDS = ['fiscalClientRif', 'fiscalClientPhone', 'fiscalClientName', 'fiscalClientAddress', 'fiscalPaymentMethod'];
+
+        async function prepareFiscalReceiptModal(data) {
+            tempReceiptData = data;
+            const inv = data.invoice;
+            fiscalCtx = await invoiceRates(data);
+
+            // Datos de la empresa (en una factura emitida, los de ese momento)
+            const co = inv ? inv.company : { name: state.fiscalConfig.companyName, rif: state.fiscalConfig.rif, address: state.fiscalConfig.address, zip: state.fiscalConfig.zip };
+            $('printFiscRif').textContent = co.rif;
+            $('printFiscCompany').textContent = co.name || 'EMPRESA';
+            $('printFiscAddress').textContent = co.address;
+            $('printFiscZip').textContent = co.zip;
+
+            if (inv) {
+                $('fiscalClientRif').value = inv.client.rif;
+                $('fiscalClientPhone').value = inv.client.phone;
+                $('fiscalClientName').value = inv.client.name;
+                $('fiscalClientAddress').value = inv.client.address;
+                $('fiscalPaymentMethod').value = inv.method;
             } else {
-                fillGenericClient();
-            }
-
-            // Metodo de pago default
-            if (data.isCredit) $('fiscalPaymentMethod').value = 'CREDITO';
-            else $('fiscalPaymentMethod').value = 'EFECTIVO';
-
-            // Asignar Correlativo Permanente si no tiene
-            if (!data.fiscalNum) {
-                const newNum = allocateFiscalNumber().toString().padStart(6, '0');
-                data.fiscalNum = newNum;
-                
-                // Buscar y guardar en la DB real para que sea permanente
-                if (data.id) {
-                    if (data.isCredit) {
-                        const cIdx = state.credits.findIndex(c => c.id == data.id);
-                        if (cIdx > -1) state.credits[cIdx].fiscalNum = newNum;
-                    } else {
-                        const sIdx = state.sales.findIndex(s => s.id == data.id);
-                        if (sIdx > -1) state.sales[sIdx].fiscalNum = newNum;
-                    }
-                    saveData(); // Guardar el contador y el numero asignado
+                if (data.customer && data.customer.toLowerCase() !== 'cliente genérico') {
+                    $('fiscalClientName').value = data.customer;
+                } else {
+                    fillGenericClient();
                 }
+                $('fiscalPaymentMethod').value = data.isCredit ? 'CREDITO' : 'EFECTIVO';
             }
+            FISCAL_CLIENT_FIELDS.forEach(id => { $(id).disabled = !!inv; });
+
+            // Aviso de estado y botones
+            let status = '';
+            if (inv) {
+                status = `Factura emitida el ${new Date(inv.emittedAt).toLocaleDateString('es-VE').replace(/\//g, '-')}.`;
+                const credit = data.isCredit && state.credits.find(c => c.id == data.id);
+                if (credit && invoiceItems(credit.items, credit.date).length < credit.items.length) status += ' Se agregaron productos después de esta factura.';
+            } else if (data.numPending) status = 'Conéctate para asignar el número de esta factura.';
+            else if (!data.fiscalNum) status = 'Se asignará un número al emitir.';
+            $('fiscalStatusNote').textContent = status;
+            $('fiscalStatusNote').classList.toggle('hidden', !status);
+            const blocked = !!data.numPending && !inv;
+            $('fiscalActions').querySelectorAll('button').forEach(b => { b.disabled = blocked; b.classList.toggle('opacity-50', blocked); });
 
             updateFiscalPreview();
             $('fiscalReceiptModal').classList.remove('hidden');
@@ -194,7 +314,7 @@
             const data = tempReceiptData;
             if (!data) return;
 
-            const rate = getActiveRate();
+            const m = invoiceModel(invoiceRec(data), fiscalModelCtx());
 
             // Actualizar inputs de cliente en el ticket
             $('printFiscCliRif').textContent = $('fiscalClientRif').value || 'J-00000000';
@@ -202,83 +322,121 @@
             $('printFiscCliAddress').textContent = $('fiscalClientAddress').value || 'GENERICO';
             $('printFiscCliPhone').textContent = $('fiscalClientPhone').value || '0000-0000000';
 
-            // Meta
-            const d = new Date(data.date);
+            // Meta: la fecha es la de cuando se asignó el número (en datos viejos con número, la de la venta)
+            const d = new Date(data.numAt || (data.fiscalNum ? data.date : new Date().toISOString()));
             $('printFiscDate').textContent = d.toLocaleDateString('es-VE').replace(/\//g, '-');
             $('printFiscTime').textContent = d.toLocaleTimeString('es-VE', {hour: '2-digit', minute:'2-digit'});
-            $('printFiscNum').textContent = data.fiscalNum;
+            $('printFiscNum').textContent = data.fiscalNum && !data.numPending ? data.fiscalNum : 'POR ASIGNAR';
 
             // Items (Renderizados en Bolívares)
-            const tbody = $('printFiscItems');
-            tbody.innerHTML = '';
-            
-            let totalBs = 0;
-
-            if (data.items) {
-                data.items.forEach(item => {
-                    const priceBs = item.price * rate;
-                    const itemTotalBs = (item.qty * item.price) * rate;
-                    totalBs += itemTotalBs;
-                    
-                    // Formato SENIAT:
-                    // 1  XIAOMI REDMI 15C
-                    //                       Bs XXXXX.XX
-                    tbody.innerHTML += `
+            $('printFiscItems').innerHTML = m.items.map(item => `
                         <div class="flex justify-between mb-1">
-                            <span class="w-6">${item.qty}</span>
+                            <span class="w-6">${escapeHtml(item.qty)}</span>
                             <span class="flex-1">${escapeHtml(item.name)}</span>
                         </div>
-                        <div class="text-right mb-2 pr-1">Bs ${itemTotalBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits:2})}</div>
-                    `;
-                });
-            } else if (data.type === 'payment') {
-                totalBs = data.total * rate;
-                tbody.innerHTML = `
-                    <div class="flex justify-between mb-1"><span class="w-6">1</span><span class="flex-1">ABONO A CUENTA</span></div>
-                    <div class="text-right mb-2 pr-1">Bs ${totalBs.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits:2})}</div>`;
+                        <div class="text-right mb-2 pr-1">Bs ${fmtBs(item.bs)}</div>`).join('');
+
+            $('printFiscNote').classList.toggle('hidden', !m.note);
+            $('printFiscNote').textContent = m.note;
+            $('printFiscRateLine').classList.toggle('hidden', !m.bcvRate);
+            $('printFiscRateLine').textContent = m.bcvRate ? `Tasa BCV: ${fmtBs(m.bcvRate)}` + (m.equivUsd ? ` · Equivale a $${fmtBs(m.equivUsd)}` : '') : '';
+
+            $('printFiscSubtotal').textContent = `Bs ${fmtBs(m.bi)}`;
+            $('printFiscBI').textContent = `Bs ${fmtBs(m.bi)}`;
+            $('printFiscIVA').textContent = `Bs ${fmtBs(m.iva)}`;
+            $('printFiscTotal').textContent = `Bs ${fmtBs(m.total)}`;
+
+            // Pago: si es crédito, lo abonado
+            $('printFiscPaymentMethod').textContent = m.method;
+            $('printFiscPaymentAmount').textContent = `Bs ${fmtBs(m.method === 'CREDITO' ? m.paidBs : m.total)}`;
+        }
+
+        // Guarda la copia fija de la factura en la venta o el fiado (y le da número si es un dato viejo sin él). false si no se pudo.
+        async function emitInvoice(data) {
+            const rec = (data.isCredit ? state.credits : state.sales).find(x => x.id == data.id);
+            if (!rec) { alert('No se encontró la operación de esta factura.'); return false; }
+            if (rec.invoice) return true;
+            if (!rec.fiscalNum) {
+                rec.numPending = true;
+                await assignPendingNumbers();
+                if (!rec.fiscalNum) await assignPendingNumbers(); // había otra asignación en curso
+                if (!rec.fiscalNum) {
+                    delete rec.numPending;
+                    alert('No se pudo asignar el número de la factura. Conéctate e inténtalo de nuevo.');
+                    return false;
+                }
             }
+            syncReceiptRecord(data);
+            const cfg = state.fiscalConfig;
+            const client = {
+                rif: $('fiscalClientRif').value || 'J-00000000', name: $('fiscalClientName').value || 'CLIENTE GENERICO',
+                address: $('fiscalClientAddress').value || 'GENERICO', phone: $('fiscalClientPhone').value || '0000-0000000'
+            };
+            const m = invoiceModel(invoiceRec(data), fiscalModelCtx());
+            rec.invoice = invoiceCopy(m, { name: cfg.companyName, rif: cfg.rif, address: cfg.address, zip: cfg.zip }, client, new Date().toISOString());
+            saveData();
+            syncReceiptRecord(data);
+            await prepareFiscalReceiptModal(data); // se repinta desde la copia, con los campos bloqueados
+            return true;
+        }
 
-            // Cálculos de IVA
-            let BI, IVA, FinalTotal;
-            if (state.fiscalConfig.ivaIncluded) {
-                // Extraemos el 16% hacia atrás
-                BI = totalBs / 1.16;
-                IVA = totalBs - BI;
-                FinalTotal = totalBs;
-            } else {
-                // Sumamos el 16% hacia adelante
-                BI = totalBs;
-                IVA = totalBs * 0.16;
-                FinalTotal = totalBs + IVA;
-            }
+        function selfTestFiscal() {
+            const iso = n => `2026-10-${String(n).padStart(2, '0')}T12:00:00.000Z`;
+            const ids = a => a.map(x => x.id).join();
 
-            const fmt = (num) => num.toLocaleString('es-VE', {minimumFractionDigits: 2, maximumFractionDigits:2});
+            // Pendientes y plan de números
+            const st = {
+                sales: [
+                    { id: 1, type: 'sale', date: iso(3), numPending: true },
+                    { id: 2, type: 'payment', date: iso(2), numPending: true },
+                    { id: 3, type: 'sale', date: iso(1), numPending: true },
+                    { id: 4, type: 'sale', date: iso(4), fiscalNum: '000001' }
+                ],
+                credits: [{ id: 5, date: iso(2), numPending: true }, { id: 6, date: iso(5), fiscalNum: '000002' }]
+            };
+            const p = pendingDocs(st);
+            console.assert(ids(p.sales) === '3,5,1' && ids(p.payments) === '2', 'selfTestFiscal: pendientes separados y por fecha');
+            const plan = numberPlan(p.sales, 10);
+            console.assert(plan.map(x => x.num).join() === '10,11,12' && ids(plan.map(x => x.ref)) === '3,5,1', 'selfTestFiscal: números consecutivos en orden de fecha');
+            console.assert(fiscalStart(76, { next: 51, end: 75 }, 76) === 51, 'selfTestFiscal: recupera el bloque');
+            console.assert(fiscalStart(101, { next: 51, end: 75 }, 76) === 101, 'selfTestFiscal: otro reservó después');
+            console.assert(fiscalStart(30, null, 40) === 40 && fiscalStart(50, null, 40) === 50, 'selfTestFiscal: sin bloque');
 
-            // Nota de saldo a favor (abonos que incluyen un sobrante)
-            $('printFiscNote').classList.toggle('hidden', !(data.toBalance > 0));
-            if (data.toBalance > 0) $('printFiscNote').textContent = `Esta factura incluye Bs ${fmt(data.toBalance * rate)} de saldo a favor del cliente.`;
+            // Factura: venta en modo personalizado, copia fija, fiado
+            const ctx = { ivaIncluded: true, bcvRate: 50, fallbackRate: 99, method: 'EFECTIVO', note: '' };
+            const sale = { kind: 'sale', total: 10, items: [{ qty: 1, name: 'A', price: 10 }], rate: 60 };
+            let m = invoiceModel(sale, ctx);
+            console.assert(m.total === 600 && m.equivUsd === 12 && roundMoney(m.bi + m.iva) === m.total, 'selfTestFiscal: venta con tasa propia');
+            const copy = invoiceCopy(m, {}, {}, iso(1));
+            const again = invoiceModel({ ...sale, invoice: copy }, { ivaIncluded: false, bcvRate: 70, fallbackRate: 1, method: 'PAGO MOVIL', note: '' });
+            console.assert(again.total === 600 && again.method === 'EFECTIVO' && again.rate === 60 && again.bi === m.bi, 'selfTestFiscal: la copia no cambia con otra tasa');
+            m = invoiceModel({ ...sale, items: [{ qty: 1, name: 'A', price: 100 }] }, { ...ctx, ivaIncluded: false, bcvRate: 0 });
+            console.assert(m.bi === 6000 && m.iva === 960 && m.total === 6960 && m.equivUsd === null, 'selfTestFiscal: IVA no incluido');
+            const credit = { kind: 'credit', total: 15, rate: 60, paid: 0, creditDate: iso(1), items: [{ qty: 1, name: 'A', price: 10, at: iso(1) }, { qty: 1, name: 'B', price: 5, at: iso(9) }] };
+            m = invoiceModel(credit, ctx);
+            console.assert(m.total === 500 && m.method === 'CREDITO' && m.items.length === 1, 'selfTestFiscal: fiado con tasa BCV y solo lo entregado ese día');
 
-            $('printFiscSubtotal').textContent = `Bs ${fmt(BI)}`;
-            $('printFiscBI').textContent = `Bs ${fmt(BI)}`;
-            $('printFiscIVA').textContent = `Bs ${fmt(IVA)}`;
-            $('printFiscTotal').textContent = `Bs ${fmt(FinalTotal)}`;
+            // Tasa histórica del BCV
+            const h = [{ fecha: '2026-10-30', dolar: 10 }, { fecha: '2026-11-02', dolar: 11 }];
+            console.assert(bcvRateOn(h, '2026-10-31T15:00:00-04:00', 'dolar') === 10, 'selfTestFiscal: sábado usa el viernes');
+            console.assert(bcvRateOn(h, '2026-11-02T09:00:00-04:00', 'dolar') === 11, 'selfTestFiscal: lunes');
+            console.assert(bcvRateOn(h, '2026-10-30T23:30:00-04:00', 'dolar') === 10, 'selfTestFiscal: hora de Venezuela, no UTC');
+            console.assert(bcvRateOn(h, '2026-10-01T12:00:00-04:00', 'dolar') === null && bcvRateOn([], iso(1), 'dolar') === null, 'selfTestFiscal: sin historial');
 
-            // Pago
-            const pMethod = $('fiscalPaymentMethod').value;
-            $('printFiscPaymentMethod').textContent = pMethod;
-            // Si es crédito, mostramos lo abonado (si es venta nueva)
-            if (pMethod === 'CREDITO') {
-                $('printFiscPaymentAmount').textContent = `Bs ${fmt((data.paid || 0) * rate)}`;
-            } else {
-                $('printFiscPaymentAmount').textContent = `Bs ${fmt(FinalTotal)}`;
-            }
+            // Un abono sin número va al recibo personalizado aunque el modo sea fiscal
+            const bak = { t: state.receiptType, rif: state.fiscalConfig.rif };
+            try {
+                state.receiptType = 'FISCAL'; state.fiscalConfig.rif = 'J-1';
+                console.assert(receiptTarget({ type: 'payment' }) === 'personalized', 'selfTestFiscal: abono nuevo al recibo personalizado');
+                console.assert(receiptTarget({ type: 'payment', fiscalNum: '000001' }) === 'fiscal' && receiptTarget({ type: 'sale' }) === 'fiscal', 'selfTestFiscal: abono viejo y venta a la factura');
+            } finally { state.receiptType = bak.t; state.fiscalConfig.rif = bak.rif; }
+            console.log('selfTestFiscal terminado');
         }
 
         // Funciones de descarga para Fiscal
-        async function generateFiscalImage() {
+        async function generateFiscalImage(btn) {
             const node = document.getElementById('fiscalCanvas');
             const options = { backgroundColor: '#ffffff', pixelRatio: 3, width: node.scrollWidth, height: node.scrollHeight };
-            const btn = event.currentTarget;
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generando...';
             btn.disabled = true;
@@ -293,9 +451,11 @@
         }
 
         async function downloadFiscalReceipt(type) {
+            const btn = event.currentTarget; // se lee antes de esperar: después `event` ya no existe
             try {
-                const imgData = await generateFiscalImage();
-                const fileName = `factura_fiscal_${tempReceiptData.fiscalNum}`;
+                if (!(await emitInvoice(tempReceiptData))) return;
+                const imgData = await generateFiscalImage(btn);
+                const fileName = `factura_${tempReceiptData.fiscalNum}`;
                 if (type === 'img') {
                     const link = document.createElement('a'); link.download = `${fileName}.png`; link.href = imgData; link.click();
                 } else {
@@ -313,7 +473,8 @@
         async function shareFiscalReceipt() {
             const btn = event.currentTarget; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>...';
             try {
-                const imgData = await generateFiscalImage();
+                if (!(await emitInvoice(tempReceiptData))) return;
+                const imgData = await generateFiscalImage(btn);
                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                 if (isMobile && navigator.share) {
                     const blob = await (await fetch(imgData)).blob();
@@ -324,6 +485,5 @@
                     alert('Imagen descargada. Se abrirá WhatsApp para que la adjuntes.');
                     window.open(`https://wa.me/?text=Factura%20${tempReceiptData.fiscalNum}`, '_blank');
                 }
-            } catch (e) { console.error(e); } finally { btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl mr-2"></i> Compartir Ticket Fiscal'; }
+            } catch (e) { console.error(e); } finally { btn.innerHTML = '<i class="fa-brands fa-whatsapp text-xl mr-2"></i> Compartir documento'; }
         }
-
