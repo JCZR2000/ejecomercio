@@ -8,10 +8,20 @@
     <title>Pagar</title>
     <script src="https://cdn.tailwindcss.com/3.4.17"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Solo enlaces cortos (body.brand): la página pone --h1..--h3, --btn y --cat según el color de la tienda */
+        body.brand .brand-hdr { background: linear-gradient(135deg, var(--h1), var(--h2), var(--h3)); }
+        body.brand .copy-btn { color: var(--cat); background: #f1f5f9; }
+        body.brand #paidBtn, body.brand #paidSend { background: var(--btn); }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen pb-28 antialiased">
-    <header class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white px-4 pt-6 pb-6 shadow-lg">
+    <header class="brand-hdr bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white px-4 pt-6 pb-6 shadow-lg">
         <div class="max-w-md mx-auto text-center">
+            <div id="brandRow" class="hidden flex items-center justify-center gap-3 mb-1">
+                <div id="shopInitial" class="w-11 h-11 rounded-xl bg-white text-slate-900 font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <p id="brandName" class="text-xl font-extrabold truncate"></p>
+            </div>
             <p id="shopName" class="text-xs uppercase tracking-wide text-slate-300 truncate"></p>
             <p class="text-xs text-slate-400 mt-3">Total a pagar</p>
             <p id="totalBs" class="text-3xl font-extrabold"></p>
@@ -23,8 +33,9 @@
     <main class="max-w-md mx-auto px-4 py-4">
         <div id="errorBox" class="hidden text-center py-16">
             <i class="fa-solid fa-link-slash text-4xl text-slate-300"></i>
-            <p class="font-bold mt-3">Enlace de pago no válido</p>
-            <p class="text-xs text-slate-500 mt-1">Pídele a la tienda que te envíe el enlace de nuevo.</p>
+            <p id="errTitle" class="font-bold mt-3">Enlace de pago no válido</p>
+            <p id="errText" class="text-xs text-slate-500 mt-1">Pídele a la tienda que te envíe el enlace de nuevo.</p>
+            <button id="retryBtn" class="hidden mt-4 bg-slate-800 text-white font-bold text-sm px-5 py-2 rounded-xl">Reintentar</button>
         </div>
 
         <section id="chooser" class="hidden space-y-2">
@@ -48,10 +59,10 @@
     <div id="paidModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center">
         <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 space-y-3">
             <h3 class="font-bold">Confirmar pago</h3>
-            <label class="block text-xs font-bold text-slate-500">Referencia (opcional)
+            <label class="block text-xs font-bold text-slate-500">Referencia del pago
                 <input id="refInput" type="text" maxlength="40" class="w-full border rounded-lg p-2 text-sm mt-1 font-normal text-slate-800">
             </label>
-            <label class="block text-xs font-bold text-slate-500">Adjuntar comprobante
+            <label class="block text-xs font-bold text-slate-500">Adjuntar comprobante (opcional)
                 <input id="proofInput" type="file" accept="image/*,application/pdf" class="w-full text-xs mt-1 font-normal">
             </label>
             <p class="text-[11px] text-slate-500">El archivo no se sube a ningún servidor: lo compartes tú por WhatsApp.</p>
@@ -149,7 +160,7 @@
             const v = document.createElement('p'); v.className = 'text-sm font-bold break-words whitespace-pre-line'; v.textContent = shown;
             box.append(l, v);
             const b = document.createElement('button');
-            b.className = 'text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5 shrink-0';
+            b.className = 'copy-btn text-xs font-bold text-indigo-600 bg-indigo-50 rounded-lg px-3 py-1.5 shrink-0';
             b.textContent = 'Copiar';
             b.onclick = () => copyText(copy, b);
             row.append(box, b);
@@ -177,13 +188,21 @@
 
     function paidText() {
         const ref = $('refInput').value.trim();
-        return `Hola, ya pagué ${bsText(payload.bs)} (${usdText(payload.usd)}) por ${METHOD_NAMES[current.t]}. Referencia: ${ref || 'sin referencia'}`;
+        return `Hola, ya pagué ${bsText(payload.bs)} (${usdText(payload.usd)}) por ${METHOD_NAMES[current.t]}. Referencia: ${ref}`;
     }
 
     async function sendPaid() {
+        const note = $('paidNote');
+        // La referencia es obligatoria: es lo que usa la tienda para comprobar el pago
+        if (!$('refInput').value.trim()) {
+            note.textContent = 'Escribe la referencia del pago para poder enviarlo.';
+            note.classList.remove('hidden');
+            $('refInput').focus();
+            return;
+        }
+        note.classList.add('hidden');
         const text = paidText();
         const file = $('proofInput').files[0];
-        const note = $('paidNote');
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(() => {}); // por si WhatsApp no usa el texto como pie de foto
         if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
             try { await navigator.share({ files: [file], text }); } catch (e) { /* cancelado */ }
@@ -197,9 +216,123 @@
         if (file) { note.textContent = 'Adjunta la captura en el chat de WhatsApp.'; note.classList.remove('hidden'); }
     }
 
+    // ---------- Enlace corto (#u=…): los datos de cobro vienen del perfil público de la tienda ----------
+    const BUCKET = 'ejecomercio-27f57.firebasestorage.app';
+    const PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
+    // Copia de THEMES de catalogo.html
+    const THEMES = {
+        indigo: ['#0f172a', '#1e293b', '#312e81', '#facc15', '#1e1b4b', '#6366f1'],
+        verde: ['#052e16', '#14532d', '#166534', '#a3e635', '#14532d', '#16a34a'],
+        rojo: ['#450a0a', '#7f1d1d', '#991b1b', '#fbbf24', '#7f1d1d', '#dc2626'],
+        azul: ['#082f49', '#0c4a6e', '#075985', '#38bdf8', '#0c4a6e', '#0284c7'],
+        morado: ['#3b0764', '#581c87', '#6b21a8', '#f0abfc', '#581c87', '#9333ea'],
+        oscuro: ['#0a0a0a', '#171717', '#262626', '#facc15', '#262626', '#737373']
+    };
+    const SHORT_METHOD_LETTER = { PAGO_MOVIL: 'P', TRANSFER: 'T', BINANCE: 'B', CUSTOM: 'O' };
+    const SHORT_RATE_NAME = { b: 'BCV', e: 'Euro BCV', p: 'personalizada' };
+    // Misma fórmula que roundMoney (js/08-rates-utils.js)
+    const roundMoney = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+    // Copia de parseShortPaymentLink de js/15-credits.js
+    function parseShortPaymentLink(hash) {
+        try {
+            const q = new URLSearchParams(String(hash || '').replace(/^#/, ''));
+            const uid = q.get('u'), n = q.get('n'), f = q.get('f'), m = q.get('m'), w = q.get('w') || '';
+            const dec = /^\d+(\.\d+)?$/;
+            if (!/^[A-Za-z0-9]{10,40}$/.test(uid || '') || !dec.test(q.get('a') || '') || !dec.test(q.get('r') || '')) return null;
+            const usd = Number(q.get('a')), rate = Number(q.get('r'));
+            if (!(usd > 0) || !(rate > 0) || !SHORT_RATE_NAME[n] || !/^\d{8}$/.test(f || '') || !/^[PTBO]{1,4}$/.test(m || '') || new Set(m).size !== m.length || !/^\d{0,20}$/.test(w)) return null;
+            const keys = [...m].map(l => Object.keys(SHORT_METHOD_LETTER).find(k => SHORT_METHOD_LETTER[k] === l));
+            return { uid, usd, rate, rateName: SHORT_RATE_NAME[n], date: `${f.slice(0, 2)}/${f.slice(2, 4)}/${f.slice(4)}`, keys, wa: w };
+        } catch (e) { return null; }
+    }
+
+    // Une el enlace con el perfil de la tienda; devuelve { payload, shop } o null. Mismos tipos y largos que validatePayload.
+    function buildFromProfile(s, prof) {
+        const str = (v, max) => typeof v === 'string' && v.length <= max;
+        if (!prof || prof.v !== 1 || !prof.shop || typeof prof.shop !== 'object' || !prof.methods || typeof prof.methods !== 'object') return null;
+        const sh = prof.shop;
+        if (!str(sh.title, 120) || !sh.title.trim() || !str(sh.wa, 20)) return null;
+        const methods = [];
+        for (const k of s.keys) {
+            const d = prof.methods[k];
+            if (!d || typeof d !== 'object') continue;
+            const clean = { t: k };
+            for (const f of METHOD_FIELDS[k]) {
+                if (!str(d[f], 400)) return null;
+                clean[f] = d[f];
+            }
+            methods.push(clean);
+        }
+        if (!methods.length) return null;
+        return {
+            payload: { shop: sh.title, wa: (s.wa || sh.wa).replace(/\D/g, ''), usd: s.usd, bs: roundMoney(s.usd * s.rate), rate: s.rate, rateName: s.rateName, date: s.date, methods },
+            brand: { color: THEMES[sh.color] ? sh.color : 'indigo', logo: str(sh.logo, 600) && sh.logo.startsWith(PHOTO_PREFIX) ? sh.logo : '' }
+        };
+    }
+
+    function showError(title, text, retry) {
+        $('errTitle').textContent = title;
+        $('errText').textContent = text;
+        $('retryBtn').classList.toggle('hidden', !retry);
+        $('errorBox').classList.remove('hidden');
+        $('totalBs').textContent = '—';
+    }
+
+    function applyBrand(brand) {
+        const t = THEMES[brand.color];
+        ['--h1', '--h2', '--h3', '--acc', '--btn', '--cat'].forEach((v, i) => document.documentElement.style.setProperty(v, t[i]));
+        document.querySelector('meta[name=theme-color]').content = t[0];
+        document.body.classList.add('brand');
+        document.querySelector('header').classList.remove('from-slate-900', 'via-slate-800', 'to-indigo-900');
+        $('shopName').classList.add('hidden');
+        $('brandRow').classList.remove('hidden');
+        $('brandName').textContent = 'Pagar a ' + payload.shop;
+        const box = $('shopInitial');
+        const initial = () => { box.textContent = payload.shop.trim().charAt(0).toUpperCase() || '?'; };
+        if (brand.logo) {
+            const img = document.createElement('img');
+            img.alt = '';
+            img.className = 'w-full h-full object-contain';
+            img.onerror = initial;
+            img.src = brand.logo;
+            box.appendChild(img);
+        } else initial();
+    }
+
+    async function initShort(s) {
+        $('errorBox').classList.add('hidden');
+        $('totalBs').textContent = '…';
+        let prof;
+        try {
+            // t cambia cada minuto (igual que max-age del archivo): una caché vieja no sirve datos bancarios desactualizados
+            const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/perfil%2F${s.uid}.json?alt=media&t=${Math.floor(Date.now() / 60000)}`);
+            if (res.status === 404 || res.status === 403) return showError('Enlace de pago no válido', 'Pídele a la tienda que te envíe el enlace de nuevo.');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            prof = await res.json();
+        } catch (e) {
+            return showError('Sin conexión', 'No se pudieron cargar los datos de la tienda.', true);
+        }
+        const built = buildFromProfile(s, prof);
+        if (!built) return showError('Enlace de pago no válido', 'Pídele a la tienda que te envíe el enlace de nuevo.');
+        payload = built.payload;
+        applyBrand(built.brand);
+        renderPage();
+    }
+
     function init() {
+        if (/(?:^|[#&])u=/.test(location.hash)) {
+            const s = parseShortPaymentLink(location.hash);
+            if (!s) return showError('Enlace de pago no válido', 'Pídele a la tienda que te envíe el enlace de nuevo.');
+            $('retryBtn').onclick = () => initShort(s);
+            return initShort(s);
+        }
         payload = validatePayload(decodePaymentPayload(location.hash));
         if (!payload) { $('errorBox').classList.remove('hidden'); $('totalBs').textContent = '—'; return; }
+        renderPage();
+    }
+
+    function renderPage() {
         document.title = 'Pagar a ' + payload.shop;
         $('shopName').textContent = payload.shop;
         $('totalBs').textContent = bsText(payload.bs);

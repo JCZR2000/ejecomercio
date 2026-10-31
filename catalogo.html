@@ -162,13 +162,23 @@
     setInterval(renderUpdated, 60000);
 
     async function load() {
-        const uid = new URLSearchParams(location.search).get('u') || '';
-        if (!/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
+        const params = new URLSearchParams(location.search);
+        const slug = params.get('t') || '';
+        let uid = params.get('u') || '';
+        // ?t= es el nombre corto (tienda/{nombre}.json = { u: uid }); ?u= es el enlace de siempre
+        if (slug ? !/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(slug) : !/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
         showMessage('Cargando...');
         $('message').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
         try {
             // El parámetro t cambia cada minuto (igual que max-age del archivo): evita que una caché vieja sirva un catálogo desactualizado
             const t = Math.floor(Date.now() / 60000);
+            if (slug) {
+                const r = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/tienda%2F${slug}.json?alt=media&t=${t}`);
+                if (r.status === 404 || r.status === 403) return showMessage('Esta vitrina no está disponible');
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                uid = String((await r.json()).u || '');
+                if (!/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
+            }
             const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/catalogo%2F${uid}.json?alt=media&t=${t}`);
             if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible');
             if (!res.ok) throw new Error('HTTP ' + res.status);

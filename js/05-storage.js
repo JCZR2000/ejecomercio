@@ -103,6 +103,7 @@
             put('inv_catalog_config', JSON.stringify(state.catalogConfig));
             // funciona sin conexión: solo agenda la cola del dispositivo. Un fallo aquí no debe frenar la subida.
             try { scheduleCatalogPublish(); } catch (e) { console.error('No se pudo agendar la vitrina:', e); }
+            try { schedulePayProfile(); } catch (e) { console.warn('Perfil de cobro:', e); }
 
             // [NUEVO] Guardamos la llave si existe, para no pedirla en el próximo inicio
             if(encryptionKey) put('inv_enc_key', encryptionKey);

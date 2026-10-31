@@ -89,8 +89,89 @@
         }
 
         function buildPaymentLink(payload) {
-            const base = location.origin + location.pathname.replace(/[^/]*$/, '') + 'pagar.html';
-            return base + '#d=' + encodePaymentPayload(payload);
+            return publicPageUrl('pagar') + '#d=' + encodePaymentPayload(payload);
+        }
+
+        // ---------- Fase 17: perfil de cobro público + enlace corto ----------
+        // perfil/{uid}.json guarda marca y datos de cobro de la tienda; el enlace corto solo lleva uid, monto, tasa, fecha y métodos.
+        const PAY_PROFILE_KEY = 'inv_payprofile_hash';
+        const SHORT_METHOD_LETTER = { PAGO_MOVIL: 'P', TRANSFER: 'T', BINANCE: 'B', CUSTOM: 'O' };
+        const SHORT_RATE_LETTER = { 'BCV': 'b', 'Euro BCV': 'e', 'personalizada': 'p' };
+        const SHORT_RATE_NAME = { b: 'BCV', e: 'Euro BCV', p: 'personalizada' };
+        let payProfileTimer = null;
+        let payProfilePublishing = false;
+        let payProfileTried = '';
+
+        // Misma fórmula que roundMoney (js/08-rates-utils.js); pagar.html tiene una copia igual
+        const calcBsFromLink = (usd, rate) => Math.round((usd * rate + Number.EPSILON) * 100) / 100;
+
+        function buildPayProfile() {
+            const c = normalizeCatalogConfig();
+            const keys = SHARE_METHOD_KEYS.filter(isShareMethodConfigured);
+            const methods = {};
+            buildShareMethodList(keys).forEach(({ t, ...fields }) => { methods[t] = fields; });
+            return {
+                v: 1,
+                shop: {
+                    title: clipText(c.title) || clipText((state.receiptConfig || {}).companyName) || 'Mi tienda',
+                    color: c.color,
+                    logo: c.logoUrl,
+                    wa: getShareWhatsapp()
+                },
+                methods
+            };
+        }
+
+        const payProfileHash = (profile) => hashText(JSON.stringify(profile));
+        const payProfileStoredKey = (uid, profile) => uid + ':' + payProfileHash(profile);
+
+        async function publishPayProfile() {
+            const user = auth.currentUser;
+            if (!user || !navigator.onLine || payProfilePublishing) return;
+            const profile = buildPayProfile();
+            if (!Object.keys(profile.methods).length) return; // seguro: un estado vacío (p. ej. cifrado sin desbloquear) nunca reemplaza el perfil
+            payProfilePublishing = true;
+            try {
+                const hash = payProfileHash(profile);
+                await storage.ref(`perfil/${user.uid}.json`).putString(JSON.stringify(profile), 'raw', { contentType: 'application/json', cacheControl: 'public, max-age=60', customMetadata: { hash } });
+                localStorage.setItem(PAY_PROFILE_KEY, user.uid + ':' + hash);
+                const c = normalizeCatalogConfig();
+                if (!c.payProfile) {
+                    state.catalogConfig = { ...c, payProfile: true };
+                    localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+                    saveData();
+                }
+            } finally { payProfilePublishing = false; }
+        }
+
+        // Mantiene el perfil al día (3 s de espera que se reinicia con cada cambio) una vez publicado por primera vez
+        function schedulePayProfile() {
+            const user = auth.currentUser;
+            const c = state.catalogConfig;
+            if (!c || c.payProfile !== true || !user || !navigator.onLine || !state.isCloudSynced) return;
+            clearTimeout(payProfileTimer);
+            if (localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, buildPayProfile())) return;
+            payProfileTimer = setTimeout(() => publishPayProfile().catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e)), 3000);
+        }
+
+        function buildShortPaymentLink({ uid, usd, rate, rateName, date, keys, wa }) {
+            const q = new URLSearchParams({ u: uid, a: String(usd), r: String(rate), n: SHORT_RATE_LETTER[rateName] || 'b',
+                f: formatShareDate(date).replace(/\//g, ''), m: keys.map(k => SHORT_METHOD_LETTER[k]).join('') });
+            if (wa) q.set('w', wa);
+            return publicPageUrl('pagar') + '#' + q.toString();
+        }
+
+        function parseShortPaymentLink(hash) {
+            try {
+                const q = new URLSearchParams(String(hash || '').replace(/^#/, ''));
+                const uid = q.get('u'), n = q.get('n'), f = q.get('f'), m = q.get('m'), w = q.get('w') || '';
+                const dec = /^\d+(\.\d+)?$/;
+                if (!/^[A-Za-z0-9]{10,40}$/.test(uid || '') || !dec.test(q.get('a') || '') || !dec.test(q.get('r') || '')) return null;
+                const usd = Number(q.get('a')), rate = Number(q.get('r'));
+                if (!(usd > 0) || !(rate > 0) || !SHORT_RATE_NAME[n] || !/^\d{8}$/.test(f || '') || !/^[PTBO]{1,4}$/.test(m || '') || new Set(m).size !== m.length || !/^\d{0,20}$/.test(w)) return null;
+                const keys = [...m].map(l => Object.keys(SHORT_METHOD_LETTER).find(k => SHORT_METHOD_LETTER[k] === l));
+                return { uid, usd, rate, rateName: SHORT_RATE_NAME[n], date: `${f.slice(0, 2)}/${f.slice(2, 4)}/${f.slice(4)}`, keys, wa: w };
+            } catch (e) { return null; }
         }
 
         function decodePaymentPayload(hash) {
@@ -157,6 +238,7 @@
             state.currentShareId = id;
             const c = getShareCredit();
             if (!c) return;
+            payProfileTried = '';
             getPaymentMethods();
             shareDraft = {
                 step: 1,
@@ -311,17 +393,31 @@
             const opts = { debt: shareDraft.debt, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now, link: '' };
             if ($('chkIncludeLink').checked) {
                 const cfg = state.catalogConfig || {};
-                opts.link = buildPaymentLink({
-                    v: 1,
-                    shop: clipText(cfg.title) || 'Mi tienda',
-                    wa: getShareWhatsapp() || normalizeCatalogWhatsapp($('shareWhatsapp').value),
-                    usd: amount,
-                    bs: calcBs(amount, shareDraft.rate),
-                    rate: shareDraft.rate,
-                    rateName: shareDraft.rateName,
-                    date: formatShareDate(now),
-                    methods
-                });
+                const user = auth.currentUser;
+                const canCloud = !!user && navigator.onLine;
+                const profile = canCloud ? buildPayProfile() : null;
+                if (canCloud && localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, profile)) {
+                    opts.link = buildShortPaymentLink({ uid: user.uid, usd: amount, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now,
+                        keys: getSelectedShareMethods(), wa: getShareWhatsapp() ? '' : normalizeCatalogWhatsapp($('shareWhatsapp').value) });
+                } else {
+                    opts.link = buildPaymentLink({
+                        v: 1,
+                        shop: clipText(cfg.title) || 'Mi tienda',
+                        wa: getShareWhatsapp() || normalizeCatalogWhatsapp($('shareWhatsapp').value),
+                        usd: amount,
+                        bs: calcBs(amount, shareDraft.rate),
+                        rate: shareDraft.rate,
+                        rateName: shareDraft.rateName,
+                        date: formatShareDate(now),
+                        methods
+                    });
+                    // Enlace largo por ahora; al publicarse el perfil el texto pasa al corto (una sola vez por perfil, para no repetir si falla)
+                    const key = payProfileStoredKey(user ? user.uid : '', profile || {});
+                    if (canCloud && !payProfilePublishing && payProfileTried !== key) {
+                        payProfileTried = key;
+                        publishPayProfile().then(() => regenerateShareMessage()).catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e));
+                    }
+                }
             }
             $('shareMessageInput').value = buildShareMessage(c, amount, methods, opts);
         }
@@ -390,6 +486,21 @@
             t(msg.includes('Monto: 400,00') && msg.includes('Teléfono: 04140000000') && msg.includes('Monto a pagar: $10.00') && msg.includes('- 3x Producto A') && msg.includes('26/10/2026'), 'formato del mensaje');
             const msgFull = buildShareMessage(credit, 20, methods.slice(0, 1), { debt: 20, rate: 40, rateName: 'BCV', date: new Date(2026, 9, 26), link: '' });
             t(!msgFull.includes('Monto a pagar') && !msgFull.includes('Paga y copia'), 'deuda completa sin línea de monto ni enlace');
+            // Enlace corto (Fase 17)
+            const sl = { uid: 'AbC123xyz789AbC123xyz789Abcd', usd: 12.5, rate: 36.02, rateName: 'Euro BCV', date: new Date(2026, 9, 30), keys: ['TRANSFER', 'PAGO_MOVIL', 'CUSTOM'], wa: '584140000000' };
+            const back = parseShortPaymentLink(new URL(buildShortPaymentLink(sl)).hash);
+            t(back && back.uid === sl.uid && back.usd === 12.5 && back.rate === 36.02 && back.rateName === 'Euro BCV' && back.date === '30/10/2026'
+                && back.keys.join() === sl.keys.join() && back.wa === sl.wa, 'enlace corto de ida y vuelta');
+            t(parseShortPaymentLink(new URL(buildShortPaymentLink({ ...sl, wa: '', keys: ['BINANCE'], rateName: 'BCV' })).hash).wa === '', 'enlace corto sin w');
+            t(buildShortPaymentLink(sl).length < 140, 'el enlace corto es corto');
+            ['', '#', '#u=abc&a=1&r=1&n=b&f=30102026&m=P', '#u=AbC123xyz789&a=0&r=1&n=b&f=30102026&m=P', '#u=AbC123xyz789&a=1&r=1&n=x&f=30102026&m=P',
+             '#u=AbC123xyz789&a=1&r=1&n=b&f=3010&m=P', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=PP', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=Z',
+             '#u=AbC123xyz789&a=1e3&r=1&n=b&f=30102026&m=P'].forEach(h => t(parseShortPaymentLink(h) === null, 'enlace corto dañado da null: ' + h));
+            [[1234.56, 36.02], [0.01, 40], [99.995, 1]].forEach(([u, r]) => t(calcBsFromLink(u, r) === calcBs(u, r), `monto en Bs de la página = calcBs (${u} x ${r})`));
+            const prof = buildPayProfile();
+            t(Object.keys(prof).sort().join() === 'methods,shop,v' && prof.v === 1, 'perfil: solo v, shop y methods');
+            t(Object.values(prof.methods).every(m => Object.values(m).some(x => String(x).trim() !== '')), 'perfil: sin métodos vacíos');
+            ['paymentMethods', 'security', 'credits', 'sales'].forEach(s => t(!JSON.stringify(prof).includes(s), 'perfil: apareció ' + s));
             console.log(fails ? `selfTestPaymentRequest: ${fails} fallas` : 'selfTestPaymentRequest: OK');
             return fails;
         }

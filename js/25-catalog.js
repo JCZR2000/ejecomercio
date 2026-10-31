@@ -6,14 +6,28 @@
         const CATALOG_ALLOWED_FIELDS = ['id', 'name', 'category', 'price', 'photo', 'available'];
         const CATALOG_OPTIONAL_FIELDS = ['stock'];
         const CATALOG_PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
-        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, showStock: false, askCustomer: false, allowHide: false, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '' };
+        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, showStock: false, askCustomer: false, allowHide: false, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '', slug: '', payProfile: false };
 // Paletas de la vitrina (la página tiene los mismos nombres); el valor es la muestra del selector
 const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', azul: '#075985', morado: '#6b21a8', oscuro: '#262626' };
         let catalogTimer = null;
         let isPublishingCatalog = false;
         let catalogError = '';
 
+        const CATALOG_SLUG_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
         const catalogPath = (uid) => `catalogo/${uid}.json`;
+        const slugPath = (slug) => `tienda/${slug}.json`;
+
+        // GitHub Pages sirve las páginas sin .html; el servidor local no
+        function publicPageUrl(name) {
+            const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+            return base + name + (location.hostname.endsWith('github.io') ? '' : '.html');
+        }
+
+        // Minúsculas, sin acentos, espacios y _ → '-', sin guiones repetidos ni en los extremos
+        function normalizeSlug(text) {
+            return String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        }
         const normalizeCatalogWhatsapp = (v) => String(v || '').replace(/\D/g, '');
         const isValidCatalogWhatsapp = (v) => /^\d{10,15}$/.test(v);
 
@@ -27,6 +41,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             c.whatsapp = normalizeCatalogWhatsapp(c.whatsapp);
             c.title = String(c.title || '');
             c.slogan = String(c.slogan || '').slice(0, 80);
+            c.slug = CATALOG_SLUG_RE.test(c.slug) ? c.slug : '';
+            c.payProfile = c.payProfile === true;
             if (!CATALOG_COLORS[c.color]) c.color = 'indigo';
             if (typeof c.logoUrl !== 'string' || !c.logoUrl.startsWith(CATALOG_PHOTO_PREFIX)) { c.logoUrl = ''; c.logoHash = ''; }
             state.catalogConfig = c;
@@ -159,6 +175,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         // Tras cada sincronización con la nube (lo llama afterCloudSyncImages, cuando los enlaces de fotos ya están al día)
         function afterCloudSyncCatalog() {
             scheduleCatalogPublish();
+            try { schedulePayProfile(); } catch (e) { console.warn('Perfil de cobro:', e); }
             runCatalogQueue();
             renderCatalogConfigUI();
         }
@@ -205,7 +222,60 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         function catalogPublicUrl() {
             const user = auth.currentUser;
             if (!user) return '';
-            return location.origin + location.pathname.replace(/[^/]*$/, '') + 'catalogo.html?u=' + encodeURIComponent(user.uid);
+            const c = normalizeCatalogConfig();
+            return publicPageUrl('catalogo') + (c.slug ? '?t=' + c.slug : '?u=' + encodeURIComponent(user.uid));
+        }
+
+        // ---------- Nombre de la vitrina (tienda/{slug}.json = { u: uid }) ----------
+        function renderSlugUI() {
+            const input = $('catalogSlug');
+            if (!input) return;
+            const c = normalizeCatalogConfig();
+            if (document.activeElement !== input) input.value = c.slug;
+            const slug = normalizeSlug(input.value);
+            $('catalogSlugPreview').textContent = CATALOG_SLUG_RE.test(slug) ? publicPageUrl('catalogo') + '?t=' + slug : 'De 3 a 30 letras, números o guiones.';
+            $('catalogSlugRelease').classList.toggle('hidden', !c.slug);
+        }
+
+        async function claimCatalogSlug() {
+            const user = auth.currentUser;
+            const slug = normalizeSlug($('catalogSlug').value);
+            if (!user || !navigator.onLine) { customAlert('Sin conexión', 'Necesitas sesión y conexión para reservar el nombre.', 'error'); return; }
+            if (!CATALOG_SLUG_RE.test(slug)) { customAlert('Nombre no válido', 'Usa de 3 a 30 letras, números o guiones.', 'error'); return; }
+            const c = normalizeCatalogConfig();
+            if (slug === c.slug) { renderSlugUI(); return; }
+            busyStart('Reservando nombre...');
+            try {
+                const ref = storage.ref(slugPath(slug));
+                let mine = false;
+                try { const m = await ref.getMetadata(); mine = !!(m.customMetadata && m.customMetadata.owner === user.uid); if (!mine) throw Object.assign(new Error('en uso'), { inUse: true }); }
+                catch (e) { if (e.code !== 'storage/object-not-found') throw e; }
+                if (!mine) {
+                    try { await ref.putString(JSON.stringify({ u: user.uid }), 'raw', { contentType: 'application/json', customMetadata: { owner: user.uid } }); }
+                    catch (e) { if (e.code === 'storage/unauthorized') throw Object.assign(new Error('en uso'), { inUse: true }); throw e; }
+                }
+                if (c.slug) storage.ref(slugPath(c.slug)).delete().catch(() => {});
+                state.catalogConfig = { ...c, slug };
+                localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+                saveData();
+                renderCatalogConfigUI();
+            } catch (e) {
+                if (e.inUse) customAlert('Nombre en uso', 'Ese nombre ya está en uso. Prueba con otro.', 'error');
+                else { console.warn('Nombre no reservado:', e); customAlert('No se pudo reservar', e.message || 'Intenta de nuevo.', 'error'); }
+            } finally { busyEnd(); }
+        }
+
+        function releaseCatalogSlug() {
+            const c = normalizeCatalogConfig();
+            if (!c.slug) return;
+            customConfirm('¿Liberar el nombre?', 'El enlace con este nombre dejará de abrir y cualquiera podrá reservarlo.', 'warning', async () => {
+                try { await storage.ref(slugPath(c.slug)).delete(); }
+                catch (e) { if (e.code !== 'storage/object-not-found') { customAlert('No se pudo liberar', e.message || 'Intenta de nuevo.', 'error'); return; } }
+                state.catalogConfig = { ...normalizeCatalogConfig(), slug: '' };
+                localStorage.setItem('inv_catalog_config', JSON.stringify(state.catalogConfig));
+                saveData();
+                renderCatalogConfigUI();
+            });
         }
 
         function renderCatalogConfigUI() {
@@ -231,6 +301,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             $('catalogLinkBox').classList.toggle('hidden', !c.enabled);
             if (c.enabled) $('catalogLinkInput').value = catalogPublicUrl();
             $('catalogError').textContent = catalogError;
+            renderSlugUI();
             renderCatalogBadge();
         }
 
@@ -413,5 +484,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             const shopOut = buildPublicCatalog(products, { title: 'T', slogan: 'x'.repeat(100), color: 'fucsia', logoUrl: 'https://otro.dominio/l.png' }, { currency: '$', rate: 0 }).shop;
             console.assert(shopOut.slogan.length === 80 && shopOut.color === 'indigo' && shopOut.logo === '', 'selfTestCatalog: lema, color y logo se validan');
             console.assert(buildPublicCatalog(products, { title: 'T', color: 'rojo', logoUrl: fb }, { currency: '$', rate: 0 }).shop.logo === fb, 'selfTestCatalog: logo de Firebase');
+            console.assert(normalizeSlug('Bodega Juan') === 'bodega-juan' && normalizeSlug('Ñandú Café') === 'nandu-cafe' && normalizeSlug('a--b') === 'a-b', 'selfTestCatalog: normalizeSlug');
+            console.assert(CATALOG_SLUG_RE.test('abc') && !CATALOG_SLUG_RE.test(normalizeSlug('ab')) && !CATALOG_SLUG_RE.test('--x--') && !CATALOG_SLUG_RE.test('a'.repeat(31)) && CATALOG_SLUG_RE.test('a'.repeat(30)), 'selfTestCatalog: largo del nombre');
             console.log('selfTestCatalog terminado');
         }
