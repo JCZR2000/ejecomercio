@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v59.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v60.0'; // Actualizado para forzar la recarga
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación

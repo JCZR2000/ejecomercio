@@ -368,7 +368,9 @@
                             totalDebt: totalUSD,
                             paid: roundMoney(initialPay - excess),
                             date: new Date().toISOString(),
-                            nextPaymentDate: nextPaymentDate
+                            nextPaymentDate: nextPaymentDate,
+                            rate: getFiadosActiveRate(),
+                            ...numFields()
                         });
                     }
                     // Saldo a favor (Fase 13b): el sobrante entra al saldo; si el cliente pidió usar su saldo, se aplica
@@ -395,7 +397,8 @@
                             description: `Abono Inicial: ${payName}` + (excess > 0 ? ` (incluye ${formatMoney(excess)} a saldo a favor)` : ''),
                             total: initialPay,
                             ...(excess > 0 ? { toBalance: excess } : {}),
-                            rate: activeRate
+                            rate: activeRate,
+                            ...numFields()
                         });
                     }
                     // Preparar recibo
@@ -421,7 +424,8 @@
                         type: 'sale',
                         items: [...state.cart],
                         total: totalUSD,
-                        rate: activeRate
+                        rate: activeRate,
+                        ...numFields()
                     });
                     
                     tempReceiptData = {
@@ -471,6 +475,7 @@
 
                 // E. PERSISTENCIA Y CIERRE
                 saveData(); // Guardar en Firebase/LocalStorage
+                assignPendingNumbers(); // Fase 21: número de la venta (sin esperar; sin red queda «por asignar»)
                 renderAll(); // Actualizar inventario visual
                 toggleCartModal(false); // CERRAR LA VENTANA (Ahora sí llegará aquí)
             }

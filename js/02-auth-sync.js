@@ -204,6 +204,7 @@
 
         // Listeners del Navegador (Actualizados)
         window.addEventListener('online', () => updateCloudStatus('ONLINE'));
+        window.addEventListener('online', () => assignPendingNumbers());
         window.addEventListener('offline', () => updateCloudStatus('OFFLINE'));
 
         // -------------------------------------------------------------
@@ -747,7 +748,7 @@
                     // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
                     setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state));
                     safeSetItem('inv_cloud_dirty', '');
-                    if (state.receiptType === 'FISCAL' && fiscalRemaining() < FISCAL_LOW_WATER) reserveFiscalBlock();
+                    assignPendingNumbers(); // Fase 21: numera lo que quedó «por asignar» sin conexión
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
                     if (cloudLacksClients || clientsMigrated || cloudLacksArchive) saveData(); // sube 'clients' (y los clientId nuevos) a la nube

@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v51.2</title>
+    <title>EjeComercio v60.0</title>
 
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -155,7 +155,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v51.2</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v60.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -636,7 +636,7 @@
                         <div id="btnTypeFisc" role="button" tabindex="0" onclick="setInvoiceType('FISCAL')" onkeydown="if(event.key==='Enter')setInvoiceType('FISCAL')" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left cursor-pointer bg-white border-slate-200 hover:bg-slate-50">
                             <span class="bg-blue-100 text-blue-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-file-invoice"></i></span>
                             <span class="min-w-0 flex-1">
-                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700">Fiscal (SENIAT)<span id="chipTypeFisc" class="hidden bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">En uso</span></span>
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700">Documento no fiscal<span id="chipTypeFisc" class="hidden bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">En uso</span></span>
                                 <span class="block text-[11px] text-slate-500">Factura con RIF y número de control.</span>
                             </span>
                             <button type="button" id="btnConfigFiscal" onclick="event.stopPropagation(); openFiscalConfigFromMenu()" aria-label="Configurar datos fiscales" class="w-10 h-10 rounded-full bg-white text-blue-600 shadow-sm border border-blue-200 hover:bg-blue-50 flex items-center justify-center shrink-0 transition active:scale-90"><i class="fa-solid fa-gear"></i></button>
@@ -972,7 +972,7 @@
     <div id="editCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto p-4">
             <h3 id="editCreditTitle" class="text-lg font-bold text-gray-800 mb-2"></h3>
-            <p id="editCreditFiscal" class="hidden text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-2">Este fiado ya tiene número fiscal. Al reimprimir, la factura saldrá con los productos nuevos.</p>
+            <p id="editCreditFiscal" class="hidden text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-2">Este fiado ya tiene factura emitida. Los productos nuevos no entran en ella.</p>
             <div id="editCreditItems" class="space-y-2 mb-3"></div>
             <div class="flex justify-between items-center text-sm font-bold mb-3"><span>Deuda actual</span><span id="editCreditDebt"></span></div>
             <button onclick="closeEditCreditModal()" class="w-full bg-gray-200 text-gray-700 py-2 rounded font-bold">Cerrar</button>
@@ -1357,7 +1357,7 @@
             <div class="space-y-3">
                 <button onclick="selectInvoiceType('FISCAL')"
                     class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-slate-900 transition flex items-center justify-between px-4">
-                    <span class="flex items-center gap-2"><i class="fa-solid fa-print"></i> Ticket Fiscal (SENIAT)</span>
+                    <span class="flex items-center gap-2"><i class="fa-solid fa-print"></i> Documento no fiscal (formato factura)</span>
                     <i class="fa-solid fa-chevron-right text-slate-400"></i>
                 </button>
                 <button onclick="selectInvoiceType('PERSONALIZED')"
@@ -1456,6 +1456,7 @@
                         class="col-span-2 border rounded px-2 py-1.5 text-xs uppercase outline-none focus:border-blue-500"
                         placeholder="Dirección" oninput="updateFiscalPreview()">
                 </div>
+                <p id="fiscalStatusNote" class="hidden text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded p-1.5"></p>
                 <div class="flex justify-between mt-1">
                     <button onclick="fillGenericClient()"
                         class="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold hover:bg-blue-200 transition">Usar
@@ -1473,14 +1474,14 @@
             </div>
     
             <!-- PREVIEW DEL TICKET -->
-            <div class="overflow-y-auto bg-slate-800 p-4 flex justify-center custom-scrollbar flex-1"
+            <div class="overflow-y-auto bg-slate-800 p-4 flex justify-center items-start custom-scrollbar flex-1 min-h-0"
                 id="fiscalReceiptScrollArea">
                 <div id="fiscalCanvas" class="bg-white overflow-hidden relative shrink-0 p-4"
                     style="width: 300px; font-family: 'Courier New', Courier, monospace; color: #000;">
     
-                    <!-- Header SENIAT -->
+                    <!-- Encabezado -->
                     <div class="text-center text-xs leading-tight mb-3">
-                        <div class="font-bold text-sm">SENIAT</div>
+                        <div class="font-bold text-sm">DOCUMENTO NO FISCAL</div>
                         <div>RIF <span id="printFiscRif">J-00000000</span></div>
                         <div id="printFiscCompany" class="uppercase">EMPRESA</div>
                         <div id="printFiscAddress" class="uppercase">DIRECCION</div>
@@ -1537,12 +1538,13 @@
                             <span>TOTAL</span>
                             <span id="printFiscTotal">Bs 0.00</span>
                         </div>
+                        <p id="printFiscRateLine" class="hidden text-[9px] mt-2 text-gray-700"></p>
                         <p id="printFiscNote" class="hidden text-[9px] mt-2 text-gray-700"></p>
                     </div>
                 </div>
             </div>
     
-            <div class="p-3 bg-white border-t grid grid-cols-2 gap-2 shrink-0">
+            <div id="fiscalActions" class="p-3 bg-white border-t grid grid-cols-2 gap-2 shrink-0">
                 <button onclick="downloadFiscalReceipt('img')"
                     class="bg-slate-100 text-slate-700 py-2.5 rounded-lg font-bold text-xs hover:bg-slate-200 border border-slate-300 transition">
                     <i class="fa-solid fa-image mr-1"></i> Descargar IMG
@@ -1553,7 +1555,7 @@
                 </button>
                 <button onclick="shareFiscalReceipt()"
                     class="col-span-2 bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 shadow-lg transition active:scale-95">
-                    <i class="fa-brands fa-whatsapp text-xl mr-2"></i> Compartir Ticket Fiscal
+                    <i class="fa-brands fa-whatsapp text-xl mr-2"></i> Compartir documento
                 </button>
             </div>
         </div>
