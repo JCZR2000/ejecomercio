@@ -6,7 +6,8 @@
         const CATALOG_ALLOWED_FIELDS = ['id', 'name', 'category', 'price', 'photo', 'available'];
         const CATALOG_OPTIONAL_FIELDS = ['stock'];
         const CATALOG_PHOTO_PREFIX = 'https://firebasestorage.googleapis.com/';
-        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, showStock: false, askCustomer: false, allowHide: false, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '', slug: '', payProfile: false };
+        const CATALOG_DEFAULT_CONFIG = { enabled: false, delayMin: 5, showStock: false, askCustomer: false, allowHide: false, whatsapp: '', title: '', slogan: '', color: 'indigo', logoUrl: '', logoHash: '', slug: '', payProfile: false, orderMode: 'whatsapp', allowCredit: false };
+const CATALOG_ORDER_MODES = ['whatsapp', 'app', 'both'];
 // Paletas de la vitrina (la página tiene los mismos nombres); el valor es la muestra del selector
 const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', azul: '#075985', morado: '#6b21a8', oscuro: '#262626' };
         let catalogTimer = null;
@@ -43,6 +44,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             c.slogan = String(c.slogan || '').slice(0, 80);
             c.slug = CATALOG_SLUG_RE.test(c.slug) ? c.slug : '';
             c.payProfile = c.payProfile === true;
+            if (!CATALOG_ORDER_MODES.includes(c.orderMode)) c.orderMode = 'whatsapp';
+            c.allowCredit = c.allowCredit === true;
             if (!CATALOG_COLORS[c.color]) c.color = 'indigo';
             if (typeof c.logoUrl !== 'string' || !c.logoUrl.startsWith(CATALOG_PHOTO_PREFIX)) { c.logoUrl = ''; c.logoHash = ''; }
             state.catalogConfig = c;
@@ -73,6 +76,10 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                     logo: typeof config.logoUrl === 'string' && config.logoUrl.startsWith(CATALOG_PHOTO_PREFIX) ? config.logoUrl : ''
             };
             if (config.askCustomer) shop.askCustomer = true; // solo con la opción: el hash de quien no la usa no cambia
+            if (CATALOG_ORDER_MODES.includes(config.orderMode) && config.orderMode !== 'whatsapp') {
+                shop.orderMode = config.orderMode;
+                if (config.allowCredit === true) shop.allowCredit = true;
+            }
             return {
                 v: 1,
                 updatedAt: new Date().toISOString(),
@@ -177,7 +184,29 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             scheduleCatalogPublish();
             try { schedulePayProfile(); } catch (e) { console.warn('Perfil de cobro:', e); }
             runCatalogQueue();
+            syncOrderFlags();
+            startOrdersListener();
             renderCatalogConfigUI();
+        }
+
+        // ---------- Indicadores de pedidos (Fase 19) ----------
+        // users/{uid}/publico/pedidos = { abierto, fiado }: lo que las reglas de Firestore miran para dejar entrar pedidos del cliente
+        function orderFlagsNow() {
+            const c = normalizeCatalogConfig();
+            const abierto = c.enabled && c.orderMode !== 'whatsapp';
+            return { abierto, fiado: abierto && c.allowCredit };
+        }
+
+        async function syncOrderFlags() {
+            const user = auth.currentUser;
+            if (!user || !navigator.onLine) return;
+            const flags = orderFlagsNow();
+            const key = user.uid + JSON.stringify(flags);
+            if (key === localStorage.getItem('inv_order_flags')) return;
+            try {
+                await db.collection('users').doc(user.uid).collection('publico').doc('pedidos').set(flags);
+                localStorage.setItem('inv_order_flags', key);
+            } catch (e) { console.warn('Pedidos: no se pudo actualizar', e.code || e.message || e); } // se reintenta tras la siguiente sincronización
         }
 
         // ---------- Indicador ----------
@@ -294,6 +323,9 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             $('catalogShowStock').checked = c.showStock;
             $('catalogAskCustomer').checked = c.askCustomer;
             $('catalogAllowHide').checked = c.allowHide;
+            $('catalogOrderMode').value = c.orderMode;
+            $('catalogAllowCredit').checked = c.allowCredit;
+            $('catalogAllowCreditBox').classList.toggle('hidden', c.orderMode === 'whatsapp');
             if ($('prodHideBox') && state.editingId === null) $('prodHideBox').classList.toggle('hidden', !c.allowHide);
             $('catalogColors').innerHTML = Object.entries(CATALOG_COLORS).map(([k, hex]) =>
                 `<button type="button" onclick="setCatalogColor('${k}')" title="${k}" class="w-7 h-7 rounded-full border-2 ${c.color === k ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-white'} shadow" style="background:${hex}"></button>`).join('');
@@ -308,7 +340,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             renderCatalogBadge();
         }
 
-        const catalogOptionsFromUI = () => ({ showStock: $('catalogShowStock').checked, askCustomer: $('catalogAskCustomer').checked, allowHide: $('catalogAllowHide').checked });
+        const catalogOptionsFromUI = () => ({ showStock: $('catalogShowStock').checked, askCustomer: $('catalogAskCustomer').checked, allowHide: $('catalogAllowHide').checked, orderMode: $('catalogOrderMode').value, allowCredit: $('catalogAllowCredit').checked });
 
         function saveCatalogConfig() {
             const c = normalizeCatalogConfig();
@@ -321,7 +353,9 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             state.catalogConfig = { ...c, whatsapp, title: $('catalogTitle').value.trim(), slogan: $('catalogSlogan').value.trim(), delayMin: parseInt($('catalogDelay').value) || 5, ...catalogOptionsFromUI() };
             localStorage.setItem('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
             saveData(); // sincroniza la configuración y agenda la subida
+            syncOrderFlags();
             renderCatalogConfigUI();
+            startOrdersListener();
         }
 
         function toggleCatalog(enabled) {
@@ -340,7 +374,9 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 catalogError = '';
                 setCatalogQueue({ uid: auth.currentUser.uid, action: 'publish', due: Date.now(), qhash: '' });
                 runCatalogQueue(true);
+                syncOrderFlags();
                 renderCatalogConfigUI();
+                startOrdersListener();
             } else {
                 customConfirm('¿Apagar la vitrina?', 'Se borrará el archivo público y el enlace dejará de funcionar.', 'warning', () => {
                     state.catalogConfig = { ...c, enabled: false };
@@ -349,7 +385,9 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                     catalogError = '';
                     if (auth.currentUser) setCatalogQueue({ uid: auth.currentUser.uid, action: 'delete', due: Date.now() });
                     runCatalogQueue(true);
+                    syncOrderFlags();
                     renderCatalogConfigUI();
+                    startOrdersListener();
                 });
             }
         }
@@ -489,5 +527,11 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             console.assert(buildPublicCatalog(products, { title: 'T', color: 'rojo', logoUrl: fb }, { currency: '$', rate: 0 }).shop.logo === fb, 'selfTestCatalog: logo de Firebase');
             console.assert(normalizeSlug('Bodega Juan') === 'bodega-juan' && normalizeSlug('Ñandú Café') === 'nandu-cafe' && normalizeSlug('a--b') === 'a-b', 'selfTestCatalog: normalizeSlug');
             console.assert(CATALOG_SLUG_RE.test('abc') && !CATALOG_SLUG_RE.test(normalizeSlug('ab')) && !CATALOG_SLUG_RE.test('--x--') && !CATALOG_SLUG_RE.test('a'.repeat(31)) && CATALOG_SLUG_RE.test('a'.repeat(30)), 'selfTestCatalog: largo del nombre');
+            const ord = buildPublicCatalog(products, { title: 'T', orderMode: 'both', allowCredit: true }, { currency: '$', rate: 0 }).shop;
+            console.assert(ord.orderMode === 'both' && ord.allowCredit === true, 'selfTestCatalog: orderMode / allowCredit');
+            console.assert(!('orderMode' in buildPublicCatalog(products, { title: 'T', orderMode: 'whatsapp', allowCredit: true }, { currency: '$', rate: 0 }).shop), 'selfTestCatalog: orderMode por defecto no sale');
+            state.catalogConfig = { orderMode: 'raro', allowCredit: 'si' };
+            console.assert(normalizeCatalogConfig().orderMode === 'whatsapp' && normalizeCatalogConfig().allowCredit === false, 'selfTestCatalog: orderMode desconocido -> por defecto');
+            state.catalogConfig = keep;
             console.log('selfTestCatalog terminado');
         }

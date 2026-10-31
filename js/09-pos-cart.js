@@ -320,6 +320,9 @@
 
             // excess: parte del abono inicial que va al saldo a favor del cliente
             function runCheckout(excess) {
+                // Fase 19: se lee al inicio porque exitEditMode (fiado existente) cierra el carrito y limpiaría el pedido pendiente
+                const doneOrderId = state.pendingOrderId, doneOrderPhone = state.pendingOrderPhone, doneOrderMsg = state.pendingOrderMsg, doneOrderName = state.pendingOrderName;
+                state.pendingOrderId = state.pendingOrderPhone = state.pendingOrderMsg = state.pendingOrderName = null;
                 // Cliente del fiado nuevo (Fase 13): el elegido, uno con ese nombre o uno nuevo solo con nombre
                 const clientId = isCredit && !state.activeCreditId ? resolvePosClient(customerName).id : null;
                 let payName = customerName;
@@ -337,6 +340,7 @@
                 // receiptId: el recibo debe llevar el id real para que su número fiscal quede guardado en la venta/fiado
                 let receiptId = Date.now();
                 let receiptFiscalNum;
+                let prevPaid = 0, addedToExisting = false; // sumar a un fiado existente: el recibo muestra el fiado completo
                 if (isCredit) {
                     if (state.activeCreditId) {
                         receiptId = state.activeCreditId;
@@ -344,6 +348,8 @@
                         const idx = state.credits.findIndex(c => c.id == state.activeCreditId);
                         if (idx !== -1) {
                             receiptFiscalNum = state.credits[idx].fiscalNum;
+                            prevPaid = state.credits[idx].paid;
+                            addedToExisting = true;
                             payName = state.credits[idx].customer;
                             if (!getClient(state.credits[idx].clientId)) state.credits[idx].clientId = resolvePosClient(payName).id;
                             state.credits[idx].items.push(...state.cart.map(i => ({ ...i, at: new Date().toISOString() }))); // 'at': día en que se fiaron (Fase 14)
@@ -394,9 +400,10 @@
                     }
                     // Preparar recibo
                     tempReceiptData = {
-                        items: [...state.cart],
-                        total: totalUSD,
+                        items: addedToExisting && creditRef ? creditRef.items.map(i => ({ ...i })) : [...state.cart],
+                        total: addedToExisting && creditRef ? calculateRealDebt(creditRef) : totalUSD,
                         paid: roundMoney(initialPay - excess),
+                        ...(addedToExisting && creditRef ? { paidBefore: prevPaid, addedToday: totalUSD } : {}),
                         balanceUsed,
                         date: new Date().toISOString(),
                         customer: payName,
@@ -426,6 +433,16 @@
                         id: receiptId
                     };
                     $('successModal').classList.remove('hidden');
+                }
+
+                // Fase 19: si el carrito venía de un pedido en línea, se cierra el pedido y el recibo puede ir a su WhatsApp
+                if (doneOrderId) {
+                    tempReceiptData.waPhone = clientWaNumber(doneOrderPhone);
+                    tempReceiptData.waMsg = doneOrderMsg;
+                    if (!tempReceiptData.customer) tempReceiptData.customer = doneOrderName || ''; // el recibo de contado sale con el nombre del cliente del pedido
+                    if ($('successOrderWa')) $('successOrderWa').classList.toggle('hidden', !tempReceiptData.waPhone);
+                    if ($('successMsg')) $('successMsg').textContent = tempReceiptData.waPhone ? 'Pedido en línea listo. Puedes avisarle al cliente o enviarle el recibo por WhatsApp.' : 'Pedido en línea listo.';
+                    finishOrder(doneOrderId);
                 }
 
                 // D. GUARDADO Y LIMPIEZA FINAL

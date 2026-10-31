@@ -166,6 +166,7 @@
             <div class="flex items-center gap-3">
                 
                 <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden"></button>
+                <button type="button" id="ordersBadge" onclick="openOrders()" class="hidden text-[11px] font-bold flex items-center gap-1 h-8 px-2 rounded bg-slate-800 border border-slate-700 text-amber-300" title="Pedidos en línea"><i class="fa-solid fa-inbox text-sm"></i><span id="ordersCount"></span></button>
                 <div id="rateBox" class="bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors">
                     <span class="text-xs text-gray-400 font-bold">Tasa:</span>
                     <input type="number" id="displayRate" readonly class="bg-transparent text-white w-16 text-sm font-mono focus:outline-none text-right cursor-default" placeholder="0.00">
@@ -683,6 +684,23 @@
                                 </select>
                             </label>
                             <p class="text-[10px] text-slate-400 mt-0.5">Después de un cambio, la app espera este tiempo antes de publicar la vitrina, para juntar varios cambios en una sola subida.</p>
+                        </div>
+                        <div class="border-t border-slate-100 pt-3 space-y-3">
+                            <p class="text-xs font-bold text-slate-600 uppercase tracking-wide">Pedidos</p>
+                            <div>
+                                <label for="catalogOrderMode" class="flex items-center justify-between gap-3 text-xs font-bold text-slate-600">Cómo recibir pedidos
+                                    <select id="catalogOrderMode" onchange="saveCatalogConfig()" class="border border-slate-200 rounded-xl px-2 py-1 text-xs bg-white font-normal">
+                                        <option value="whatsapp">Solo WhatsApp</option><option value="app">Solo en la app</option><option value="both">Ambos</option>
+                                    </select>
+                                </label>
+                                <p class="text-[10px] text-slate-400 mt-0.5">En la app, los pedidos llegan a la bandeja y tú decides si aceptarlos.</p>
+                            </div>
+                            <div id="catalogAllowCreditBox" class="hidden">
+                                <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Permitir pedir fiado
+                                    <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAllowCredit" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                                </label>
+                                <p class="text-[10px] text-gray-500 mt-0.5">Siempre tendrás que aprobar cada fiado.</p>
+                            </div>
                         </div>
                         <details class="group border border-slate-100 rounded-2xl bg-slate-50">
                             <summary class="flex items-center justify-between gap-2 p-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
@@ -1229,15 +1247,29 @@
         </div>
     </div>
 
+    <div id="ordersModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between p-4 border-b">
+                <h3 id="ordersTitle" class="font-bold text-gray-800"><i class="fa-solid fa-inbox mr-2 text-amber-500"></i>Pedidos en línea</h3>
+                <button onclick="closeOrders()" class="text-gray-400 hover:text-gray-600 w-8 h-8" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="ordersBody" class="p-4 overflow-y-auto space-y-2"></div>
+        </div>
+    </div>
+
     <div id="successModal" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs p-6 text-center animate-bounce-in">
             <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i class="fa-solid fa-check text-3xl text-green-600"></i>
             </div>
             <h3 class="text-xl font-bold text-gray-800 mb-2">¡Operación Exitosa!</h3>
-            <p class="text-sm text-gray-500 mb-6">Los datos se han guardado correctamente.</p>
+            <p id="successMsg" class="text-sm text-gray-500 mb-6">Los datos se han guardado correctamente.</p>
     
             <div class="space-y-3">
+                <button id="successOrderWa" onclick="notifyOrderApproved()"
+                    class="hidden w-full bg-green-600 text-white py-3 rounded-lg font-bold shadow hover:bg-green-700 flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-whatsapp"></i> Avisar: pedido aprobado
+                </button>
                 <button onclick="openReceiptFromSuccess()"
                     class="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow hover:bg-indigo-700 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-receipt"></i> Generar Recibo
@@ -1363,6 +1395,14 @@
                         <div id="printCreditInfo"
                             class="hidden bg-gray-50 p-2 rounded border border-gray-300 text-[11px] mt-2 mb-3">
                             <table class="w-full">
+                                <tr id="printAddedRow" class="hidden">
+                                    <td class="text-gray-600 align-middle pb-1 text-left leading-none">Agregado hoy:</td>
+                                    <td id="printAdded" class="font-bold text-black text-right align-middle pb-1 leading-none">$0.00</td>
+                                </tr>
+                                <tr id="printPaidBeforeRow" class="hidden">
+                                    <td class="text-gray-600 align-middle pb-1 text-left leading-none">Abonado antes:</td>
+                                    <td id="printPaidBefore" class="font-bold text-black text-right align-middle pb-1 leading-none">$0.00</td>
+                                </tr>
                                 <tr>
                                     <td class="text-gray-600 align-middle pb-1 text-left leading-none">Abonado hoy:</td>
                                     <td id="printPaid"
@@ -2268,5 +2308,6 @@
     <script src="js/25-catalog.js"></script>
     <script src="js/26-clients.js"></script>
     <script src="js/27-profit.js"></script>
+    <script src="js/28-orders.js"></script>
 </body>
 </html>

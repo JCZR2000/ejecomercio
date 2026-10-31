@@ -17,6 +17,11 @@
         .acc-bg { background: var(--acc); color: #0f172a; }
         .btn-add { background: var(--btn); }
         .cat-label { color: var(--cat); }
+        /* Interruptor de opciones: el radio va oculto y el texto se colorea con el tema */
+        .seg label { flex: 1; }
+        .seg label span { display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .6rem .5rem; border-radius: .7rem; font-size: .8rem; font-weight: 700; color: #475569; cursor: pointer; transition: .15s; }
+        .seg input:checked + span { background: var(--btn); color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+        .seg input:focus-visible + span { outline: 2px solid var(--cat); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen pb-32 antialiased">
@@ -61,7 +66,10 @@
                     </span>
                 </button>
                 <button id="orderBtn" type="button" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow">
-                    <i class="fa-brands fa-whatsapp mr-1"></i> Pedir
+                    <i class="fa-brands fa-whatsapp mr-1"></i> <span id="orderBtnText">Pedir</span>
+                </button>
+                <button id="orderAppBtn" type="button" class="hidden btn-add text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow hover:opacity-90">
+                    <i class="fa-solid fa-cart-shopping mr-1"></i> Pedir
                 </button>
             </div>
             <p id="cartNote" class="text-[10px] text-slate-400 text-center pb-2 -mt-1">El negocio confirmará disponibilidad y precio</p>
@@ -69,19 +77,58 @@
     </div>
 
     <div id="custModal" class="hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center p-3">
-        <div class="bg-white rounded-2xl w-full max-w-sm p-4 space-y-3 shadow-2xl">
-            <h2 class="font-extrabold text-lg">Tus datos</h2>
-            <input id="custName" maxlength="60" placeholder="Nombre" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <div class="flex gap-4 text-sm">
-                <label class="flex items-center gap-1"><input type="radio" name="custDelivery" value="retiro" checked> Retiro en tienda</label>
-                <label class="flex items-center gap-1"><input type="radio" name="custDelivery" value="delivery"> Delivery</label>
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
+            <div class="hdr text-white px-4 py-3 flex items-center gap-3 shrink-0">
+                <span class="w-10 h-10 rounded-xl acc-bg flex items-center justify-center shrink-0"><i id="custIcon" class="fa-solid fa-cart-shopping"></i></span>
+                <div class="min-w-0">
+                    <h2 id="custTitle" class="font-extrabold text-lg leading-tight">Finalizar pedido</h2>
+                    <p id="custSummary" class="text-xs text-slate-300 truncate"></p>
+                </div>
             </div>
-            <input id="custAddress" maxlength="200" placeholder="Dirección" class="hidden w-full border rounded-lg px-3 py-2 text-sm">
-            <input id="custNote" maxlength="200" placeholder="Nota (opcional)" class="w-full border rounded-lg px-3 py-2 text-sm">
-            <p id="custError" class="text-xs text-red-600 font-bold"></p>
-            <div class="flex gap-2">
-                <button id="custCancel" type="button" class="flex-1 bg-slate-100 rounded-xl py-2.5 text-sm font-bold">Cancelar</button>
-                <button id="custSend" type="button" class="flex-1 bg-green-600 text-white rounded-xl py-2.5 text-sm font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Enviar por WhatsApp</button>
+            <div class="p-4 overflow-y-auto">
+                <div id="custForm" class="space-y-3">
+                    <div>
+                        <label for="custName" class="block text-[11px] font-bold text-slate-500 mb-1">Nombre</label>
+                        <input id="custName" maxlength="60" placeholder="Tu nombre" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                    </div>
+                    <div id="custPhoneBox" class="hidden">
+                        <label for="custPhone" class="block text-[11px] font-bold text-slate-500 mb-1">Teléfono</label>
+                        <input id="custPhone" type="tel" inputmode="tel" maxlength="20" placeholder="Ej: 04141234567" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                    </div>
+                    <div>
+                        <p class="text-[11px] font-bold text-slate-500 mb-1">Entrega</p>
+                        <div class="seg flex gap-1 bg-slate-100 rounded-2xl p-1">
+                            <label><input type="radio" name="custDelivery" value="retiro" checked class="sr-only"><span><i class="fa-solid fa-store"></i>Retiro en tienda</span></label>
+                            <label><input type="radio" name="custDelivery" value="delivery" class="sr-only"><span><i class="fa-solid fa-motorcycle"></i>Delivery</span></label>
+                        </div>
+                        <div id="custAddressBox" class="hidden mt-2">
+                            <div class="flex gap-2">
+                                <input id="custAddress" maxlength="120" placeholder="Dirección de entrega" class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                                <button id="custLocBtn" type="button" title="Usar mi ubicación" aria-label="Usar mi ubicación" class="shrink-0 w-11 rounded-xl btn-add text-white hover:opacity-90"><i class="fa-solid fa-location-dot"></i></button>
+                            </div>
+                            <p id="custLocMsg" class="hidden mt-1 text-[11px] font-bold"></p>
+                        </div>
+                    </div>
+                    <div id="custPayBox" class="hidden">
+                        <p class="text-[11px] font-bold text-slate-500 mb-1">¿Cómo pagas?</p>
+                        <div class="seg flex gap-1 bg-slate-100 rounded-2xl p-1">
+                            <label><input type="radio" name="custPay" value="contado" checked class="sr-only"><span><i class="fa-solid fa-money-bill-wave"></i>Contado</span></label>
+                            <label id="custPayCreditLbl" class="hidden"><input type="radio" name="custPay" value="fiado" class="sr-only"><span><i class="fa-solid fa-handshake"></i>Fiado</span></label>
+                        </div>
+                    </div>
+                    <input id="custNote" maxlength="200" placeholder="Nota (opcional)" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                    <p id="custError" class="text-xs text-red-600 font-bold empty:hidden"></p>
+                    <div class="flex gap-2">
+                        <button id="custCancel" type="button" class="flex-1 bg-slate-100 rounded-xl py-3 text-sm font-bold">Cancelar</button>
+                        <button id="custSend" type="button" class="flex-[2] btn-add text-white rounded-xl py-3 text-sm font-bold shadow"><i class="fa-solid fa-paper-plane mr-1"></i>Enviar pedido</button>
+                    </div>
+                    <p id="custPrivacy" class="hidden text-[10px] text-slate-400 text-center">Tu nombre y teléfono se envían solo a esta tienda para atender tu pedido.</p>
+                </div>
+                <div id="custDone" class="hidden space-y-3 text-center">
+                    <p class="font-bold text-green-700"><i class="fa-solid fa-circle-check mr-1"></i>¡Pedido enviado! La tienda lo revisará y te contactará.</p>
+                    <button id="custClose" type="button" class="w-full bg-slate-100 rounded-xl py-3 text-sm font-bold">Cerrar</button>
+                </div>
+                <button id="custWaAlert" type="button" class="hidden mt-3 w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Avisar por WhatsApp</button>
             </div>
         </div>
     </div>
@@ -103,7 +150,10 @@
         morado: ['#3b0764', '#581c87', '#6b21a8', '#f0abfc', '#581c87', '#9333ea'],
         oscuro: ['#0a0a0a', '#171717', '#262626', '#facc15', '#262626', '#737373']
     };
-    let shop = { title: 'Catálogo', whatsapp: '', slogan: '', color: 'indigo', logo: '', askCustomer: false };
+    // apiKey de firebaseConfig: pública por diseño; la seguridad está en las reglas de Firestore
+    const FS_PROJECT = 'ejecomercio-27f57', FS_API_KEY = 'AIzaSyBMjRVdh6_3-eqOlxFpjjIPOJhWgIsaJOo';
+    let shop = { title: 'Catálogo', whatsapp: '', slogan: '', color: 'indigo', logo: '', askCustomer: false, orderMode: 'whatsapp', allowCredit: false };
+    let shopUid = '';
     let currency = '$', rate = null, products = [], activeCat = '', updatedAt = null;
     const cart = new Map(); // id -> cantidad
 
@@ -129,7 +179,9 @@
             slogan: String(s.slogan || '').trim().slice(0, 80),
             color: THEMES[s.color] ? s.color : 'indigo',
             logo: typeof s.logo === 'string' && s.logo.startsWith(PHOTO_PREFIX) ? s.logo : '',
-            askCustomer: s.askCustomer === true
+            askCustomer: s.askCustomer === true,
+            orderMode: ['app', 'both'].includes(s.orderMode) ? s.orderMode : 'whatsapp',
+            allowCredit: s.allowCredit === true
         };
         const d = new Date(data.updatedAt);
         updatedAt = isNaN(d) ? null : d;
@@ -183,6 +235,7 @@
             if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible');
             if (!res.ok) throw new Error('HTTP ' + res.status);
             normalize(await res.json());
+            shopUid = uid;
         } catch (e) {
             console.warn('Vitrina:', e);
             return showMessage('Sin conexión. Intenta de nuevo', true);
@@ -262,33 +315,128 @@
         $('cartNote').textContent = products.some(p => p.stock !== null)
             ? 'La tienda podrá cumplir tu pedido según la disponibilidad de los productos.'
             : 'El negocio confirmará disponibilidad y precio';
-        $('orderBtn').classList.toggle('hidden', !shop.whatsapp); // sin WhatsApp no hay a quién pedir
+        // Un botón por vía: WhatsApp (si hay número) y/o el carrito de la página; con ambos, el de WhatsApp se llama «WhatsApp»
+        $('orderBtn').classList.toggle('hidden', shop.orderMode === 'app' || !shop.whatsapp);
+        $('orderBtnText').textContent = shop.orderMode === 'both' ? 'WhatsApp' : 'Pedir';
+        $('orderAppBtn').classList.toggle('hidden', shop.orderMode === 'whatsapp');
+        $('custSummary').textContent = `${shop.title} · ${items.reduce((s, x) => s + x.n, 0)} producto(s) · ${currency}${fmt(total)}`;
     }
 
     let orderText = '';
     const sendOrder = (extra) => window.open(`https://wa.me/${shop.whatsapp}?text=${encodeURIComponent(orderText + extra)}`, '_blank', 'noopener');
     const getSaved = () => { try { return JSON.parse(localStorage.getItem('vitrina_cliente')) || {}; } catch (e) { return {}; } };
     const delivery = () => document.querySelector('input[name=custDelivery]:checked').value;
-    const syncAddress = () => $('custAddress').classList.toggle('hidden', delivery() !== 'delivery');
+    const syncAddress = () => $('custAddressBox').classList.toggle('hidden', delivery() !== 'delivery');
 
-    $('orderBtn').addEventListener('click', () => {
-        if (!shop.askCustomer) return sendOrder('');
-        const s = getSaved();
-        $('custName').value = s.name || '';
-        $('custAddress').value = s.address || '';
-        $('custError').textContent = '';
-        $('custModal').classList.remove('hidden');
+    // Ubicación (pin): enlace de Google Maps que se une a la dirección. Cabe en el tope de 120 letras de las reglas.
+    let custLoc = '';
+    function setLocMsg(text, ok) {
+        const m = $('custLocMsg');
+        m.textContent = text;
+        m.className = 'mt-1 text-[11px] font-bold ' + (ok ? 'text-green-700' : 'text-red-600') + (text ? '' : ' hidden');
+    }
+    const locMaxAddress = () => 120 - (custLoc ? custLoc.length + 1 : 0);
+    function syncAddressLimit() { $('custAddress').maxLength = locMaxAddress(); }
+    $('custLocBtn').addEventListener('click', () => {
+        if (!navigator.geolocation) return setLocMsg('Tu navegador no permite usar la ubicación. Escribe la dirección.', false);
+        setLocMsg('Buscando tu ubicación...', true);
+        navigator.geolocation.getCurrentPosition(pos => {
+            custLoc = `https://maps.google.com/?q=${pos.coords.latitude.toFixed(6)},${pos.coords.longitude.toFixed(6)}`;
+            $('custAddress').value = $('custAddress').value.slice(0, locMaxAddress());
+            syncAddressLimit();
+            setLocMsg('Ubicación añadida. Puedes escribir también una referencia.', true);
+        }, err => setLocMsg(err.code === 1 ? 'No diste permiso. Escribe la dirección.' : 'No se pudo obtener tu ubicación. Escribe la dirección.', false),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
     });
+    const fullAddress = () => [$('custAddress').value.trim(), custLoc].filter(Boolean).join(' ');
+
+    let modalApp = false; // true: el pedido va a la bandeja de la tienda; false: por WhatsApp
+    let lastWaExtra = '';
+
+    function openOrderModal(app) {
+        modalApp = app;
+        const sv = getSaved();
+        $('custName').value = sv.name || '';
+        $('custPhone').value = sv.phone || '';
+        $('custAddress').value = (sv.address || '').replace(/https:\/\/maps\.google\.com\S*/, '').trim();
+        custLoc = '';
+        syncAddressLimit();
+        setLocMsg('', true);
+        $('custError').textContent = '';
+        // En la app: teléfono obligatorio, forma de pago y aviso de privacidad; la nota solo va por WhatsApp
+        $('custPhoneBox').classList.toggle('hidden', !app);
+        $('custPayBox').classList.toggle('hidden', !app);
+        $('custPayCreditLbl').classList.toggle('hidden', !shop.allowCredit);
+        document.querySelector('input[name=custPay][value=contado]').checked = true;
+        document.querySelector('input[name=custDelivery][value=retiro]').checked = true;
+        syncAddress();
+        $('custPrivacy').classList.toggle('hidden', !app);
+        $('custNote').classList.toggle('hidden', app);
+        $('custIcon').className = app ? 'fa-solid fa-cart-shopping' : 'fa-brands fa-whatsapp';
+        $('custSend').className = 'flex-[2] text-white rounded-xl py-3 text-sm font-bold shadow ' + (app ? 'btn-add' : 'bg-green-600');
+        $('custSend').innerHTML = app ? '<i class="fa-solid fa-paper-plane mr-1"></i>Enviar pedido' : '<i class="fa-brands fa-whatsapp mr-1"></i>Enviar por WhatsApp';
+        $('custWaAlert').classList.add('hidden');
+        $('custForm').classList.remove('hidden');
+        $('custDone').classList.add('hidden');
+        $('custModal').classList.remove('hidden');
+    }
+
+    $('orderBtn').addEventListener('click', () => { if (shop.askCustomer) openOrderModal(false); else sendOrder(''); });
+    $('orderAppBtn').addEventListener('click', () => openOrderModal(true));
     document.querySelectorAll('input[name=custDelivery]').forEach(r => r.addEventListener('change', syncAddress));
     $('custCancel').addEventListener('click', () => $('custModal').classList.add('hidden'));
-    $('custSend').addEventListener('click', () => {
-        const name = $('custName').value.trim(), address = $('custAddress').value.trim(), note = $('custNote').value.trim();
+    $('custClose').addEventListener('click', () => $('custModal').classList.add('hidden'));
+    $('custWaAlert').addEventListener('click', () => sendOrder(lastWaExtra));
+
+    const fsStr = (v) => ({ stringValue: String(v) });
+    // POST a la API REST de Firestore (sin SDK). Las reglas validan forma y tamaño; el pedido no lleva precios.
+    async function postOrder(o) {
+        const fields = {
+            v: { integerValue: '1' }, name: fsStr(o.name), phone: fsStr(o.phone), pay: fsStr(o.pay), delivery: fsStr(o.delivery),
+            items: { arrayValue: { values: o.items.map(i => ({ mapValue: { fields: { id: fsStr(i.id), n: { integerValue: String(i.n) }, name: fsStr(i.name.slice(0, 80)) } } })) } },
+            at: { timestampValue: new Date().toISOString() }
+        };
+        if (o.delivery === 'delivery') fields.address = fsStr(o.address);
+        const r = await fetch(`https://firestore.googleapis.com/v1/projects/${FS_PROJECT}/databases/(default)/documents/users/${encodeURIComponent(shopUid)}/pedidos?key=${FS_API_KEY}`,
+            { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields }) });
+        if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { status: r.status });
+    }
+
+    $('custSend').addEventListener('click', async () => {
+        const name = $('custName').value.trim(), address = fullAddress(), note = $('custNote').value.trim();
+        const phone = $('custPhone').value.replace(/\D/g, '');
         const isDelivery = delivery() === 'delivery';
         if (!name) return $('custError').textContent = 'Escribe tu nombre';
+        if (modalApp && !/^\d{7,15}$/.test(phone)) return $('custError').textContent = 'Escribe tu teléfono (de 7 a 15 números)';
         if (isDelivery && !address) return $('custError').textContent = 'Escribe la dirección de entrega';
-        try { localStorage.setItem('vitrina_cliente', JSON.stringify({ name, address })); } catch (e) { /* modo privado */ }
-        sendOrder(`\nNombre: ${name}\nEntrega: ${isDelivery ? 'Delivery — Dirección: ' + address : 'Retiro en tienda'}` + (note ? `\nNota: ${note}` : ''));
-        $('custModal').classList.add('hidden');
+        if (isDelivery && address.length > 120 && modalApp) return $('custError').textContent = 'La dirección es muy larga (máximo 120 letras)';
+        try { localStorage.setItem('vitrina_cliente', JSON.stringify({ name, phone, address: $('custAddress').value.trim() })); } catch (e) { /* modo privado */ }
+        const extra = `\nNombre: ${name}\nEntrega: ${isDelivery ? 'Delivery — Dirección: ' + address : 'Retiro en tienda'}` + (note ? `\nNota: ${note}` : '');
+        if (!modalApp) {
+            sendOrder(extra);
+            $('custModal').classList.add('hidden');
+            return;
+        }
+        const items = [...cart].map(([id, n]) => ({ p: products.find(x => x.id === id), n })).filter(x => x.p).map(x => ({ id: x.p.id, n: x.n, name: x.p.name }));
+        if (!items.length || items.length > 50) return $('custError').textContent = items.length ? 'Son demasiados productos en un pedido (máximo 50)' : 'Tu pedido está vacío';
+        const btn = $('custSend'), both = shop.orderMode === 'both' && !!shop.whatsapp;
+        btn.disabled = true;
+        $('custError').textContent = 'Enviando...';
+        try {
+            await postOrder({ name, phone, address, delivery: isDelivery ? 'delivery' : 'retiro', pay: shop.allowCredit && document.querySelector('input[name=custPay]:checked').value === 'fiado' ? 'fiado' : 'contado', items });
+            cart.clear();
+            render();
+            lastWaExtra = extra;
+            $('custError').textContent = '';
+            $('custWaAlert').classList.toggle('hidden', !both);
+            $('custForm').classList.add('hidden');
+            $('custDone').classList.remove('hidden');
+        } catch (e) {
+            console.warn('Pedido no enviado:', e);
+            // 403 también ocurre si la hora del teléfono está desfasada más de 10 minutos
+            $('custError').textContent = (e.status === 403 ? 'La tienda no está recibiendo pedidos ahora (revisa también la hora de tu teléfono).' : 'No se pudo enviar el pedido. Revisa tu conexión.') + (both ? ' Puedes pedir por WhatsApp.' : '');
+            if (both) { lastWaExtra = extra; $('custWaAlert').classList.remove('hidden'); }
+        } finally { btn.disabled = false; }
     });
 
     $('list').addEventListener('click', (e) => {
