@@ -13,13 +13,9 @@
             const btnDyn = $('btnCredDynamic');
             const btnFix = $('btnCredFixed');
             
-            if (state.creditMode === 'DYNAMIC') {
-                btnDyn.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-blue-50 border-blue-200 text-blue-700 ring-1 ring-blue-300";
-                btnFix.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600 hover:bg-gray-50";
-            } else {
-                btnDyn.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600 hover:bg-gray-50";
-                btnFix.className = "w-full text-left p-2 rounded border flex items-center gap-2 transition bg-gray-600 border-gray-600 text-white shadow";
-            }
+            const dynamic = state.creditMode === 'DYNAMIC';
+            btnDyn.className = optionClass(dynamic ? 'blue' : '');
+            btnFix.className = optionClass(dynamic ? '' : 'slate');
         }
 
         // ESTA ES LA FUNCIÓN CLAVE: Calcula cuánto debe realmente

@@ -143,16 +143,25 @@
             }
         }
 
+        // Barra azul de Ajustes: copias guardadas frente al máximo que se conservan (n = null: sin datos)
+        function setBackupsBar(n) {
+            if (!$('backupsBar')) return;
+            $('backupsBar').style.width = n === null ? '0%' : `${Math.min(n / BACKUPS_KEEP, 1) * 100}%`;
+            $('backupsText').textContent = n === null ? 'Sin datos' : `${n} / ${BACKUPS_KEEP} copias en la nube`;
+        }
+
         async function renderCloudBackupsUI() {
             const box = $('cloudBackupsUI');
             if (!box) return;
             box.textContent = '';
             const note = (text) => { const p = document.createElement('p'); p.className = 'text-xs text-gray-500'; p.textContent = text; box.appendChild(p); };
+            setBackupsBar(null);
             if (!auth.currentUser) return note('Inicia sesión para ver las copias en la nube.');
             note('Cargando copias...');
             let list;
             try { list = await listCloudBackups(); } catch (e) { box.textContent = ''; return note('No se pudieron leer las copias (¿sin conexión?).'); }
             box.textContent = '';
+            setBackupsBar(list.length);
             if (!list.length) return note('Aún no hay copias. Se crean solas antes de cambios grandes.');
             list.forEach(b => {
                 const row = document.createElement('div');

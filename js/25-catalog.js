@@ -219,11 +219,12 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         }
 
         // ---------- Configuración ----------
-        function catalogPublicUrl() {
+        // kind === 'direct' fuerza el enlace con uid; sin argumento, el del nombre reservado si existe
+        function catalogPublicUrl(kind) {
             const user = auth.currentUser;
             if (!user) return '';
             const c = normalizeCatalogConfig();
-            return publicPageUrl('catalogo') + (c.slug ? '?t=' + c.slug : '?u=' + encodeURIComponent(user.uid));
+            return publicPageUrl('catalogo') + (c.slug && kind !== 'direct' ? '?t=' + c.slug : '?u=' + encodeURIComponent(user.uid));
         }
 
         // ---------- Nombre de la vitrina (tienda/{slug}.json = { u: uid }) ----------
@@ -234,7 +235,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             if (document.activeElement !== input) input.value = c.slug;
             const slug = normalizeSlug(input.value);
             $('catalogSlugPreview').textContent = CATALOG_SLUG_RE.test(slug) ? publicPageUrl('catalogo') + '?t=' + slug : 'De 3 a 30 letras, números o guiones.';
-            $('catalogSlugRelease').classList.toggle('hidden', !c.slug);
+            $('catalogSlugClaim').classList.toggle('hidden', !!c.slug);
+            $('catalogSlugOwned').classList.toggle('hidden', !c.slug);
         }
 
         async function claimCatalogSlug() {
@@ -282,8 +284,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             if (!$('catalogToggleBtn')) return;
             const c = normalizeCatalogConfig();
             const btn = $('catalogToggleBtn');
-            btn.textContent = c.enabled ? 'Activada' : 'Apagada';
-            btn.className = 'px-3 py-1 rounded text-xs font-bold ' + (c.enabled ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-600');
+            btn.setAttribute('aria-checked', String(c.enabled));
+            btn.className = "relative shrink-0 w-11 h-6 rounded-full transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition " + (c.enabled ? 'bg-green-600 after:translate-x-5' : 'bg-slate-300');
             // No se pisa lo que el usuario está escribiendo
             if (document.activeElement !== $('catalogTitle')) $('catalogTitle').value = c.title;
             if (document.activeElement !== $('catalogWhatsapp')) $('catalogWhatsapp').value = c.whatsapp;
@@ -299,7 +301,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             $('catalogLogoPreview').classList.toggle('hidden', !c.logoUrl);
             $('catalogLogoRemove').classList.toggle('hidden', !c.logoUrl);
             $('catalogLinkBox').classList.toggle('hidden', !c.enabled);
-            if (c.enabled) $('catalogLinkInput').value = catalogPublicUrl();
+            $('catalogLinkInput').value = catalogPublicUrl();
+            $('catalogDirectLinkInput').value = catalogPublicUrl('direct');
             $('catalogError').textContent = catalogError;
             renderSlugUI();
             renderCatalogBadge();
@@ -419,8 +422,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             renderCatalogConfigUI();
         }
 
-        function copyCatalogLink() {
-            const url = catalogPublicUrl();
+        function copyCatalogLink(kind) {
+            const url = catalogPublicUrl(kind);
             if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => customAlert('Enlace copiado', url, 'success'), () => prompt('Copia el enlace:', url));
             else prompt('Copia el enlace:', url);
         }

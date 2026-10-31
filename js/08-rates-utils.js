@@ -59,24 +59,24 @@
             // Reset styles
             $('rateBox').className = "bg-slate-800 p-1.5 rounded flex items-center gap-2 border border-slate-700 transition-colors";
             $('displayRate').className = "bg-transparent text-white w-16 text-sm font-mono focus:outline-none text-right cursor-default";
-            $('btnModeUSD').className = "w-full flex justify-between items-center p-3 border rounded transition border-gray-200 text-gray-700";
-            $('btnModeEUR').className = "w-full flex justify-between items-center p-3 border rounded transition border-gray-200 text-gray-700";
-            $('customRateContainer').className = "border border-yellow-300 rounded bg-yellow-50 p-3 transition-all";
+            $('btnModeUSD').className = optionClass();
+            $('btnModeEUR').className = optionClass();
+            $('customRateContainer').className = "p-3 rounded-2xl border transition border-slate-200 bg-white";
 
             if (state.rateMode === 'CUSTOM') {
                 $('customRateBadge').classList.remove('hidden');
                 $('rateBox').classList.replace('border-slate-700', 'border-yellow-500');
                 $('displayRate').classList.add('text-yellow-400');
-                $('customRateContainer').classList.add('ring-2', 'ring-yellow-500');
+                $('customRateContainer').className = "p-3 rounded-2xl border transition bg-amber-50 border-amber-400 ring-1 ring-amber-300";
             } else if (state.rateMode === 'EUR') {
                 $('euroRateBadge').classList.remove('hidden');
                 $('rateBox').classList.replace('border-slate-700', 'border-green-500');
                 $('displayRate').classList.add('text-green-400');
-                $('btnModeEUR').classList.add('bg-green-50', 'border-green-400');
+                $('btnModeEUR').className = optionClass('green');
             } else {
                 $('rateBox').classList.replace('border-slate-700', 'border-blue-500');
                 $('displayRate').classList.add('text-blue-400');
-                $('btnModeUSD').classList.add('bg-blue-50', 'border-blue-400');
+                $('btnModeUSD').className = optionClass('blue');
             }
 
             // --- CORRECCIÓN AQUÍ (Botón de Tasa en Fiados) ---
@@ -96,6 +96,12 @@
             $('colHeaderCurrency').textContent = sym;
             $('cartTotalLabel').textContent = `Total ${sym}`;
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
+        }
+
+        // Fila de opción de Ajustes: marcada con el color dado, o neutra si no hay color
+        function optionClass(color) {
+            return 'w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left ' +
+                (color ? `bg-${color}-50 border-${color}-400 ring-1 ring-${color}-300` : 'bg-white border-slate-200 hover:bg-slate-50');
         }
 
         // Redondea a centavos al GUARDAR montos en dólares (formatMoney solo formatea al mostrar)
@@ -124,24 +130,24 @@
             if (encryptionKey) {
                 // --- ESTADO: ACTIVADA (Modo Seguro) 🟢 ---
                 container.innerHTML = `
-                    <div class="bg-green-50 p-3 rounded border border-green-200">
+                    <div>
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex items-center gap-2">
                                 <i class="fa-solid fa-shield-halved text-green-600"></i>
-                                <h4 class="font-bold text-xs text-green-800 uppercase">Encriptación E2EE</h4>
+                                <h4 class="font-bold text-sm text-slate-700">Encriptación E2EE</h4>
                             </div>
-                            <span class="bg-green-200 text-green-800 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Activada</span>
+                            <span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Activado</span>
                         </div>
-                        <p class="text-[10px] text-green-700 mb-3">
+                        <p class="text-[11px] text-green-700 mb-3">
                             Tus datos están blindados. Solo tú tienes la llave.
                         </p>
                         <p class="text-[10px] text-gray-500 mb-3 leading-tight"><i class="fa-solid fa-image mr-1"></i>Las fotos de los productos se guardan sin cifrar en la nube. Los datos (productos, ventas, fiados y configuración) sí van cifrados.</p>
                 
                         <div class="grid grid-cols-2 gap-2">
-                            <button onclick="changeEncryptionPassword()" class="bg-white border border-green-300 text-green-700 py-2 rounded text-xs font-bold hover:bg-green-50 transition">
+                            <button onclick="changeEncryptionPassword()" class="bg-white border border-green-300 text-green-700 py-2 rounded-xl text-xs font-bold hover:bg-green-50 transition">
                                 <i class="fa-solid fa-key mr-1"></i> Cambiar Clave
                             </button>
-                            <button onclick="disableEncryption()" class="bg-white border border-red-200 text-red-600 py-2 rounded text-xs font-bold hover:bg-red-50 transition">
+                            <button onclick="disableEncryption()" class="bg-white border border-red-200 text-red-600 py-2 rounded-xl text-xs font-bold hover:bg-red-50 transition">
                                 <i class="fa-solid fa-lock-open mr-1"></i> Desactivar
                             </button>
                         </div>
@@ -149,20 +155,20 @@
             } else {
                 // --- ESTADO: DESACTIVADA (Modo Estándar) ⚪ ---
                 container.innerHTML = `
-                    <div class="bg-purple-50 p-3 rounded border border-purple-200">
+                    <div>
                         <div class="flex justify-between items-start mb-2">
                             <div class="flex items-center gap-2">
                                 <i class="fa-solid fa-lock text-purple-600"></i>
-                                <h4 class="font-bold text-xs text-purple-800 uppercase">Encriptación E2EE</h4>
+                                <h4 class="font-bold text-sm text-slate-700">Encriptación E2EE</h4>
                             </div>
-                            <span class="bg-gray-200 text-gray-600 text-[10px] px-2 py-0.5 rounded-full font-bold uppercase">Desactivada</span>
+                            <span class="bg-slate-100 text-slate-500 text-[10px] px-2 py-0.5 rounded-full font-bold">Desactivado</span>
                         </div>
-                        <p class="text-[10px] text-purple-600 mb-3 leading-tight">
+                        <p class="text-[11px] text-slate-500 mb-3 leading-tight">
                             Protege tus datos en la nube para que sean ilegibles sin tu contraseña.
                             <br><span class="font-bold text-red-500">Advertencia: Si olvidas la clave, pierdes los datos.</span>
                         </p>
                         <p class="text-[10px] text-gray-500 mb-3 leading-tight"><i class="fa-solid fa-image mr-1"></i>Las fotos de los productos se guardan sin cifrar en la nube. Los datos (productos, ventas, fiados y configuración) sí van cifrados.</p>
-                        <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded text-xs font-bold shadow hover:bg-purple-700 transition">
+                        <button onclick="enableEncryption()" class="w-full bg-purple-600 text-white py-2 rounded-xl text-xs font-bold shadow hover:bg-purple-700 transition">
                             <i class="fa-solid fa-shield-halved mr-1"></i> Activar Protección Extrema
                         </button>
                     </div>`;
@@ -223,6 +229,7 @@
                 if (confirm('⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.')) {
                     
                     const user = auth.currentUser;
+                    const slug = normalizeCatalogConfig().slug; // se lee antes de borrar nada
                     
                     // Función interna para borrar local y recargar
                     const wipeLocalAndReload = () => {
@@ -252,7 +259,10 @@
                         // Las fotos de Storage también; si Storage falla, se sigue (no es motivo para no formatear)
                         const deleteImages = () => deleteStorageFolder(storage.ref(`users/${user.uid}`))
                             .catch(e => console.warn('No se pudieron borrar las fotos de Storage:', e.message || e));
-                        deleteChunks().then(() => deleteAllCloudBackups(userRef)).then(deleteImages).then(() => userRef.set({
+                        // Archivos públicos (vitrina, perfil de cobro y nombre reservado): si fallan, se sigue
+                        const deletePublicFiles = () => Promise.all([catalogPath(user.uid), `perfil/${user.uid}.json`, slug && slugPath(slug)].filter(Boolean).map(path =>
+                            storage.ref(path).delete().catch(e => { if (e.code !== 'storage/object-not-found') console.warn('No se pudo borrar ' + path + ':', e.message || e); })));
+                        deleteChunks().then(() => deleteAllCloudBackups(userRef)).then(deleteImages).then(deletePublicFiles).then(() => userRef.set({
                             products: [],
                             sales: [],
                             credits: [],

@@ -16,17 +16,11 @@
 
         function updateConfigUI() {
             if(!$('btnTypePers')) return;
-            if (state.receiptType === 'FISCAL') {
-                $('btnTypeFisc').className = "flex-1 py-2 text-xs border rounded transition font-bold bg-blue-600 text-white shadow";
-                $('btnTypePers').className = "flex-1 py-2 text-xs border rounded transition font-bold bg-gray-50 text-gray-600 hover:bg-gray-100";
-                $('btnConfigFiscal').classList.remove('hidden');
-                $('btnConfigPersonalized').classList.add('hidden'); // Ocultar el otro
-            } else {
-                $('btnTypePers').className = "flex-1 py-2 text-xs border rounded transition font-bold bg-indigo-600 text-white shadow";
-                $('btnTypeFisc').className = "flex-1 py-2 text-xs border rounded transition font-bold bg-gray-50 text-gray-600 hover:bg-gray-100";
-                $('btnConfigFiscal').classList.add('hidden');
-                $('btnConfigPersonalized').classList.remove('hidden'); // Mostrar el personalizado
-            }
+            const fiscal = state.receiptType === 'FISCAL';
+            $('btnTypeFisc').className = optionClass(fiscal ? 'blue' : '') + ' cursor-pointer';
+            $('btnTypePers').className = optionClass(fiscal ? '' : 'indigo') + ' cursor-pointer';
+            $('chipTypeFisc').classList.toggle('hidden', !fiscal);
+            $('chipTypePers').classList.toggle('hidden', fiscal);
         }
 
         function openFiscalConfigFromMenu() {

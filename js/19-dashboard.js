@@ -8,7 +8,6 @@
             const factor = encryptionKey ? 1.34 : 1;
             const mainBytes = new Blob([JSON.stringify(main)]).size * factor;
             const chunkBytes = Object.values(chunks).map(c => c.json.length * factor);
-            const totalBytes = mainBytes + chunkBytes.reduce((a, b) => a + b, 0);
 
             // 2. La barra mide el documento más grande frente al límite de Firestore por documento (1 MiB)
             const bytes = Math.max(mainBytes, ...chunkBytes);
@@ -21,10 +20,10 @@
             const text = $('storageText');
             
             bar.style.width = `${percentage}%`;
-            text.textContent = `Documento principal ${toKb(mainBytes)} KB · Total en la nube ${toKb(totalBytes)} KB (documento más grande: ${percentage}% del límite)`;
+            text.textContent = `Documento más grande: ${toKb(bytes)} KB de 1 MB`;
 
             // 5. Colores del Semáforo
-            bar.className = "h-2.5 rounded-full transition-all duration-1000 ";
+            bar.className = "h-1.5 rounded-full transition-all duration-1000 ";
             
             if (percentage < 50) {
                 bar.classList.add('bg-green-500'); // Zona Segura

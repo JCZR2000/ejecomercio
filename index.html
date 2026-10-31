@@ -464,234 +464,315 @@
         <option value="BANCO NACIONAL DE CREDITO (0191)">
     </datalist>
 
-    <div id="configModal" class="fixed inset-0 modal-bg z-[60] hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
-            <div class="bg-slate-800 text-white p-4 flex justify-between items-center">
-                <h3 class="font-bold"><i class="fa-solid fa-gear mr-2"></i>Configuración Global</h3>
-                <button onclick="toggleMenu('config')" class="text-gray-400 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
+    <div id="configModal" class="fixed inset-0 modal-bg z-[60] hidden flex items-end sm:items-center justify-center sm:p-4">
+        <div class="bg-slate-50 rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+            <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-800 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md"><i class="fa-solid fa-gear"></i></div>
+                    <h3 class="font-bold text-slate-800 text-lg leading-tight">Ajustes</h3>
+                </div>
+                <button onclick="toggleMenu('config')" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition active:scale-90"><i class="fa-solid fa-times"></i></button>
             </div>
-            
-            <div class="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Tasa de Cambio</p>
+
+            <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
+
+                <!-- TASA DE CAMBIO -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-blue-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-coins"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Tasa de cambio</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Con qué tasa se calculan los precios</p></div>
+                    </div>
                     <div class="space-y-2">
-                        <button onclick="setRateMode('USD')" id="btnModeUSD" class="w-full flex justify-between items-center p-3 border rounded hover:bg-blue-50 transition border-gray-200 text-gray-700">
-                            <span class="font-bold"><i class="fa-solid fa-dollar-sign text-blue-600 w-6"></i> Dólar BCV</span>
-                            <span id="modalUsdDisplay" class="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded">0.00</span>
+                        <button onclick="setRateMode('USD')" id="btnModeUSD" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-blue-100 text-blue-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-dollar-sign"></i></span>
+                            <span class="font-bold text-slate-700 flex-1">Dólar BCV</span>
+                            <span class="text-sm font-mono bg-blue-100 text-blue-800 px-2.5 py-1 rounded-xl">Bs <span id="modalUsdDisplay">0.00</span></span>
                         </button>
-                        <button onclick="setRateMode('EUR')" id="btnModeEUR" class="w-full flex justify-between items-center p-3 border rounded hover:bg-green-50 transition border-gray-200 text-gray-700">
-                            <span class="font-bold"><i class="fa-solid fa-euro-sign text-green-600 w-6"></i> Euro BCV</span>
-                            <span id="modalEurDisplay" class="text-xs font-mono bg-green-100 text-green-800 px-2 py-1 rounded">0.00</span>
+                        <button onclick="setRateMode('EUR')" id="btnModeEUR" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-green-100 text-green-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-euro-sign"></i></span>
+                            <span class="font-bold text-slate-700 flex-1">Euro BCV</span>
+                            <span class="text-sm font-mono bg-green-100 text-green-800 px-2.5 py-1 rounded-xl">Bs <span id="modalEurDisplay">0.00</span></span>
                         </button>
-                        <div id="customRateContainer" class="border border-yellow-300 rounded bg-yellow-50 p-3 transition-all">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="font-bold text-yellow-800 text-sm"><i class="fa-solid fa-pen-to-square w-6"></i> Tasa Personalizada</span>
+                        <div id="customRateContainer" class="p-3 rounded-2xl border transition border-slate-200 bg-white">
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-amber-100 text-amber-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-pen-to-square"></i></span>
+                                <span class="font-bold text-slate-700">Tasa personalizada</span>
                             </div>
                             <div class="flex gap-2">
-                                <input type="number" id="customRateInput" step="0.01" class="w-full px-3 py-1.5 text-sm border border-yellow-300 rounded focus:ring-2 focus:ring-yellow-500 outline-none bg-white" placeholder="Ej: 300.00">
-                                <button onclick="saveCustomRate()" class="bg-yellow-500 text-white px-3 py-1 rounded hover:bg-yellow-600 text-sm font-bold shadow">Aplicar</button>
+                                <input type="number" id="customRateInput" step="0.01" class="w-full px-3 py-2 text-sm font-mono border border-slate-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none bg-white" placeholder="Ej: 300.00">
+                                <button onclick="saveCustomRate()" class="bg-amber-500 text-white px-4 py-2 rounded-xl hover:bg-amber-600 text-sm font-bold shadow-sm">Aplicar</button>
                             </div>
                         </div>
                     </div>
-                </div>
-                <hr class="border-gray-200">
-                <div class="bg-gray-50 rounded-lg p-3 border border-gray-200 mb-4">
-                    <div class="flex justify-between items-center mb-1">
-                        <span class="text-[10px] font-bold text-gray-500 uppercase">Uso de Almacenamiento (Nube)</span>
-                        <span id="storageText" class="text-[10px] font-bold text-gray-700">Calculando...</span>
+                </section>
+
+                <!-- ALMACENAMIENTO -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-emerald-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-database"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Almacenamiento</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Nube y copias de seguridad</p></div>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                        <div id="storageBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-1000" style="width: 0%">
+                    <div class="space-y-3 mb-3">
+                        <div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div id="storageBar" class="bg-green-500 h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                            </div>
+                            <p id="storageText" class="text-[11px] text-slate-500 mt-1">Calculando...</p>
+                        </div>
+                        <div>
+                            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                <div id="backupsBar" class="bg-blue-500 h-1.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+                            </div>
+                            <p id="backupsText" class="text-[11px] text-slate-500 mt-1">Sin datos</p>
                         </div>
                     </div>
-                    <p class="text-[9px] text-gray-400 mt-1 text-right">Límite recomendado: ~1 MB</p>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <button onclick="downloadBackup()" class="flex flex-col items-center justify-center p-3 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition text-green-700">
-                        <i class="fa-solid fa-download text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Backup</span>
-                    </button>
-                    <label class="flex flex-col items-center justify-center p-3 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition text-orange-700 cursor-pointer">
-                        <i class="fa-solid fa-upload text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Restaurar</span>
-                        <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="restoreBackup(event)">
-                    </label>
-                </div>
-                <hr class="border-gray-200">
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Configuración de Fiados</p>
-                    <div class="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
-                        <p class="text-[10px] text-gray-400 mb-2">Define cómo se calcula el total de la deuda si los precios cambian.
-                        </p>
-                
-                        <button onclick="setCreditMode('DYNAMIC')" id="btnCredDynamic"
-                            class="w-full text-left p-2 rounded border flex items-center gap-2 transition bg-blue-50 border-blue-200 text-blue-700">
-                            <i class="fa-solid fa-arrow-trend-up"></i>
-                            <div>
-                                <div class="text-xs font-bold">Precios Dinámicos (Recomendado)</div>
-                                <div class="text-[9px]">La deuda se actualiza si el producto sube de precio.</div>
+                    <div class="space-y-2">
+                        <details class="group border border-slate-100 rounded-2xl bg-slate-50">
+                            <summary class="flex items-center justify-between gap-2 p-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700"><i class="fa-solid fa-cloud text-blue-500"></i>Copias en la nube</span>
+                                <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center transition-transform duration-300 group-open:rotate-180"><i class="fa-solid fa-chevron-down text-xs"></i></span>
+                            </summary>
+                            <div class="p-3 pt-0"><div id="cloudBackupsUI"></div></div>
+                        </details>
+                        <details class="group border border-slate-100 rounded-2xl bg-slate-50">
+                            <summary class="flex items-center justify-between gap-2 p-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700"><i class="fa-solid fa-hard-drive text-emerald-500"></i>Copia local</span>
+                                <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center transition-transform duration-300 group-open:rotate-180"><i class="fa-solid fa-chevron-down text-xs"></i></span>
+                            </summary>
+                            <div class="p-3 pt-0 grid grid-cols-2 gap-3">
+                                <button onclick="downloadBackup()" class="flex flex-col items-center justify-center p-3 bg-green-50 border border-green-200 rounded-2xl hover:bg-green-100 transition text-green-700">
+                                    <i class="fa-solid fa-download text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Backup</span>
+                                </button>
+                                <label class="flex flex-col items-center justify-center p-3 bg-orange-50 border border-orange-200 rounded-2xl hover:bg-orange-100 transition text-orange-700 cursor-pointer">
+                                    <i class="fa-solid fa-upload text-2xl mb-1"></i><span class="text-xs font-bold mt-1">Restaurar</span>
+                                    <input type="file" id="restoreInput" accept=".json" class="hidden" onchange="restoreBackup(event)">
+                                </label>
                             </div>
+                        </details>
+                    </div>
+                </section>
+
+                <!-- SEGURIDAD -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-indigo-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-user-shield"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Seguridad</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">PIN y cifrado</p></div>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <p class="text-sm font-bold text-slate-700">Bloqueo con PIN</p>
+                            <p class="text-[11px] text-slate-500 mb-2">Pide un PIN para añadir, editar o borrar productos y para tocar los fiados. Tú eliges qué se protege.</p>
+                            <div id="securitySetupDiv">
+                                <div class="flex gap-2">
+                                    <input type="password" id="newPinInput" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm" placeholder="Nueva Contraseña">
+                                    <button onclick="setPin()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-700">Establecer</button>
+                                </div>
+                            </div>
+                            <div id="securityManageDiv" class="hidden space-y-3">
+                                <div class="flex justify-between items-center bg-slate-50 p-2 rounded-xl border border-slate-100 gap-2">
+                                    <span class="text-xs text-green-600 font-bold flex items-center"><i class="fa-solid fa-check-circle mr-1"></i>Activada</span>
+                                    <div class="flex gap-2">
+                                        <button onclick="changePin()" class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded-lg text-[10px] hover:bg-yellow-200 font-bold flex items-center gap-1"><i class="fa-solid fa-key"></i> Cambiar</button>
+                                        <button onclick="removePin()" class="bg-red-100 text-red-600 px-2 py-1 rounded-lg text-[10px] hover:bg-red-200 font-bold flex items-center gap-1"><i class="fa-solid fa-trash"></i> Borrar</button>
+                                    </div>
+                                </div>
+                                <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <p class="text-[10px] text-slate-500 font-bold mb-2 uppercase">Permisos Protegidos:</p>
+                                    <div class="space-y-1 mb-3">
+                                        <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockAdd" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Añadir Productos</span></label>
+                                        <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockEdit" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Modificar / Borrar Productos</span></label>
+                                        <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockCreditAdd" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Agregar a Fiados (Crédito)</span></label>
+                                        <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockCreditPay" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Abonar a Fiados</span></label>
+                                    </div>
+                                    <button onclick="saveSecurityPreferences()" class="w-full bg-indigo-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-indigo-700"><i class="fa-solid fa-save mr-1"></i> Guardar Preferencias</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="encryptionUI" class="bg-purple-50/70 border border-purple-100 rounded-2xl p-3"></div>
+                    </div>
+                </section>
+
+                <!-- FIADOS -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-orange-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Fiados</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Cómo se calcula la deuda si los precios cambian</p></div>
+                    </div>
+                    <div class="space-y-2">
+                        <button onclick="setCreditMode('DYNAMIC')" id="btnCredDynamic" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-blue-100 text-blue-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-arrow-trend-up"></i></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold text-slate-700">Precios dinámicos (recomendado)</span>
+                                <span class="block text-[11px] text-slate-500">La deuda se actualiza si el producto sube de precio.</span>
+                            </span>
                         </button>
-                
-                        <button onclick="setCreditMode('FIXED')" id="btnCredFixed"
-                            class="w-full text-left p-2 rounded border flex items-center gap-2 transition bg-white border-gray-200 text-gray-600">
-                            <i class="fa-solid fa-lock"></i>
-                            <div>
-                                <div class="text-xs font-bold">Precios Fijos</div>
-                                <div class="text-[9px]">La deuda se congela al momento de la venta.</div>
-                            </div>
+                        <button onclick="setCreditMode('FIXED')" id="btnCredFixed" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-slate-100 text-slate-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-lock"></i></span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold text-slate-700">Precios fijos</span>
+                                <span class="block text-[11px] text-slate-500">La deuda se congela al momento de la venta.</span>
+                            </span>
                         </button>
                     </div>
-                </div>
-                <hr class="border-gray-200">
-                <div class="border border-indigo-200 bg-indigo-50 rounded-lg p-4">
-                    <p class="text-xs text-indigo-800 uppercase font-bold mb-3 flex items-center"><i class="fa-solid fa-user-shield mr-2"></i> Seguridad</p>
-                    <div id="securitySetupDiv">
-                        <div class="flex gap-2 mb-2">
-                            <input type="password" id="newPinInput" class="w-full border rounded px-3 py-1 text-sm" placeholder="Nueva Contraseña">
-                            <button onclick="setPin()" class="bg-indigo-600 text-white px-3 py-1 rounded text-xs font-bold hover:bg-indigo-700">Establecer</button>
+                </section>
+
+                <!-- FACTURACIÓN -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-sky-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-receipt"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Facturación</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Qué se entrega al cliente</p></div>
+                    </div>
+                    <div class="space-y-2">
+                        <div id="btnTypePers" role="button" tabindex="0" onclick="setInvoiceType('PERSONALIZED')" onkeydown="if(event.key==='Enter')setInvoiceType('PERSONALIZED')" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left cursor-pointer bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-indigo-100 text-indigo-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-image"></i></span>
+                            <span class="min-w-0 flex-1">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700">Personalizada<span id="chipTypePers" class="hidden bg-indigo-100 text-indigo-700 text-[10px] px-2 py-0.5 rounded-full font-bold">En uso</span></span>
+                                <span class="block text-[11px] text-slate-500">Recibo con tu logo y tus datos.</span>
+                            </span>
+                            <button type="button" id="btnConfigPersonalized" onclick="event.stopPropagation(); toggleReceiptConfig()" aria-label="Configurar recibo personalizado" class="w-10 h-10 rounded-full bg-white text-indigo-600 shadow-sm border border-indigo-200 hover:bg-indigo-50 flex items-center justify-center shrink-0 transition active:scale-90"><i class="fa-solid fa-gear"></i></button>
+                        </div>
+                        <div id="btnTypeFisc" role="button" tabindex="0" onclick="setInvoiceType('FISCAL')" onkeydown="if(event.key==='Enter')setInvoiceType('FISCAL')" class="w-full flex items-center gap-3 p-3 rounded-2xl border transition text-left cursor-pointer bg-white border-slate-200 hover:bg-slate-50">
+                            <span class="bg-blue-100 text-blue-600 w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"><i class="fa-solid fa-file-invoice"></i></span>
+                            <span class="min-w-0 flex-1">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700">Fiscal (SENIAT)<span id="chipTypeFisc" class="hidden bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-bold">En uso</span></span>
+                                <span class="block text-[11px] text-slate-500">Factura con RIF y número de control.</span>
+                            </span>
+                            <button type="button" id="btnConfigFiscal" onclick="event.stopPropagation(); openFiscalConfigFromMenu()" aria-label="Configurar datos fiscales" class="w-10 h-10 rounded-full bg-white text-blue-600 shadow-sm border border-blue-200 hover:bg-blue-50 flex items-center justify-center shrink-0 transition active:scale-90"><i class="fa-solid fa-gear"></i></button>
                         </div>
                     </div>
-                    <div id="securityManageDiv" class="hidden space-y-3">
-                        <div class="flex justify-between items-center bg-white p-2 rounded border gap-2">
-                            <span class="text-xs text-green-600 font-bold flex items-center"><i class="fa-solid fa-check-circle mr-1"></i>Activada</span>
-                            <div class="flex gap-2">
-                                <button onclick="changePin()" class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-[10px] hover:bg-yellow-200 font-bold flex items-center gap-1"><i class="fa-solid fa-key"></i> Cambiar</button>
-                                <button onclick="removePin()" class="bg-red-100 text-red-600 px-2 py-1 rounded text-[10px] hover:bg-red-200 font-bold flex items-center gap-1"><i class="fa-solid fa-trash"></i> Borrar</button>
-                            </div>
-                        </div>
-                        <div class="bg-white p-2 rounded border">
-                            <p class="text-[10px] text-gray-500 font-bold mb-2 uppercase">Permisos Protegidos:</p>
-                            <div class="space-y-1 mb-2">
-                                <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockAdd" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Añadir Productos</span></label>
-                                <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockEdit" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Modificar / Borrar Productos</span></label>
-                                <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockCreditAdd" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Agregar a Fiados (Crédito)</span></label>
-                                <label class="flex items-center space-x-2 text-sm cursor-pointer"><input type="checkbox" id="chkLockCreditPay" class="form-checkbox h-3 w-3 text-indigo-600 rounded"><span>Abonar a Fiados</span></label>
-                            </div>
-                            <button onclick="saveSecurityPreferences()" class="w-full bg-indigo-600 text-white py-1 rounded text-xs font-bold hover:bg-indigo-700"><i class="fa-solid fa-save mr-1"></i> Guardar Preferencias</button>
-                        </div>
+                </section>
+
+                <!-- VITRINA -->
+                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-pink-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-store"></i></div>
+                        <div class="min-w-0 flex-1"><h4 class="font-bold text-slate-800 leading-tight">Vitrina</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Catálogo público con pedidos por WhatsApp</p></div>
+                        <button type="button" id="catalogToggleBtn" role="switch" aria-checked="false" aria-label="Activar vitrina" onclick="toggleCatalog(!state.catalogConfig.enabled)" class="relative shrink-0 w-11 h-6 rounded-full transition bg-slate-300"></button>
                     </div>
-                </div>
-                <div class="mt-4 border-t pt-4">
-                    <div id="encryptionUI" class="transition-all duration-300">
+                    <div class="space-y-3">
+                        <div>
+                            <label for="catalogTitle" class="block text-xs font-bold text-slate-600 mb-1">Nombre de la tienda</label>
+                            <input type="text" id="catalogTitle" maxlength="60" onchange="saveCatalogConfig()" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                            <p class="text-[10px] text-slate-400 mt-0.5">Si lo dejas vacío, se usa el nombre del negocio.</p>
                         </div>
-                </div>
-                <div class="mt-4 border-t pt-4">
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Copias en la nube</p>
-                    <div id="cloudBackupsUI"></div>
-                </div>
-                <hr class="border-gray-200">
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Exportación externa</p>
-                    <div class="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-bold text-gray-700"><i class="fa-solid fa-store text-indigo-500 mr-1"></i> Vitrina en línea</span>
-                            <button type="button" id="catalogToggleBtn" onclick="toggleCatalog(!state.catalogConfig.enabled)" class="px-3 py-1 rounded text-xs font-bold bg-gray-200 text-gray-600">Apagada</button>
+                        <div>
+                            <label for="catalogWhatsapp" class="block text-xs font-bold text-slate-600 mb-1">WhatsApp de contacto</label>
+                            <input type="tel" id="catalogWhatsapp" maxlength="20" onchange="saveCatalogConfig()" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                            <p class="text-[10px] text-slate-400 mt-0.5">Con código de país, solo números. Ej: 584120000000</p>
                         </div>
-                        <p class="text-[10px] text-gray-500">Catálogo público con pedido por WhatsApp. Se publica: nombre, categoría, precio, foto y si hay o no. Nunca existencias, costos, clientes ni deudas.</p>
-                        <input type="text" id="catalogTitle" maxlength="60" placeholder="Título (si lo dejas vacío, el nombre del negocio)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
-                        <input type="tel" id="catalogWhatsapp" maxlength="20" placeholder="WhatsApp con código de país (584120000000)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
-                        <input type="text" id="catalogSlogan" maxlength="80" placeholder="Lema (vacío = el de siempre)" onchange="saveCatalogConfig()" class="w-full border rounded px-3 py-1 text-sm">
+                        <div>
+                            <label for="catalogSlogan" class="block text-xs font-bold text-slate-600 mb-1">Lema</label>
+                            <input type="text" id="catalogSlogan" maxlength="80" onchange="saveCatalogConfig()" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        </div>
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs text-gray-600">Color</span>
+                            <span class="text-xs font-bold text-slate-600">Logo</span>
+                            <div class="flex items-center gap-2">
+                                <img id="catalogLogoPreview" class="hidden w-8 h-8 rounded-lg object-contain bg-white border" alt="">
+                                <label class="bg-indigo-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer">Subir<input type="file" accept="image/*" class="hidden" onchange="onCatalogLogoPicked(event)"></label>
+                                <button type="button" id="catalogLogoRemove" onclick="removeCatalogLogo()" class="hidden bg-red-100 text-red-600 px-3 py-1.5 rounded-xl text-xs font-bold">Quitar</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-slate-600">Color</span>
                             <div id="catalogColors" class="flex gap-2"></div>
                         </div>
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs text-gray-600">Logo</span>
-                            <div class="flex items-center gap-2">
-                                <img id="catalogLogoPreview" class="hidden w-8 h-8 rounded object-contain bg-white border" alt="">
-                                <label class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold cursor-pointer">Subir<input type="file" accept="image/*" class="hidden" onchange="onCatalogLogoPicked(event)"></label>
-                                <button type="button" id="catalogLogoRemove" onclick="removeCatalogLogo()" class="hidden bg-red-100 text-red-600 px-2 py-1 rounded text-xs font-bold">Quitar</button>
-                            </div>
-                        </div>
-                        <label class="flex items-center justify-between text-xs text-gray-600">Espera antes de publicar
-                            <select id="catalogDelay" onchange="saveCatalogConfig()" class="border rounded px-2 py-1 text-xs bg-white">
-                                <option value="3">3 min</option><option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>
-                            </select>
-                        </label>
                         <div>
-                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Mostrar existencias a los clientes
-                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogShowStock" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                            <label for="catalogDelay" class="flex items-center justify-between text-xs font-bold text-slate-600">Tiempo de espera
+                                <select id="catalogDelay" onchange="saveCatalogConfig()" class="border border-slate-200 rounded-xl px-2 py-1 text-xs bg-white font-normal">
+                                    <option value="3">3 min</option><option value="5">5 min</option><option value="6">6 min</option><option value="7">7 min</option><option value="8">8 min</option><option value="9">9 min</option><option value="10">10 min</option>
+                                </select>
                             </label>
-                            <p class="text-[10px] text-gray-500 mt-0.5">Tus clientes verán cuántas unidades quedan. Se actualiza con cada publicación.</p>
+                            <p class="text-[10px] text-slate-400 mt-0.5">Después de un cambio, la app espera este tiempo antes de publicar la vitrina, para juntar varios cambios en una sola subida.</p>
                         </div>
-                        <div>
-                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Pedir nombre y entrega al cliente
-                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAskCustomer" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
-                            </label>
-                            <p class="text-[10px] text-gray-500 mt-0.5">Antes de enviar el pedido por WhatsApp se piden nombre y retiro o delivery.</p>
-                        </div>
-                        <div>
-                            <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Permitir ocultar productos
-                                <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAllowHide" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
-                            </label>
-                            <p class="text-[10px] text-gray-500 mt-0.5">Cada producto tendrá la casilla «No mostrar en la vitrina».</p>
-                        </div>
-                        <div>
-                            <div class="flex gap-2">
-                                <input type="text" id="catalogSlug" maxlength="40" placeholder="Nombre del enlace (ej: bodegajuan)" oninput="renderSlugUI()" class="flex-1 min-w-0 border rounded px-3 py-1 text-sm">
-                                <button type="button" onclick="claimCatalogSlug()" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">Reservar</button>
+                        <details class="group border border-slate-100 rounded-2xl bg-slate-50">
+                            <summary class="flex items-center justify-between gap-2 p-3 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden">
+                                <span class="flex items-center gap-2 text-sm font-bold text-slate-700"><i class="fa-solid fa-sliders text-pink-500"></i>Opciones adicionales</span>
+                                <span class="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center transition-transform duration-300 group-open:rotate-180"><i class="fa-solid fa-chevron-down text-xs"></i></span>
+                            </summary>
+                            <div class="p-3 pt-0 space-y-3">
+                                <div>
+                                    <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Mostrar existencias a los clientes
+                                        <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogShowStock" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                                    </label>
+                                    <p class="text-[10px] text-gray-500 mt-0.5">Tus clientes verán cuántas unidades quedan. Se actualiza con cada publicación.</p>
+                                </div>
+                                <div>
+                                    <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Pedir nombre y entrega al cliente
+                                        <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAskCustomer" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                                    </label>
+                                    <p class="text-[10px] text-gray-500 mt-0.5">Antes de enviar el pedido por WhatsApp se piden nombre y retiro o delivery.</p>
+                                </div>
+                                <div>
+                                    <label class="flex items-center justify-between gap-3 text-xs text-gray-600 cursor-pointer">Permitir ocultar productos
+                                        <span class="relative inline-flex shrink-0"><input type="checkbox" id="catalogAllowHide" onchange="saveCatalogConfig()" class="peer sr-only"><span class="w-9 h-5 rounded-full bg-gray-300 peer-checked:bg-green-600 transition after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition peer-checked:after:translate-x-4"></span></span>
+                                    </label>
+                                    <p class="text-[10px] text-gray-500 mt-0.5">Cada producto tendrá la casilla «No mostrar en la vitrina».</p>
+                                </div>
                             </div>
-                            <p id="catalogSlugPreview" class="text-[10px] text-gray-500 mt-0.5 break-all"></p>
-                            <button type="button" id="catalogSlugRelease" onclick="releaseCatalogSlug()" class="hidden text-[10px] text-red-600 font-bold underline mt-0.5">Liberar nombre</button>
-                        </div>
-                        <div id="catalogLinkBox" class="hidden space-y-2">
-                            <div class="flex gap-2">
-                                <input type="text" id="catalogLinkInput" readonly class="flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white">
-                                <button type="button" onclick="copyCatalogLink()" class="bg-indigo-600 text-white px-2 py-1 rounded text-xs font-bold">Copiar</button>
-                                <button type="button" onclick="shareCatalogLink()" class="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">Compartir</button>
+                        </details>
+                        <div class="border-t border-slate-100 pt-3 space-y-3">
+                            <p class="text-xs font-bold text-slate-600 uppercase tracking-wide">Enlaces</p>
+                            <div>
+                                <p class="text-xs font-bold text-slate-600 mb-1">Enlace personalizado</p>
+                                <div id="catalogSlugClaim">
+                                    <div class="flex gap-2">
+                                        <input type="text" id="catalogSlug" maxlength="40" placeholder="Nombre del enlace (ej: bodegajuan)" oninput="renderSlugUI()" class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                                        <button type="button" onclick="claimCatalogSlug()" class="bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs font-bold">Reservar</button>
+                                    </div>
+                                    <p id="catalogSlugPreview" class="text-[10px] text-slate-400 mt-0.5 break-all"></p>
+                                </div>
+                                <div id="catalogSlugOwned" class="hidden">
+                                    <div class="flex gap-2">
+                                        <input type="text" id="catalogLinkInput" readonly class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50">
+                                        <button type="button" onclick="copyCatalogLink()" class="bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs font-bold">Copiar</button>
+                                    </div>
+                                    <button type="button" id="catalogSlugRelease" onclick="releaseCatalogSlug()" class="text-[10px] text-red-600 font-bold underline mt-1">Liberar nombre</button>
+                                </div>
                             </div>
-                            <p class="text-[10px] text-gray-500">La vitrina es pública aunque el cifrado esté activado. Se actualiza cuando usas la app.</p>
+                            <div id="catalogLinkBox" class="hidden space-y-3">
+                                <div>
+                                    <p class="text-xs font-bold text-slate-600 mb-1">Enlace directo</p>
+                                    <div class="flex gap-2">
+                                        <input type="text" id="catalogDirectLinkInput" readonly class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50">
+                                        <button type="button" onclick="copyCatalogLink('direct')" class="bg-indigo-600 text-white px-3 py-2 rounded-xl text-xs font-bold">Copiar</button>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="shareCatalogLink()" class="w-full bg-green-600 text-white py-2 rounded-xl text-xs font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Compartir</button>
+                                <p class="text-[10px] text-slate-400">La vitrina es pública aunque el cifrado esté activado. Se actualiza cuando usas la app.</p>
+                            </div>
                         </div>
                         <p id="catalogError" class="text-[10px] text-red-600 font-bold"></p>
                     </div>
-                </div>
-                <hr class="border-gray-200">
+                </section>
 
-                <!-- NUEVA SECCIÓN DE FACTURACIÓN -->
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Modo de Facturación</p>
-                    <div class="bg-gray-50 p-3 rounded border border-gray-200 space-y-2">
-                        <div class="flex gap-2 mb-2">
-                            <button onclick="setInvoiceType('PERSONALIZED')" id="btnTypePers"
-                                class="flex-1 py-2 text-xs border rounded transition font-bold">Personalizada</button>
-                            <button onclick="setInvoiceType('FISCAL')" id="btnTypeFisc"
-                                class="flex-1 py-2 text-xs border rounded transition font-bold">Fiscal (SENIAT)</button>
-                        </div>
-                        <button onclick="openFiscalConfigFromMenu()" id="btnConfigFiscal"
-                            class="hidden w-full bg-blue-50 text-blue-700 border border-blue-200 py-1.5 rounded text-xs font-bold hover:bg-blue-100 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-file-invoice"></i> Configurar Datos Fiscales
+                <!-- ZONA DE LIMPIEZA -->
+                <details class="group bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+                    <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden bg-red-50">
+                        <span class="flex items-center gap-3 min-w-0">
+                            <span class="bg-red-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-triangle-exclamation"></i></span>
+                            <span class="min-w-0"><span class="block font-bold text-red-800 leading-tight">Zona de limpieza</span><span class="block text-[10px] text-red-400 font-medium uppercase tracking-wide">Borrar datos de este negocio</span></span>
+                        </span>
+                        <span class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center transition-transform duration-300 group-open:rotate-180 shrink-0"><i class="fa-solid fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="p-4 space-y-2">
+                        <button onclick="requestAction('clean_inv')" class="w-full flex items-center p-3 bg-white border border-slate-200 rounded-2xl hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group/btn">
+                            <div class="bg-slate-100 p-2 rounded-xl mr-3 group-hover/btn:bg-red-100"><i class="fa-solid fa-box-open"></i></div>
+                            <div class="text-left"><div class="font-bold text-sm">Vaciar Inventario</div><div class="text-[10px] text-gray-500">Elimina productos. Mantiene historial.</div></div>
                         </button>
-
-                        <!-- NUEVO BOTÓN: Configuración Personalizada -->
-                        <button onclick="toggleReceiptConfig()" id="btnConfigPersonalized"
-                            class="hidden w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-1.5 rounded text-xs font-bold hover:bg-indigo-100 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-image"></i> Personalizar Recibo
+                        <button onclick="requestAction('clean_hist')" class="w-full flex items-center p-3 bg-white border border-slate-200 rounded-2xl hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group/btn">
+                            <div class="bg-slate-100 p-2 rounded-xl mr-3 group-hover/btn:bg-red-100"><i class="fa-solid fa-history"></i></div>
+                            <div class="text-left"><div class="font-bold text-sm">Borrar Historial</div><div class="text-[10px] text-gray-500">Elimina registros de venta.</div></div>
+                        </button>
+                        <button onclick="requestAction('clean_credits')" class="w-full flex items-center p-3 bg-white border border-slate-200 rounded-2xl hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group/btn">
+                            <div class="bg-slate-100 p-2 rounded-xl mr-3 group-hover/btn:bg-red-100"><i class="fa-solid fa-file-invoice-dollar"></i></div>
+                            <div class="text-left"><div class="font-bold text-sm">Borrar Fiados</div><div class="text-[10px] text-gray-500">Elimina todas las deudas pendientes.</div></div>
+                        </button>
+                        <button onclick="requestAction('factory_reset')" class="w-full flex items-center p-3 bg-red-600 text-white rounded-2xl hover:bg-red-700 transition shadow mt-2">
+                            <div class="p-2 mr-2"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="text-left"><div class="font-bold text-sm">Reinicio de Fábrica</div><div class="text-[10px] text-red-100">Borra TODO y reinicia la app.</div></div>
                         </button>
                     </div>
-                </div>
-
-                <hr class="border-gray-200">
-                <div class="space-y-2">
-                    <p class="text-xs text-gray-500 uppercase font-bold mb-2">Zona de Limpieza</p>
-                    <button onclick="requestAction('clean_inv')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group">
-                        <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-box-open"></i></div>
-                        <div class="text-left"><div class="font-bold text-sm">Vaciar Inventario</div><div class="text-[10px] text-gray-500">Elimina productos. Mantiene historial.</div></div>
-                    </button>
-                    <button onclick="requestAction('clean_hist')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group">
-                        <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-history"></i></div>
-                        <div class="text-left"><div class="font-bold text-sm">Borrar Historial</div><div class="text-[10px] text-gray-500">Elimina registros de venta.</div></div>
-                    </button>
-                    <button onclick="requestAction('clean_credits')" class="w-full flex items-center p-3 bg-white border border-gray-300 rounded hover:bg-red-50 hover:border-red-300 hover:text-red-600 transition group mt-2">
-                        <div class="bg-gray-100 p-2 rounded mr-3 group-hover:bg-red-100"><i class="fa-solid fa-file-invoice-dollar"></i></div>
-                        <div class="text-left">
-                            <div class="font-bold text-sm">Borrar Fiados</div>
-                            <div class="text-[10px] text-gray-500">Elimina todas las deudas pendientes.</div>
-                        </div>
-                    </button>
-                    <button onclick="requestAction('factory_reset')" class="w-full flex items-center p-3 bg-red-600 text-white rounded hover:bg-red-700 transition shadow mt-4">
-                        <div class="p-2 mr-2"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                        <div class="text-left"><div class="font-bold text-sm">Reinicio de Fábrica</div><div class="text-[10px] text-red-100">Borra TODO y reinicia la app.</div></div>
-                    </button>
-                </div>
+                </details>
             </div>
         </div>
     </div>
@@ -1375,45 +1456,48 @@
     <!-- 2. MODAL DE CONFIGURACIÓN FISCAL -->
     <div id="fiscalConfigModal"
         class="fixed inset-0 modal-bg z-[115] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
-            <div class="bg-slate-800 text-white p-3 flex justify-between items-center">
-                <h3 class="font-bold text-sm"><i class="fa-solid fa-building mr-2"></i>Datos Fiscales de la Empresa</h3>
-                <button onclick="closeFiscalConfig()" class="hover:text-gray-300"><i class="fa-solid fa-times"></i></button>
+        <div class="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="bg-blue-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-building"></i></div>
+                    <div class="min-w-0"><h3 class="font-bold text-slate-800 leading-tight">Datos fiscales</h3><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Encabezado del ticket fiscal</p></div>
+                </div>
+                <button onclick="closeFiscalConfig()" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition active:scale-90 shrink-0"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-                <div class="bg-blue-50 p-2 rounded text-[10px] text-blue-800 border border-blue-200 flex gap-2">
+                <div class="bg-blue-50 p-3 rounded-2xl text-[11px] text-blue-800 border border-blue-100 flex gap-2">
                     <i class="fa-solid fa-circle-info mt-0.5"></i>
                     Estos datos aparecerán en el encabezado de todos tus tickets fiscales.
                 </div>
                 <!-- NUEVO CAMPO: Nombre de la Empresa -->
                 <div>
-                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Razón Social (Nombre de la
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Razón Social (Nombre de la
                         Empresa)</label>
                     <input type="text" id="fiscCfgCompany"
-                        class="w-full border rounded px-3 py-2 text-sm font-bold uppercase focus:border-blue-500 outline-none"
+                        class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm font-bold uppercase focus:border-blue-500 outline-none"
                         placeholder="Ej: INVERSIONES ROCA FIRME, C.A">
                 </div>
                 <div>
-                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">RIF de la Empresa (o Cédula)</label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">RIF de la Empresa (o Cédula)</label>
                     <input type="text" id="fiscCfgRif"
-                        class="w-full border rounded px-3 py-2 text-sm font-bold uppercase focus:border-blue-500 outline-none"
+                        class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm font-bold uppercase focus:border-blue-500 outline-none"
                         placeholder="Ej: J-123456789">
                 </div>
                 <div>
-                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Dirección del Local</label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Dirección del Local</label>
                     <textarea id="fiscCfgAddress"
-                        class="w-full border rounded px-3 py-2 text-sm focus:border-blue-500 outline-none uppercase resize-none h-16"
+                        class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm focus:border-blue-500 outline-none uppercase resize-none h-16"
                         placeholder="Ej: AV. PRINCIPAL, LOCAL 4, CARACAS"></textarea>
                 </div>
                 <div>
-                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Zona Postal</label>
+                    <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Zona Postal</label>
                     <input type="text" id="fiscCfgZip"
-                        class="w-full border rounded px-3 py-2 text-sm focus:border-blue-500 outline-none uppercase"
+                        class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm focus:border-blue-500 outline-none uppercase"
                         placeholder="Ej: 1060">
                 </div>
-                <div class="border-t pt-3">
+                <div class="border-t border-slate-200 pt-3">
                     <p class="text-[10px] font-bold text-gray-500 uppercase mb-2">Cálculo de IVA (16%)</p>
-                    <label class="flex items-start gap-2 cursor-pointer bg-gray-50 p-2 rounded border">
+                    <label class="flex items-start gap-2 cursor-pointer bg-white p-3 rounded-2xl border border-slate-200">
                         <input type="checkbox" id="fiscCfgIva" class="form-checkbox h-4 w-4 text-blue-600 rounded mt-0.5">
                         <div>
                             <span class="text-xs font-bold text-gray-700 block">Mis precios YA incluyen IVA</span>
@@ -1423,7 +1507,7 @@
                     </label>
                 </div>
                 <button onclick="saveFiscalConfig()"
-                    class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition">
+                    class="w-full bg-blue-600 text-white py-3 rounded-2xl font-bold hover:bg-blue-700 shadow-lg active:scale-95 transition">
                     <i class="fa-solid fa-save mr-2"></i> Guardar Configuración
                 </button>
             </div>
@@ -2098,19 +2182,21 @@
 
         <div id="receiptConfigPanel"
             class="fixed inset-0 modal-bg z-[110] hidden flex items-center justify-center p-4 backdrop-blur-sm">
-            <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
-                <div class="bg-slate-800 text-white p-3 flex justify-between items-center">
-                    <h3 class="font-bold text-sm"><i class="fa-solid fa-receipt mr-2"></i>Personalizar Ticket</h3>
-                    <button onclick="toggleReceiptConfig()" class="hover:text-gray-300"><i
-                            class="fa-solid fa-times"></i></button>
+            <div class="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+                <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center gap-3">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <div class="bg-indigo-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-receipt"></i></div>
+                        <div class="min-w-0"><h3 class="font-bold text-slate-800 leading-tight">Personalizar ticket</h3><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Logo, nombre y mensaje</p></div>
+                    </div>
+                    <button onclick="toggleReceiptConfig()" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition active:scale-90 shrink-0"><i class="fa-solid fa-times"></i></button>
                 </div>
         
                 <div class="p-5 space-y-4">
                     <div>
-                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Logotipo del Negocio</label>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Logotipo del Negocio</label>
                         <div class="flex items-center gap-3">
                             <div
-                                class="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center overflow-hidden relative bg-gray-50 group">
+                                class="w-16 h-16 border-2 border-dashed border-slate-300 rounded-2xl flex items-center justify-center overflow-hidden relative bg-gray-50 group">
                                 <img id="receiptLogoPreview" src="" class="w-full h-full object-contain hidden">
                                 <i id="receiptLogoIcon"
                                     class="fa-solid fa-image text-gray-300 text-xl group-hover:text-gray-400"></i>
@@ -2119,30 +2205,30 @@
                             </div>
                             <div class="flex-1 space-y-2">
                                 <button onclick="$('receiptLogoInput').click()"
-                                    class="w-full bg-blue-50 text-blue-600 text-xs font-bold py-1.5 rounded hover:bg-blue-100 transition">Subir
+                                    class="w-full bg-blue-50 text-blue-600 text-xs font-bold py-2 rounded-xl hover:bg-blue-100 transition">Subir
                                     Logo</button>
                                 <button onclick="removeReceiptLogo()"
-                                    class="w-full bg-red-50 text-red-600 text-xs font-bold py-1.5 rounded hover:bg-red-100 transition">Quitar</button>
+                                    class="w-full bg-red-50 text-red-600 text-xs font-bold py-2 rounded-xl hover:bg-red-100 transition">Quitar</button>
                             </div>
                         </div>
                     </div>
         
                     <div>
-                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Nombre de la Empresa</label>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Nombre de la Empresa</label>
                         <input type="text" id="cfgCompanyName"
-                            class="w-full border rounded px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-indigo-500"
+                            class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm font-bold text-gray-700 outline-none focus:border-indigo-500"
                             placeholder="Ej: BODEGA LOS ANDES">
                     </div>
         
                     <div>
-                        <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">Mensaje al Pie (Footer)</label>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">Mensaje al Pie (Footer)</label>
                         <input type="text" id="cfgFooter"
-                            class="w-full border rounded px-3 py-2 text-sm text-gray-600 outline-none focus:border-indigo-500"
+                            class="w-full border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm text-gray-600 outline-none focus:border-indigo-500"
                             placeholder="Ej: ¡Gracias por su preferencia!">
                     </div>
         
                     <button onclick="saveReceiptConfig()"
-                        class="w-full bg-slate-800 text-white py-3 rounded-lg font-bold hover:bg-slate-900 shadow-lg mt-2 active:scale-95 transition">
+                        class="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg mt-2 active:scale-95 transition">
                         <i class="fa-solid fa-save mr-2"></i> Guardar Cambios
                     </button>
                 </div>
