@@ -117,6 +117,8 @@
 
         function closeSuccessModal() {
             $('successModal').classList.add('hidden');
+            if ($('successMsg')) $('successMsg').textContent = 'Los datos se han guardado correctamente.';
+            if ($('successOrderWa')) $('successOrderWa').classList.add('hidden');
             // tempReceiptData = null; // ¡NO LIMPIAR AQUÍ, lo necesitamos para el ruteador!
         }
 
@@ -282,7 +284,13 @@
                 const balanceUsed = data.balanceUsed || 0;
                 $('printBalanceRow').classList.toggle('hidden', !(balanceUsed > 0));
                 $('printBalanceUsed').textContent = formatMoney(balanceUsed);
-                const remaining = data.total - data.paid - balanceUsed;
+                // Fiado al que se le sumaron productos: el recibo trae todo el fiado, lo agregado hoy y lo abonado antes
+                const paidBefore = data.paidBefore || 0;
+                $('printAddedRow').classList.toggle('hidden', !(data.addedToday > 0));
+                $('printAdded').textContent = formatMoney(data.addedToday || 0);
+                $('printPaidBeforeRow').classList.toggle('hidden', !(paidBefore > 0));
+                $('printPaidBefore').textContent = formatMoney(paidBefore);
+                const remaining = roundMoney(data.total - paidBefore - data.paid - balanceUsed);
                 $('printRemaining').textContent = formatMoney(remaining);
             } else {
                 $('printCreditInfo').classList.add('hidden');
@@ -449,7 +457,7 @@
 
                 // Paso C: Abrir WhatsApp Web (Solo ocurre después de cerrar la alerta)
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
-                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                window.open(`https://wa.me/${(tempReceiptData && tempReceiptData.waPhone) || ''}?text=${encodeURIComponent(text)}`, '_blank'); // waPhone: pedido en línea (Fase 19)
 
             } catch (e) {
                 console.error(e);

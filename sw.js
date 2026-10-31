@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v57.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v58.0'; // Actualizado para forzar la recarga
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
@@ -40,6 +40,7 @@ const STATIC_ASSETS = [
   './js/25-catalog.js',
   './js/26-clients.js',
   './js/27-profit.js',
+  './js/28-orders.js',
   './icon-192.png',
   './icon-512.png'
   // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos

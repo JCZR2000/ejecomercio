@@ -777,6 +777,7 @@
             } else {
                 // CERRAR
                 modal.classList.add('hidden');
+                state.pendingOrderId = state.pendingOrderPhone = state.pendingOrderMsg = state.pendingOrderName = null; // cerrar sin cobrar deja el pedido en la bandeja
             }
         }
 

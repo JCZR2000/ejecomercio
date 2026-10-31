@@ -245,6 +245,16 @@
 
                         // Primero se borran los trozos (fotos y ventas); el contador fiscal NO, para no repetir números.
                         const userRef = db.collection('users').doc(user.uid);
+                        // Fase 19: primero se cierran los pedidos (para que no entren nuevos) y luego se borran los que hay
+                        const closeAndDeleteOrders = async () => {
+                            await userRef.collection('publico').doc('pedidos').set({ abierto: false, fiado: false });
+                            const snap = await userRef.collection('pedidos').get();
+                            for (let i = 0; i < snap.docs.length; i += 400) {
+                                const b = db.batch();
+                                snap.docs.slice(i, i + 400).forEach(d => b.delete(d.ref));
+                                await b.commit();
+                            }
+                        };
                         const deleteChunks = async () => {
                             const snap = await userRef.collection('chunks').get();
                             for (let i = 0; i < snap.docs.length; i += 400) {
@@ -262,7 +272,7 @@
                         // Archivos públicos (vitrina, perfil de cobro y nombre reservado): si fallan, se sigue
                         const deletePublicFiles = () => Promise.all([catalogPath(user.uid), `perfil/${user.uid}.json`, slug && slugPath(slug)].filter(Boolean).map(path =>
                             storage.ref(path).delete().catch(e => { if (e.code !== 'storage/object-not-found') console.warn('No se pudo borrar ' + path + ':', e.message || e); })));
-                        deleteChunks().then(() => deleteAllCloudBackups(userRef)).then(deleteImages).then(deletePublicFiles).then(() => userRef.set({
+                        closeAndDeleteOrders().then(deleteChunks).then(() => deleteAllCloudBackups(userRef)).then(deleteImages).then(deletePublicFiles).then(() => userRef.set({
                             products: [],
                             sales: [],
                             credits: [],
