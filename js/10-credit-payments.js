@@ -7,6 +7,7 @@
         function applyCreditPayment(credit, amount, rate, saleId, received = amount) {
             // Antes de cobrar, guardamos la deuda real calculada (incluyendo aumentos)
             credit.totalDebt = roundMoney(calculateRealDebt(credit));
+            const debtBefore = roundMoney(credit.totalDebt - credit.paid); // Fase 20: estado de cuenta del recibo de abono
             credit.paid = roundMoney(credit.paid + amount);
 
             const settled = roundMoney(credit.totalDebt - credit.paid) <= 0.01;
@@ -19,7 +20,11 @@
                 description: `Abono: ${credit.customer}` + (received > amount ? ` (incluye ${formatMoney(roundMoney(received - amount))} a saldo a favor)` : ''),
                 total: received,
                 ...(received > amount ? { toBalance: roundMoney(received - amount) } : {}),
-                rate: rate
+                rate: rate,
+                creditId: credit.id,
+                debtBefore,
+                debtTotal: credit.totalDebt,
+                debtAfter: roundMoney(credit.totalDebt - credit.paid)
             });
             return { settled };
         }
@@ -68,6 +73,15 @@
 
                 saveData();
                 renderAll();
+
+                // Modo personalizado: en vez de la alerta, ventana de éxito con «Generar Recibo» (Fase 20)
+                if (state.receiptType === 'PERSONALIZED') {
+                    tempReceiptData = paymentReceiptData(state.sales[0]);
+                    $('successTitle').textContent = settled ? '¡Deuda saldada!' : 'Abono registrado';
+                    $('successMsg').textContent = settled ? `La deuda de ${c.customer} quedó saldada. Se ha movido al historial.` : 'El abono se guardó correctamente.';
+                    $('successModal').classList.remove('hidden');
+                    return;
+                }
 
                 // Pequeño delay para que la UI se actualice antes de la alerta
                 setTimeout(() => {
