@@ -102,10 +102,11 @@
 
         // --- RUTEADOR DE RECIBOS ---
         // Pura: a dónde va el recibo. Los abonos nuevos (sin número de factura) siempre llevan el recibo personalizado (Fase 21).
-        function receiptTarget(data) {
+        // `type` fuerza el documento (paso guiado, Fase 25) sin tocar Ajustes; sin él manda state.receiptType.
+        function receiptTarget(data, type = state.receiptType) {
             if (data.type === 'payment' && !data.isCredit && !data.fiscalNum) return 'personalized';
-            if (!state.receiptType) return 'choose'; // nunca ha elegido: modal de elección
-            if (state.receiptType === 'FISCAL') return state.fiscalConfig.rif ? 'fiscal' : 'fiscalConfig';
+            if (!type) return 'choose'; // nunca ha elegido: modal de elección
+            if (type === 'FISCAL') return state.fiscalConfig.rif ? 'fiscal' : 'fiscalConfig';
             return 'personalized';
         }
 
@@ -117,11 +118,11 @@
             return data;
         }
 
-        function routeReceipt(data) {
+        function routeReceipt(data, type) {
             syncReceiptRecord(data);
             tempReceiptData = data; // Guardamos contexto
 
-            const target = receiptTarget(data);
+            const target = receiptTarget(data, type || state.receiptType);
             if (target === 'choose') $('invoiceTypeModal').classList.remove('hidden');
             else if (target === 'fiscalConfig') $('fiscalConfigModal').classList.remove('hidden');
             else if (target === 'fiscal') prepareFiscalReceiptModal(data);
@@ -136,7 +137,72 @@
             syncReceiptRecord(dataToUse);
             // Con red, se espera un momento a que el recibo salga ya con su número
             if (dataToUse.numPending && navigator.onLine) await Promise.race([assignPendingNumbers(), new Promise(r => setTimeout(r, 4000))]);
+            if (isGuidedReceipt() && !dataToUse.isHistory && !(dataToUse.type === 'payment' && !dataToUse.isCredit)) return openGuidedReceipt(dataToUse);
             routeReceipt(dataToUse);
+        }
+
+        // ---------- Recibo guiado (Fase 25) ----------
+        const isGuidedReceipt = () => !!state.receiptConfig && state.receiptConfig.flow === 'guided';
+
+        // Pura: aplica la elección del paso guiado al registro (venta o fiado). No toca uno con factura emitida.
+        // choice = { method, methodRef, clientId } (method solo en contado)
+        function applyGuidedChoice(rec, choice) {
+            if (!rec || rec.invoice) return rec;
+            if (choice.method !== undefined) {
+                delete rec.method; delete rec.methodRef;
+                Object.assign(rec, payFields(choice));
+            }
+            if (choice.clientId) rec.clientId = choice.clientId;
+            return rec;
+        }
+
+        let guided = null; // { data, type, method, clientId, askMethod }
+
+        function openGuidedReceipt(data) {
+            const askMethod = data.type === 'sale' && !data.isCredit;
+            guided = { data, type: state.receiptType === 'FISCAL' ? 'FISCAL' : 'PERSONALIZED', askMethod,
+                method: payMethodKey(data.method) || lastPayMethod(), clientId: data.clientId || null };
+            $('guidedPayBox').classList.toggle('hidden', !askMethod);
+            $('guidedPayRef').value = data.methodRef || '';
+            renderGuidedReceipt();
+            $('guidedReceiptModal').classList.remove('hidden');
+        }
+
+        function renderGuidedReceipt() {
+            const g = guided; if (!g) return;
+            const tab = (b, active, on) => b.className = 'p-3 rounded-2xl border text-sm font-bold transition active:scale-95 ' + (active ? on : 'bg-white border-slate-200 text-slate-600');
+            tab($('guidedTypePers'), g.type !== 'FISCAL', 'bg-indigo-600 border-indigo-600 text-white');
+            tab($('guidedTypeFisc'), g.type === 'FISCAL', 'bg-blue-600 border-blue-600 text-white');
+            $('guidedPayChips').querySelectorAll('button').forEach(b => {
+                b.className = 'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition active:scale-95 ' + (b.dataset.pay === g.method ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-200 text-slate-600');
+            });
+            $('guidedPayRef').classList.toggle('hidden', !REF_METHODS.includes(g.method));
+            const c = getClient(g.clientId);
+            $('guidedClientName').textContent = c ? c.name : (g.data.customer || 'Cliente genérico');
+            $('guidedGo').textContent = g.type === 'FISCAL' ? 'Ver documento' : 'Ver recibo';
+        }
+
+        function setGuidedType(type) { if (guided) { guided.type = type; renderGuidedReceipt(); } }
+        function setGuidedMethod(key) { if (guided) { guided.method = payMethodKey(key) || 'EFECTIVO'; renderGuidedReceipt(); } }
+        function changeGuidedClient() {
+            openClientPick('Elegir cliente', null, id => { if (guided) { guided.clientId = id; renderGuidedReceipt(); } });
+        }
+        function closeGuidedReceipt() { $('guidedReceiptModal').classList.add('hidden'); guided = null; }
+
+        function confirmGuidedReceipt() {
+            const g = guided; if (!g) return;
+            const data = g.data;
+            const choice = { clientId: g.clientId };
+            if (g.askMethod) { choice.method = g.method; choice.methodRef = $('guidedPayRef').value; }
+            const rec = (data.isCredit ? state.credits : state.sales).find(x => x.id == data.id);
+            if (rec && !rec.invoice) {
+                applyGuidedChoice(rec, choice);
+                if (g.askMethod) rememberPayMethod(g.method);
+                saveData();
+            }
+            const type = g.type;
+            closeGuidedReceipt();
+            routeReceipt(data, type); // routeReceipt vuelve a leer método y cliente del registro
         }
 
         function closeSuccessModal() {

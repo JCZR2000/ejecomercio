@@ -14,7 +14,8 @@
             const row = $('posPayMethod');
             if (!row) return;
             const credit = $('isCreditSale').checked || !!state.activeCreditId;
-            row.classList.toggle('hidden', credit && !((parseFloat($('initialPayUSD').value) || 0) > 0));
+            // Guiado (Fase 25): en contado el método se pregunta después de cobrar
+            row.classList.toggle('hidden', credit ? !((parseFloat($('initialPayUSD').value) || 0) > 0) : isGuidedReceipt());
             const m = currentPosPay().method;
             row.querySelectorAll('button').forEach(b => {
                 b.className = 'shrink-0 px-3 py-2 rounded-full text-xs font-bold border transition active:scale-95 ' + (b.dataset.pay === m ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300 text-gray-600');
