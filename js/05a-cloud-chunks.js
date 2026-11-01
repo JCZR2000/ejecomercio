@@ -93,6 +93,22 @@
             return dirty ? 'CONFLICT' : 'LOAD';
         }
 
+        // Fase 24: ¿es noticia esta versión de la nube?
+        // 'OWN_NEWER': subida propia más nueva que la base (no se registró como base): se adopta.
+        // 'STALE': subida propia ya conocida, o más vieja que la base: se ignora.
+        // 'OK': versión de otro dispositivo: sigue a decideSync. rev 0 (reinicio de fábrica, sin rev) nunca es vieja.
+        function cloudFilter(token, base, ownTokens) {
+            const rev = (t) => parseInt(String(t || '').split('|')[0], 10) || 0;
+            if (ownTokens.has(token)) return token !== base && rev(token) > rev(base) ? 'OWN_NEWER' : 'STALE';
+            return rev(token) > 0 && rev(base) > rev(token) ? 'STALE' : 'OK';
+        }
+
+        // Fase 24: ventas y fiados que están en local y no en la nube (por id).
+        function localOnlyCounts(local, cloud) {
+            const miss = (a, b) => { const ids = new Set((b || []).map(x => x.id)); return (a || []).filter(x => !ids.has(x.id)).length; };
+            return { sales: miss(local.sales, cloud.sales), credits: miss(local.credits, cloud.credits) };
+        }
+
         // Tipos que bajan a 0 desde más de 0, o a menos de la mitad desde 5 o más.
         function bigLoss(baseCounts, nowCounts) {
             if (!baseCounts) return [];
@@ -123,6 +139,16 @@
             console.assert(t('a', 'a', false, true) === 'NONE', 'selfTestSync: sin cambios carga la nube');
             console.assert(t('a', 'b', false, true) === 'LOAD', 'selfTestSync: nube nueva se carga');
             console.assert(t(null, 'a', true, true) === 'LEGACY', 'selfTestSync: dispositivo viejo sigue igual');
+            const cf = (tk, b, own) => cloudFilter(tk, b, new Set(own));
+            console.assert(cf('5|a', '5|a', ['5|a']) === 'STALE', 'selfTestSync: ficha propia igual a la base');
+            console.assert(cf('6|b', '5|a', ['6|b']) === 'OWN_NEWER', 'selfTestSync: ficha propia más nueva');
+            console.assert(cf('4|x', '5|a', []) === 'STALE', 'selfTestSync: ajena más vieja');
+            console.assert(cf('6|x', '5|a', []) === 'OK', 'selfTestSync: ajena más nueva');
+            console.assert(cf('0|x', '5|a', []) === 'OK', 'selfTestSync: rev 0 nunca es vieja');
+            console.assert(cf('3|x', '', []) === 'OK' && cf('3|x', null, []) === 'OK', 'selfTestSync: sin base');
+            const lo = localOnlyCounts({ sales: [{ id: 1 }, { id: 2 }], credits: [{ id: 'a' }] }, { sales: [{ id: 1 }], credits: [{ id: 'a' }, { id: 'b' }] });
+            console.assert(lo.sales === 1 && lo.credits === 0, 'selfTestSync: localOnlyCounts');
+            console.assert(localOnlyCounts({}, {}).sales === 0, 'selfTestSync: localOnlyCounts vacío');
             // safeSetItem: guarda, y devuelve false (sin lanzar) si el almacenamiento falla. No llena el almacenamiento real.
             console.assert(safeSetItem('inv__selftest', '1') === true, 'selfTestSync: safeSetItem guarda');
             try { localStorage.removeItem('inv__selftest'); } catch (e) { /* sin almacenamiento */ }

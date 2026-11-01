@@ -30,7 +30,7 @@
         }
 
         // Fase 6: ficha de la última versión de la nube aceptada por este dispositivo (null = viene de una versión vieja)
-        let selfCloudToken = null; // ficha de nuestra última subida: su eco no se vuelve a procesar
+        const ownCloudTokens = new Set(); // fichas de nuestras últimas subidas (máx. 50): su eco no se vuelve a procesar
         let saveSeq = 0;
         const getCloudBase = () => localStorage.getItem('inv_cloud_base');
         function setCloudBase(token, counts) {
@@ -256,7 +256,8 @@
                 if (base !== null && cloudTokenOf(cur) !== base) return 'CONFLICT';
                 const doc = { ...mainDoc, rev: ((cur && cur.rev) || 0) + 1 }; // set() sin merge, intencional
                 newToken = cloudTokenOf(doc);
-                selfCloudToken = newToken;
+                ownCloudTokens.add(newToken);
+                if (ownCloudTokens.size > 50) ownCloudTokens.delete(ownCloudTokens.values().next().value);
                 tx.set(userRef, doc);
                 return 'OK';
             });

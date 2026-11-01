@@ -366,6 +366,7 @@
         async function fetchAllRates() {
             const btn = $('refreshRateBtn');
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            const prevUsd = state.bcvUsd, prevEur = state.bcvEur;
 
             try {
                 // 1. URL de tu API en GitHub
@@ -396,7 +397,8 @@
                 // Si falla (ej. sin internet), no borramos las tasas viejas, mantenemos las locales.
             }
 
-            saveData({ background: true }); // las tasas no marcan cambios ni provocan conflictos
+            // Fase 24: solo se sube si la tasa cambió; así abrir la app en otro dispositivo no cambia la ficha de la nube
+            if (state.bcvUsd !== prevUsd || state.bcvEur !== prevEur) saveData({ background: true }); // las tasas no marcan cambios ni provocan conflictos
             btn.innerHTML = '<i class="fa-solid fa-sync-alt"></i>';
             renderAll();
         }

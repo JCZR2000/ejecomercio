@@ -351,10 +351,11 @@
         let hydrateSeq = 0;
         async function hydrateCloudData(cloudData, doc, attempt = 0) {
             // Mismo filtro de eco que processSyncData: nuestra propia escritura no se vuelve a leer
+            const seq = ++hydrateSeq; // Fase 24: cualquier aviso nuevo (también un eco) cancela la hidratación vieja en curso
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
-            if (cloudTokenOf(doc.data()) === selfCloudToken) return; // eco de nuestra propia subida
+            if (cloudFilter(cloudTokenOf(doc.data()), getCloudBase(), ownCloudTokens) === 'STALE') return; // eco propio o versión vieja
             if (!localImagesReady) await localImagesLoaded; // para reutilizar las fotos locales (lp.img)
-            const seq = ++hydrateSeq;
+            if (seq !== hydrateSeq) return;
             const manifest = { key: cloudData.chunkKey || '', chunks: {} };
             let { schema, chunkKey, salesChunks, ...result } = cloudData;
             const isV2 = schema === 2 && !('sales' in cloudData);
@@ -412,6 +413,19 @@
 
             // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
+
+            // Fase 24: se ignora la versión propia o vieja; una subida propia no registrada como base se adopta
+            const token = cloudTokenOf(doc.data());
+            const filter = cloudFilter(token, getCloudBase(), ownCloudTokens);
+            if (filter === 'STALE') {
+                console.log('☁️ Versión propia o vieja de la nube: se ignora');
+                return;
+            }
+            if (filter === 'OWN_NEWER') {
+                setCloudBase(token, cloudCounts(cloudData));
+                if (isCloudDirty()) saveData();
+                return;
+            }
 
             // Fase 6: decisión por versión base. Solo un dispositivo sin base (LEGACY) usa la lógica antigua de abajo.
             const decision = decideSync(getCloudBase(), cloudTokenOf(doc.data()), isCloudDirty(), isLocalPartial());
@@ -565,6 +579,14 @@
                 };
 
                 if (choice === 'CLOUD') {
+                    // Fase 24: aviso si elegir la nube borra ventas o fiados que solo están en este dispositivo
+                    const lost = snapshot ? localOnlyCounts(state, snapshot.data) : { sales: 0, credits: 0 };
+                    if (lost.sales || lost.credits) {
+                        customConfirm('Se perderán datos de este dispositivo', `Este dispositivo tiene ${lost.sales} ventas y ${lost.credits} fiados que la nube no tiene. Si eliges la nube, se borran. ¿Continuar?`, 'warning', () => resolveConflict('CLOUD_OK'));
+                        return;
+                    }
+                }
+                if (choice === 'CLOUD' || choice === 'CLOUD_OK') {
                     startCooldown();
                     if (snapshot) {
                         console.log("☁️ Usuario eligió NUBE. Sobrescribiendo datos locales...");
