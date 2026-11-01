@@ -641,7 +641,12 @@
                             </span>
                             <button type="button" id="btnConfigFiscal" onclick="event.stopPropagation(); openFiscalConfigFromMenu()" aria-label="Configurar datos fiscales" class="w-10 h-10 rounded-full bg-white text-blue-600 shadow-sm border border-blue-200 hover:bg-blue-50 flex items-center justify-center shrink-0 transition active:scale-90"><i class="fa-solid fa-gear"></i></button>
                         </div>
-                    </div>
+                                            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wide pt-2">Al generar el recibo</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="btnFlowFast" onclick="setReceiptFlow('fast')" class="text-left cursor-pointer"><span class="block text-sm font-bold text-slate-700">Rápido</span><span class="block text-[11px] text-slate-500">El recibo sale de una vez.</span></button>
+                            <button type="button" id="btnFlowGuided" onclick="setReceiptFlow('guided')" class="text-left cursor-pointer"><span class="block text-sm font-bold text-slate-700">Guiado</span><span class="block text-[11px] text-slate-500">Te pregunta el documento y con qué pagó.</span></button>
+                        </div>
+</div>
                 </section>
 
                 <!-- VITRINA -->
@@ -1350,6 +1355,38 @@
     </div>
 
     <!-- 1. MODAL DE ELECCIÓN DE FACTURA (Aparece la primera vez) -->
+    <!-- Paso guiado del recibo (Fase 25) -->
+    <div id="guidedReceiptModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up">
+            <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center gap-3">
+                <h3 class="font-bold text-slate-800 leading-tight">Antes de ver el recibo</h3>
+                <button onclick="closeGuidedReceipt()" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div>
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Elige el documento</div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" id="guidedTypePers" onclick="setGuidedType('PERSONALIZED')">Recibo</button>
+                        <button type="button" id="guidedTypeFisc" onclick="setGuidedType('FISCAL')">Documento no fiscal</button>
+                    </div>
+                </div>
+                <div id="guidedPayBox">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">¿Con qué pagó?</div>
+                    <div id="guidedPayChips" class="flex flex-wrap gap-1.5"></div>
+                    <input type="text" id="guidedPayRef" maxlength="20" autocomplete="off" placeholder="Referencia (opcional)" class="hidden w-full mt-2 border border-slate-200 bg-white rounded-xl px-3 py-2 text-sm outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1">Cliente</div>
+                    <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                        <span id="guidedClientName" class="flex-1 min-w-0 truncate text-sm font-bold text-slate-700"></span>
+                        <button type="button" onclick="changeGuidedClient()" class="text-xs font-bold text-indigo-600 shrink-0">Cambiar</button>
+                    </div>
+                </div>
+                <button type="button" id="guidedGo" onclick="confirmGuidedReceipt()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow hover:bg-indigo-700 active:scale-95 transition">Ver recibo</button>
+            </div>
+        </div>
+    </div>
+
     <div id="invoiceTypeModal"
         class="fixed inset-0 modal-bg z-[110] hidden flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-6 text-center animate-bounce-in">

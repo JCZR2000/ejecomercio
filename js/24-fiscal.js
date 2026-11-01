@@ -21,6 +21,18 @@
             $('btnTypePers').className = optionClass(fiscal ? '' : 'indigo') + ' cursor-pointer';
             $('chipTypeFisc').classList.toggle('hidden', !fiscal);
             $('chipTypePers').classList.toggle('hidden', fiscal);
+            const guidedOn = isGuidedReceipt();
+            $('btnFlowFast').className = optionClass(guidedOn ? '' : 'indigo') + ' cursor-pointer';
+            $('btnFlowGuided').className = optionClass(guidedOn ? 'indigo' : '') + ' cursor-pointer';
+        }
+
+        // Fase 25: «Rápido» (sin clave, como siempre) o «Guiado»
+        function setReceiptFlow(flow) {
+            if (flow === 'guided') state.receiptConfig.flow = 'guided';
+            else delete state.receiptConfig.flow;
+            saveData();
+            updateConfigUI();
+            updatePosPayRow();
         }
 
         function openFiscalConfigFromMenu() {
@@ -91,6 +103,7 @@
         const payChips = fn => PAY_METHODS.map(m => `<button type="button" data-pay="${m.key}" onclick="${fn}('${m.key}')">${m.text}</button>`).join('');
         $('fiscalPayChips').innerHTML = payChips('setFiscalMethod');
         $('posPayChips').innerHTML = payChips('setPosPayMethod');
+        $('guidedPayChips').innerHTML = payChips('setGuidedMethod');
         $('multiPayMethod').innerHTML = PAY_METHODS.map(m => `<option value="${m.key}">${m.text}</option>`).join('');
         updatePosPayRow();
 
@@ -620,6 +633,27 @@
         }
 
         // Autoprueba de la factura (Fase 22): consola, datos ficticios
+        function selfTestGuided() {
+            const rif = state.fiscalConfig.rif, rt = state.receiptType;
+            state.fiscalConfig.rif = 'J-00000000-0';
+            console.assert(receiptTarget({ type: 'sale' }, 'PERSONALIZED') === 'personalized', 'selfTestGuided: recibo');
+            console.assert(receiptTarget({ type: 'sale' }, 'FISCAL') === 'fiscal', 'selfTestGuided: documento con RIF');
+            console.assert(receiptTarget({ type: 'payment' }, 'FISCAL') === 'personalized', 'selfTestGuided: el abono no cambia');
+            state.fiscalConfig.rif = '';
+            console.assert(receiptTarget({ type: 'sale' }, 'FISCAL') === 'fiscalConfig', 'selfTestGuided: documento sin RIF');
+            state.receiptType = '';
+            console.assert(receiptTarget({ type: 'sale' }) === 'choose', 'selfTestGuided: sin elegir');
+            state.fiscalConfig.rif = rif; state.receiptType = rt;
+            const inv = { id: 1, method: 'EFECTIVO', invoice: {} };
+            applyGuidedChoice(inv, { method: 'PAGO_MOVIL', methodRef: '1' });
+            console.assert(inv.method === 'EFECTIVO' && !('methodRef' in inv), 'selfTestGuided: no toca lo emitido');
+            const a = applyGuidedChoice({ id: 2 }, { method: 'TRANSFERENCIA', methodRef: 'x'.repeat(30) });
+            console.assert(a.method === 'TRANSFERENCIA' && a.methodRef.length === 20, 'selfTestGuided: referencia a 20');
+            const b = applyGuidedChoice({ id: 3, methodRef: 'viejo' }, { method: 'EFECTIVO', methodRef: '99' });
+            console.assert(b.method === 'EFECTIVO' && !('methodRef' in b), 'selfTestGuided: efectivo sin referencia');
+            console.log('selfTestGuided terminado');
+        }
+
         function selfTestInvoice() {
             const iso = n => `2026-10-${String(n).padStart(2, '0')}T12:00:00.000Z`;
             const co = { name: 'Tienda Prueba', rif: 'J-1', address: 'Calle 1', zip: '1010' }, cl = { rif: 'V-1', name: 'Ana', address: '', phone: '' };
