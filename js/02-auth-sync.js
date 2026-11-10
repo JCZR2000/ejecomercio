@@ -353,7 +353,8 @@
             // Mismo filtro de eco que processSyncData: nuestra propia escritura no se vuelve a leer
             const seq = ++hydrateSeq; // Fase 24: cualquier aviso nuevo (también un eco) cancela la hidratación vieja en curso
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
-            if (cloudFilter(cloudTokenOf(doc.data()), getCloudBase(), ownCloudTokens) === 'STALE') return; // eco propio o versión vieja
+            const hToken = cloudTokenOf(doc.data());
+            if (isStaleNews(cloudFilter(hToken, getCloudBase(), ownCloudTokens), isFirstSyncCheck, hToken, getCloudBase())) return; // eco propio o versión vieja (al abrir, la versión igual a la base sigue)
             if (!localImagesReady) await localImagesLoaded; // para reutilizar las fotos locales (lp.img)
             if (seq !== hydrateSeq) return;
             const manifest = { key: cloudData.chunkKey || '', chunks: {} };
@@ -417,14 +418,19 @@
             // Fase 24: se ignora la versión propia o vieja; una subida propia no registrada como base se adopta
             const token = cloudTokenOf(doc.data());
             const filter = cloudFilter(token, getCloudBase(), ownCloudTokens);
-            if (filter === 'STALE') {
+            if (isStaleNews(filter, isFirstSyncCheck, token, getCloudBase())) {
                 console.log('☁️ Versión propia o vieja de la nube: se ignora');
                 return;
             }
-            if (filter === 'OWN_NEWER') {
-                setCloudBase(token, cloudCounts(cloudData));
-                if (isCloudDirty()) saveData();
-                return;
+            if (filter === 'OWN_NEWER' && !isLocalPartial()) {
+                // Subida propia que no se registró como base (se cerró la app o se cortó la red): se adopta
+                setCloudBase(token, cloudCounts(cloudData), cloudUserVer(doc.data()));
+                if (!isFirstSyncCheck) { if (isCloudDirty()) saveData(); return; } // con la app abierta, como en la Fase 24
+                // Al abrir la app sigue a decideSync: nube = base → UPLOAD o NONE, que terminan el arranque
+            } else if (filter === 'OK' && isCloudDirty() && !isLocalPartial() && sameUserVersion(doc.data(), getCloudBaseUser())) {
+                // Fase 27: la nube solo cambió por subidas de fondo de otro dispositivo: los cambios locales se suben encima
+                console.log('☁️ La nube solo cambió por tasas o fotos: se suben los cambios locales');
+                setCloudBase(token, cloudCounts(cloudData), cloudUserVer(doc.data()));
             }
 
             // Fase 6: decisión por versión base. Solo un dispositivo sin base (LEGACY) usa la lógica antigua de abajo.
@@ -614,7 +620,7 @@
                         localStorage.setItem('inv_last_updated', state.lastUpdated);
 
                         // Se acepta pisar la versión que el usuario vio; si la nube cambió otra vez, la subida lo detecta
-                        if (snapshot) setCloudBase(cloudTokenOf(snapshot.doc.data()), cloudCounts(snapshot.data));
+                        if (snapshot) setCloudBase(cloudTokenOf(snapshot.doc.data()), cloudCounts(snapshot.data), cloudUserVer(snapshot.doc.data()));
                         state.isCloudSynced = true;
                         saveData({ skipLossCheck: true });
                         await waitForUpload();
@@ -768,7 +774,7 @@
                     renderAll();
                     renderEncryptionUI(); // Actualizar UI de candado
                     // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
-                    setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state));
+                    setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state), cloudUserVer(doc.data()));
                     safeSetItem('inv_cloud_dirty', '');
                     assignPendingNumbers(); // Fase 21: numera lo que quedó «por asignar» sin conexión
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono

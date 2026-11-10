@@ -30,10 +30,18 @@
         }
 
         // Fase 6: ficha de la última versión de la nube aceptada por este dispositivo (null = viene de una versión vieja)
-        const ownCloudTokens = new Set(); // fichas de nuestras últimas subidas (máx. 50): su eco no se vuelve a procesar
+        // Fase 27: fichas propias guardadas (texto JSON de inv_own_tokens). Nunca lanza.
+        function parseOwnTokens(raw) {
+            try { const a = JSON.parse(raw); return Array.isArray(a) ? a.filter(t => typeof t === 'string').slice(-10) : []; }
+            catch (e) { return []; }
+        }
+        const ownCloudTokens = new Set(parseOwnTokens(localStorage.getItem('inv_own_tokens'))); // fichas de nuestras últimas subidas (máx. 10): su eco no se vuelve a procesar
         let saveSeq = 0;
         const getCloudBase = () => localStorage.getItem('inv_cloud_base');
-        function setCloudBase(token, counts) {
+        // Fase 27: sin inv_cloud_base_user (viene de la v62.0 o anterior) la versión de usuario es la propia base
+        const getCloudBaseUser = () => localStorage.getItem('inv_cloud_base_user') || getCloudBase();
+        function setCloudBase(token, counts, userVer = token) {
+            safeSetItem('inv_cloud_base_user', userVer);
             safeSetItem('inv_cloud_base', token);
             safeSetItem('inv_cloud_base_counts', JSON.stringify(counts || {}));
         }
@@ -208,6 +216,7 @@
                 if (cloudTokenOf(s0.exists ? s0.data() : null) !== base) return 'CONFLICT';
             }
             const chunksRef = userRef.collection('chunks');
+            const userChange = isCloudDirty() || isLocalPartial(); // Fase 27: sin await hasta buildCloudParts
             const { main, chunks, kept } = buildCloudParts();
             const fp = keyFingerprint();
             const old = state.cloudManifest || {};
@@ -249,19 +258,31 @@
 
             // 2. Documento principal en transacción: solo se escribe si la nube sigue en la versión base.
             // shortcut: un conflicto aquí deja trozos nuevos huérfanos (pequeños); se borran con el reinicio de fábrica.
-            let newToken;
+            let newToken, newUserVer;
             const res = await db.runTransaction(async tx => {
                 const s = await tx.get(userRef);
                 const cur = s.exists ? s.data() : null;
                 if (base !== null && cloudTokenOf(cur) !== base) return 'CONFLICT';
                 const doc = { ...mainDoc, rev: ((cur && cur.rev) || 0) + 1 }; // set() sin merge, intencional
+                // Fase 27: una subida de fondo (sin cambios del usuario) hereda la versión de usuario de su base
+                if (!userChange && base) doc.userVer = getCloudBaseUser() || base;
                 newToken = cloudTokenOf(doc);
+                newUserVer = doc.userVer || newToken;
                 ownCloudTokens.add(newToken);
-                if (ownCloudTokens.size > 50) ownCloudTokens.delete(ownCloudTokens.values().next().value);
+                if (ownCloudTokens.size > 10) ownCloudTokens.delete(ownCloudTokens.values().next().value);
+                safeSetItem('inv_own_tokens', JSON.stringify([...ownCloudTokens])); // antes de escribir: si la app se cierra, al reabrir se reconoce
                 tx.set(userRef, doc);
                 return 'OK';
             });
             if (res === 'CONFLICT') return 'CONFLICT';
+
+            // Fase 27: registrar la base ya, antes de las esperas de red del borrado
+            const manifest = { key: fp, chunks: {} };
+            for (const [id, c] of Object.entries(chunks)) manifest.chunks[id] = c.hash;
+            kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
+            setCloudManifest(manifest);
+            setCloudBase(newToken, upCounts, newUserVer);
+            if (seq === saveSeq) safeSetItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
 
             // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)
             const stale = Object.keys(oldChunks).filter(id => !chunks[id] && !kept.includes(id));
@@ -270,13 +291,6 @@
                 stale.slice(i, i + 400).forEach(id => b.delete(chunksRef.doc(id)));
                 await b.commit();
             }
-
-            const manifest = { key: fp, chunks: {} };
-            for (const [id, c] of Object.entries(chunks)) manifest.chunks[id] = c.hash;
-            kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
-            setCloudManifest(manifest);
-            setCloudBase(newToken, upCounts);
-            if (seq === saveSeq) safeSetItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
             return true;
         }
 

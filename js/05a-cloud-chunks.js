@@ -103,6 +103,22 @@
             return rev(token) > 0 && rev(base) > rev(token) ? 'STALE' : 'OK';
         }
 
+        // Fase 27: versión de usuario de un documento de la nube (la ficha de la última subida con cambios del usuario).
+        // Sin userVer (documento viejo o subida con cambios) es su propia ficha.
+        function cloudUserVer(raw) {
+            return raw ? (raw.userVer || cloudTokenOf(raw)) : '';
+        }
+
+        // Fase 27: ¿la nube solo se diferencia de mi base en subidas de fondo (tasa, enlaces de fotos)?
+        function sameUserVersion(cloudRaw, baseUserVer) {
+            return !!baseUserVer && cloudUserVer(cloudRaw) === baseUserVer;
+        }
+
+        // Fase 27: al abrir la app, la versión igual a la base nunca es «vieja»: hay que pasar por decideSync para terminar de cargar.
+        function isStaleNews(filter, isFirst, token, base) {
+            return filter === 'STALE' && !(isFirst && token === base);
+        }
+
         // Fase 24: ventas y fiados que están en local y no en la nube (por id).
         function localOnlyCounts(local, cloud) {
             const miss = (a, b) => { const ids = new Set((b || []).map(x => x.id)); return (a || []).filter(x => !ids.has(x.id)).length; };
@@ -146,6 +162,14 @@
             console.assert(cf('6|x', '5|a', []) === 'OK', 'selfTestSync: ajena más nueva');
             console.assert(cf('0|x', '5|a', []) === 'OK', 'selfTestSync: rev 0 nunca es vieja');
             console.assert(cf('3|x', '', []) === 'OK' && cf('3|x', null, []) === 'OK', 'selfTestSync: sin base');
+            console.assert(cloudUserVer({ rev: 3, lastUpdated: 'x' }) === '3|x' && cloudUserVer({ rev: 3, lastUpdated: 'x', userVer: '2|w' }) === '2|w' && cloudUserVer(null) === '', 'selfTestSync: cloudUserVer');
+            console.assert(sameUserVersion({ rev: 4, lastUpdated: 'y', userVer: '3|x' }, '3|x') === true, 'selfTestSync: subida de fondo');
+            console.assert(sameUserVersion({ rev: 4, lastUpdated: 'y' }, '3|x') === false, 'selfTestSync: subida con cambios de usuario');
+            console.assert(sameUserVersion({ rev: 4, lastUpdated: 'y', userVer: '3|x' }, null) === false && sameUserVersion({ rev: 4, lastUpdated: 'y', userVer: '3|x' }, '') === false, 'selfTestSync: sin dato de base');
+            console.assert(sameUserVersion({ rev: 5, lastUpdated: 'z', userVer: '3|x' }, '3|x') === true, 'selfTestSync: dos subidas de fondo');
+            console.assert(isStaleNews('STALE', true, 'a', 'a') === false && isStaleNews('STALE', false, 'a', 'a') === true && isStaleNews('STALE', true, 'a', 'b') === true && isStaleNews('OK', true, 'a', 'a') === false, 'selfTestSync: isStaleNews');
+            console.assert(parseOwnTokens('["a","b"]').length === 2 && parseOwnTokens('basura').length === 0 && parseOwnTokens(null).length === 0 && parseOwnTokens('{}').length === 0
+                && parseOwnTokens(JSON.stringify(Array.from({ length: 15 }, (_, i) => 't' + i))).join() === Array.from({ length: 10 }, (_, i) => 't' + (i + 5)).join(), 'selfTestSync: parseOwnTokens');
             const lo = localOnlyCounts({ sales: [{ id: 1 }, { id: 2 }], credits: [{ id: 'a' }] }, { sales: [{ id: 1 }], credits: [{ id: 'a' }, { id: 'b' }] });
             console.assert(lo.sales === 1 && lo.credits === 0, 'selfTestSync: localOnlyCounts');
             console.assert(localOnlyCounts({}, {}).sales === 0, 'selfTestSync: localOnlyCounts vacío');
