@@ -86,7 +86,7 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
 - `main` no se usa por ahora (está atrasada).
 - Hay una etiqueta llamada `DEV` además de la rama: usa `refs/heads/DEV` en los comandos de git que lo necesiten.
 - Antes de publicar:
-  - Sube `CACHE_NAME` en `sw.js` a la nueva versión (`ejecomercio-vXX.Y`); si no, los teléfonos instalados siguen con la versión vieja.
+  - Sube `CACHE_NAME` en `sw.js` a la nueva versión (`ejecomercio-vXX.Y`); si no, los teléfonos instalados siguen con la versión vieja. Con caché primero, **sin subir `CACHE_NAME` nadie recibe la versión nueva**. Todo archivo nuevo de `js/` debe añadirse a `STATIC_ASSETS`.
   - Sirve la carpeta por HTTP en local (el Service Worker no funciona con `file://`) y prueba el flujo cambiado en el navegador, sin errores en la consola.
   - Si el cambio toca sincronización o datos guardados, prueba también con datos viejos (sección 5) y sin conexión.
   - Las pruebas en local usan el **mismo Firebase que los usuarios reales**: inicia sesión solo con una cuenta de Google de prueba o la del dueño, nunca con la de otra persona.
@@ -98,7 +98,7 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
 - **Nunca** se escribe a la nube algo que pueda borrar datos del usuario sin una protección (como el anti-wipe actual de `saveData`).
 - Toda lógica nueva de dinero, tasas, deudas o correlativo fiscal deja una pequeña prueba comprobable (por ejemplo, una función de autoprueba con `console.assert`) y se anota en el plan cómo se verificó.
 - Texto que viene del usuario o de APIs externas no se inserta con `innerHTML` sin escapar.
-- Las librerías por CDN llevan versión fija.
+- Las librerías por CDN llevan versión fija, `crossorigin="anonymous"` e `integrity`.
 
 ## 6. Git y cierre de cada fase
 - El trabajo y las pruebas se hacen en la rama **`DEV2`**. El remoto se llama `nube`.
