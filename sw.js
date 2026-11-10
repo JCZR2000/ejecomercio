@@ -1,5 +1,6 @@
-const CACHE_NAME = 'ejecomercio-v62.0'; // Actualizado para forzar la recarga
+const CACHE_NAME = 'ejecomercio-v63.0'; // Subirlo en cada publicación: con caché primero, sin esto nadie recibe la versión nueva
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
+const CDN_CACHE = 'ejecomercio-cdn'; // librerías con versión en la URL; no se borra al cambiar de versión
 
 // 1. SOLO archivos locales críticos para la instalación
 // (Evitamos poner CDNs aquí para no romper la instalación por CORS)
@@ -41,17 +42,21 @@ const STATIC_ASSETS = [
   './js/26-clients.js',
   './js/27-profit.js',
   './js/28-orders.js',
+  './js/vendor/tailwind-3.4.17.js',
   './icon-192.png',
   './icon-512.png'
   // Nota: Los sonidos o imágenes locales también deberían ir aquí si son críticos
 ];
+// Rutas precargadas: se sirven siempre de CACHE_NAME, nunca mezcladas con la red
+const PRECACHED = new Set(STATIC_ASSETS.map((p) => new URL(p, self.location).pathname));
 
 // 2. INSTALACIÓN: Pre-cachear solo lo local y seguro
 self.addEventListener('install', (e) => {
   console.log('[Service Worker] Instalando ' + CACHE_NAME + '...');
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+      // cache:'reload' evita que la caché HTTP (Pages: max-age=600) fije archivos de la versión anterior
+      return cache.addAll(STATIC_ASSETS.map((u) => new Request(u, { cache: 'reload' })));
     })
   );
   self.skipWaiting(); // Forzar activación inmediata
@@ -64,7 +69,7 @@ self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(keyList.map((key) => {
-        if (key !== CACHE_NAME && key !== IMG_CACHE) {
+        if (key !== CACHE_NAME && key !== IMG_CACHE && key !== CDN_CACHE) {
           console.log('[Service Worker] Borrando caché antigua:', key);
           return caches.delete(key);
         }
@@ -75,19 +80,20 @@ self.addEventListener('activate', (e) => {
 });
 
 // 4. INTERCEPTOR DE RED
-// - Archivos propios: red primero, con respaldo en caché (offline).
-// - CDN de la lista (con versión fija en index.html): caché primero.
+// - Archivos precargados: caché primero (la app abre con lo guardado; la versión nueva llega con un aviso).
+// - Otros archivos propios (catalogo, pagar...): red primero, con respaldo en caché.
+// - CDN de la lista (con versión fija en index.html): caché primero, solo respuestas ok.
 // - Todo lo demás (Firestore, OpenFoodFacts, tasas, imágenes externas): directo a la red, sin caché.
-const CDN_HOSTS = ['cdnjs.cloudflare.com', 'unpkg.com', 'cdn.jsdelivr.net', 'cdn.tailwindcss.com'];
+const CDN_HOSTS = ['cdnjs.cloudflare.com', 'unpkg.com', 'cdn.jsdelivr.net'];
 
 function isCdnRequest(url) {
   if (url.hostname === 'www.gstatic.com') return url.pathname.startsWith('/firebasejs/');
   return CDN_HOSTS.includes(url.hostname);
 }
 
-// Guarda solo respuestas correctas (ok) u opacas (scripts/estilos de CDN sin CORS); nunca errores
+// Guarda solo respuestas correctas (ok); nunca errores
 function cacheIfValid(request, response) {
-  if (response && (response.ok || response.type === 'opaque')) {
+  if (response && response.ok) {
     const copy = response.clone();
     caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
   }
@@ -101,11 +107,18 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
 
   if (url.origin === self.location.origin) {
-    e.respondWith(
-      fetch(e.request)
-        .then((res) => cacheIfValid(e.request, res))
-        .catch(() => caches.match(e.request))
-    );
+    if (PRECACHED.has(url.pathname)) {
+      // Lo precargado solo cambia al instalar una versión: así todos los archivos son de la misma
+      e.respondWith(
+        caches.open(CACHE_NAME).then((c) => c.match(e.request, { ignoreSearch: true })).then((hit) => hit || fetch(e.request))
+      );
+    } else {
+      e.respondWith(
+        fetch(e.request)
+          .then((res) => cacheIfValid(e.request, res))
+          .catch(() => caches.match(e.request))
+      );
+    }
   } else if (url.hostname === 'firebasestorage.googleapis.com' && url.searchParams.get('alt') === 'media' && url.pathname.includes('/o/users%2F')) {
     // Fotos de producto: el enlace lleva el hash y nunca cambia -> caché primero, en una caché que sobrevive a las versiones.
     // Solo alt=media: las demás llamadas GET del SDK (listAll, metadatos, enlace) van siempre a la red.
@@ -117,7 +130,10 @@ self.addEventListener('fetch', (e) => {
     );
   } else if (isCdnRequest(url)) {
     e.respondWith(
-      caches.match(e.request).then((cached) => cached || fetch(e.request).then((res) => cacheIfValid(e.request, res)))
+      caches.open(CDN_CACHE).then((c) => c.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
+        if (res && res.ok) c.put(e.request, res.clone());
+        return res;
+      })))
     );
   }
 });

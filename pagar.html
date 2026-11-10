@@ -6,8 +6,9 @@
     <meta name="theme-color" content="#0f172a">
     <meta name="robots" content="noindex">
     <title>Pagar</title>
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="js/vendor/tailwind-3.4.17.js"></script>
+    <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css?v=2" integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0" crossorigin="anonymous">
     <style>
         /* Solo enlaces cortos (body.brand): la página pone --h1..--h3, --btn y --cat según el color de la tienda */
         body.brand .brand-hdr { background: linear-gradient(135deg, var(--h1), var(--h2), var(--h3)); }
