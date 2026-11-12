@@ -324,12 +324,13 @@
 
 
         // ==========================================
-        // Salida de las ventanas en móvil: baja hacia abajo
+        // Salida de las hojas inferiores en móvil: bajan hacia abajo
         // ==========================================
         // Las ventanas se ocultan desde muchos sitios con classList.add('hidden'). La ventana real se oculta al
         // instante (la lógica no cambia); encima se pone una copia de lo que se veía y esa copia baja y se borra.
         (function () {
-            const isModal = el => el.classList && (el.classList.contains('modal-bg') || el.classList.contains('modal-in'));
+            // Solo las hojas inferiores (items-end); los cuadros centrados se cierran sin animación, como en PC
+            const isModal = el => el.classList && el.classList.contains('items-end') && (el.classList.contains('modal-bg') || el.classList.contains('modal-in'));
             const animate = () => matchMedia('(max-width: 639px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
             new MutationObserver(records => {
                 if (!animate()) return;
