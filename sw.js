@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v65.1'; // Subirlo en cada publicación: con caché primero, sin esto nadie recibe la versión nueva
+const CACHE_NAME = 'ejecomercio-v65.2'; // Subirlo en cada publicación: con caché primero, sin esto nadie recibe la versión nueva
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 const CDN_CACHE = 'ejecomercio-cdn'; // librerías con versión en la URL; no se borra al cambiar de versión
 
