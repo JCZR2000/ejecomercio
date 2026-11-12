@@ -18,119 +18,184 @@
         .acc-bg { background: var(--acc); color: #0f172a; }
         .btn-add { background: var(--btn); }
         .cat-label { color: var(--cat); }
-        /* Interruptor de opciones: el radio va oculto y el texto se colorea con el tema */
-        .seg label { flex: 1; }
-        .seg label span { display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .6rem .5rem; border-radius: .7rem; font-size: .8rem; font-weight: 700; color: #475569; cursor: pointer; transition: .15s; }
-        .seg input:checked + span { background: var(--btn); color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
-        .seg input:focus-visible + span { outline: 2px solid var(--cat); }
+        .th-text { color: var(--btn); }
+        .soft { background: color-mix(in srgb, var(--btn) 10%, white); }
+        .tab-on { color: var(--btn); border-bottom-color: var(--btn); }
+        .pill-on { background: var(--btn); color: #fff; }
+        /* Opciones de la hoja: el radio va oculto y la tarjeta siguiente se colorea con el tema */
+        .opt label { flex: 1; cursor: pointer; }
+        .opt input:focus-visible + span { outline: 2px solid var(--cat); outline-offset: 2px; }
+        .opt input:checked + .opt-solid { background: var(--btn); border-color: var(--btn); color: #fff; }
+        .opt input:checked + .opt-soft { border-color: var(--btn); background: color-mix(in srgb, var(--btn) 10%, white); }
+        /* Animaciones sencillas: hojas que suben, fondo que aparece, tarjetas que entran, pedido enviado que se dibuja */
+        @keyframes sheetUp { from { transform: translateY(48px); opacity: 0; } to { transform: none; opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+        @keyframes slideFwd { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+        @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.12); } 100% { transform: none; opacity: 1; } }
+        @keyframes bump { 40% { transform: scale(1.35); } }
+        @keyframes draw { to { stroke-dashoffset: 0; } }
+        .sheet-in { animation: sheetUp .3s ease-out; }
+        .fade-in { animation: fadeIn .2s ease-out; }
+        .bar-in { animation: sheetUp .3s ease-out; }
+        .anim-fwd { animation: slideFwd .3s ease-out; }
+        .bump { animation: bump .3s ease-out; }
+        .stagger > * { animation: fadeUp .35s ease-out both; animation-delay: var(--d, 0ms); }
+        @keyframes spark { 0% { transform: translate(calc(var(--x) * -1), calc(var(--y) * -1)) scale(.2); opacity: 0; } 8% { opacity: 1; } 30% { transform: translate(calc(var(--x) * .1), calc(var(--y) * .1)) scale(1.2); } 38% { transform: none; } 75% { transform: none; opacity: 1; } 100% { transform: none; opacity: 0; } }
+        .done-spark { animation: spark 2.4s ease-out both; transform-origin: center; transform-box: fill-box; }
+        .done-circle { stroke-dasharray: 176; stroke-dashoffset: 176; animation: draw .6s ease-out .1s forwards; }
+        .done-check { stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s ease-out .6s forwards; }
+        @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } .done-circle, .done-check { stroke-dashoffset: 0 !important; } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen pb-32 antialiased">
-    <header class="hdr text-white px-4 pt-5 pb-4 shadow-lg">
+    <header class="hdr text-white px-4 pt-5 pb-5 rounded-b-3xl shadow-lg">
         <div class="max-w-5xl mx-auto">
             <div class="flex items-center gap-3">
-                <div id="shopInitial" class="w-11 h-11 rounded-xl acc-bg font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden"><i class="fa-solid fa-store"></i></div>
-                <div class="min-w-0">
+                <div id="shopInitial" class="w-12 h-12 rounded-2xl acc-bg font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden"><i class="fa-solid fa-store"></i></div>
+                <div class="min-w-0 flex-1">
                     <h1 id="shopTitle" class="font-extrabold text-xl leading-tight truncate">Catálogo</h1>
-                    <p id="shopSlogan" class="text-xs text-slate-300">Haz tu pedido y te lo confirmamos por WhatsApp</p>
-                    <p id="updatedAt" class="text-[10px] text-slate-400"></p>
+                    <p id="shopSlogan" class="text-xs text-slate-300 truncate">Haz tu pedido y te lo confirmamos por WhatsApp</p>
+                    <p class="text-[11px] text-slate-400"><span id="updDot" aria-hidden="true" class="hidden inline-block w-1.5 h-1.5 rounded-full bg-green-400 mr-1 align-middle"></span><span id="updatedAt"></span></p>
                 </div>
+                <button id="infoBtn" type="button" aria-label="Información de la tienda" class="w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 text-white shrink-0"><i class="fa-solid fa-circle-info"></i></button>
             </div>
-            <div id="controls" class="hidden mt-4 space-y-3">
+            <div id="controls" class="hidden mt-4">
                 <div class="relative">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
-                    <input id="search" type="search" placeholder="Buscar producto..." class="w-full rounded-xl pl-10 pr-3 py-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-yellow-400">
+                    <input id="search" type="search" placeholder="Buscar producto..." aria-label="Buscar producto" class="w-full bg-white rounded-2xl pl-10 pr-3 py-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-yellow-400">
                 </div>
-                <div id="chips" class="flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4"></div>
             </div>
         </div>
     </header>
 
+    <div id="tabsBar" class="hidden sticky top-0 z-10 bg-slate-50 border-b border-slate-200">
+        <div id="chips" role="tablist" aria-label="Categorías" class="max-w-5xl mx-auto flex gap-1 overflow-x-auto no-scrollbar px-3"></div>
+    </div>
+
     <main class="px-3 pt-4 max-w-5xl mx-auto">
+        <div id="listHead" class="hidden flex items-end justify-between gap-3 mb-3 px-1">
+            <div class="min-w-0">
+                <h2 class="font-extrabold text-lg leading-tight">Productos</h2>
+                <p id="rateLine" class="text-xs text-slate-500"></p>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+                <div id="curToggle" role="group" aria-label="Moneda principal" class="hidden flex bg-slate-200 rounded-xl p-1">
+                    <button type="button" data-bs="0" class="min-w-[40px] h-9 px-3 rounded-lg text-sm font-bold"></button>
+                    <button type="button" data-bs="1" class="min-w-[40px] h-9 px-3 rounded-lg text-sm font-bold">Bs</button>
+                </div>
+                <button id="viewToggle" type="button" class="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-600"><i class="fa-solid fa-list"></i></button>
+            </div>
+        </div>
         <p id="message" class="text-center text-slate-500 py-20"><i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...</p>
         <button id="retryBtn" class="hidden mx-auto block bg-slate-800 text-white px-5 py-2 rounded-lg font-bold text-sm">Reintentar</button>
         <div id="list" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3"></div>
     </main>
 
     <div id="cartBar" class="hidden fixed bottom-0 inset-x-0 z-20 p-3">
-        <div class="max-w-xl mx-auto bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-            <div id="cartDetail" class="hidden max-h-52 overflow-y-auto divide-y divide-slate-100 text-sm"></div>
-            <div class="flex items-center gap-3 p-3">
-                <button id="cartToggle" class="flex items-center gap-2 text-left min-w-0 flex-1" aria-label="Ver pedido">
-                    <span class="relative w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                        <i class="fa-solid fa-basket-shopping"></i>
-                        <span id="cartCount" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"></span>
-                    </span>
-                    <span class="min-w-0">
-                        <span class="block text-[11px] text-slate-400 leading-none">Total aproximado <i class="fa-solid fa-chevron-up text-[9px]"></i></span>
-                        <span id="cartTotal" class="block font-extrabold text-lg leading-tight"></span>
-                    </span>
-                </button>
-                <button id="orderBtn" type="button" class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow">
-                    <i class="fa-brands fa-whatsapp mr-1"></i> <span id="orderBtnText">Pedir</span>
-                </button>
-                <button id="orderAppBtn" type="button" class="hidden btn-add text-white font-bold px-4 py-3 rounded-xl text-sm whitespace-nowrap shadow hover:opacity-90">
-                    <i class="fa-solid fa-cart-shopping mr-1"></i> Pedir
-                </button>
+        <div class="bar-in max-w-xl mx-auto btn-add text-white rounded-3xl shadow-2xl flex items-center gap-3 p-3">
+            <span class="relative w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-basket-shopping"></i>
+                <span id="cartCount" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"></span>
+            </span>
+            <div class="min-w-0 flex-1">
+                <p id="cartLabel" class="text-[11px] text-white/70 leading-none"></p>
+                <p class="truncate"><span id="cartTotal" class="font-extrabold text-lg leading-tight"></span> <span id="cartAlt" class="text-[11px] text-white/70"></span></p>
             </div>
-            <p id="cartNote" class="text-[10px] text-slate-400 text-center pb-2 -mt-1">El negocio confirmará disponibilidad y precio</p>
+            <button id="orderOpenBtn" type="button" class="bg-white text-slate-900 font-bold px-4 min-h-[44px] rounded-2xl text-sm whitespace-nowrap shadow">Ver pedido <i class="fa-solid fa-arrow-right text-xs"></i></button>
         </div>
     </div>
 
-    <div id="custModal" class="hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center p-3">
-        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden max-h-[95vh] flex flex-col">
-            <div class="hdr text-white px-4 py-3 flex items-center gap-3 shrink-0">
-                <span class="w-10 h-10 rounded-xl acc-bg flex items-center justify-center shrink-0"><i id="custIcon" class="fa-solid fa-cart-shopping"></i></span>
-                <div class="min-w-0">
+    <div id="custModal" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
+        <div class="sheet-in bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
+            <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2 shrink-0 sm:hidden"></div>
+            <div class="px-4 pt-3 pb-2 flex items-center gap-3 shrink-0">
+                <span class="w-10 h-10 rounded-xl soft th-text flex items-center justify-center shrink-0"><i id="custIcon" class="fa-solid fa-cart-shopping"></i></span>
+                <div class="min-w-0 flex-1">
                     <h2 id="custTitle" class="font-extrabold text-lg leading-tight">Finalizar pedido</h2>
-                    <p id="custSummary" class="text-xs text-slate-300 truncate"></p>
+                    <p id="custSummary" class="text-xs text-slate-500 truncate"></p>
                 </div>
+                <button id="custX" type="button" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 shrink-0"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="p-4 overflow-y-auto">
-                <div id="custForm" class="space-y-3">
-                    <div>
-                        <label for="custName" class="block text-[11px] font-bold text-slate-500 mb-1">Nombre</label>
-                        <input id="custName" maxlength="60" placeholder="Tu nombre" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
-                    </div>
-                    <div id="custPhoneBox" class="hidden">
-                        <label for="custPhone" class="block text-[11px] font-bold text-slate-500 mb-1">Teléfono</label>
-                        <input id="custPhone" type="tel" inputmode="tel" maxlength="20" placeholder="Ej: 04141234567" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
-                    </div>
-                    <div>
-                        <p class="text-[11px] font-bold text-slate-500 mb-1">Entrega</p>
-                        <div class="seg flex gap-1 bg-slate-100 rounded-2xl p-1">
-                            <label><input type="radio" name="custDelivery" value="retiro" checked class="sr-only"><span><i class="fa-solid fa-store"></i>Retiro en tienda</span></label>
-                            <label><input type="radio" name="custDelivery" value="delivery" class="sr-only"><span><i class="fa-solid fa-motorcycle"></i>Delivery</span></label>
+            <div class="px-4 pb-4 overflow-y-auto">
+                <div id="custForm" class="space-y-4">
+                    <div class="soft rounded-2xl p-3">
+                        <p class="text-xs font-bold text-slate-500 mb-2">Resumen del pedido</p>
+                        <div id="custItems" class="space-y-3"></div>
+                        <div class="flex items-end justify-between gap-3 border-t border-slate-200 mt-3 pt-3">
+                            <span class="text-sm font-bold">Total aproximado</span>
+                            <span class="text-right"><span id="custTotal" class="block font-extrabold text-lg leading-tight"></span><span id="custTotalAlt" class="block text-[11px] text-slate-500"></span></span>
                         </div>
-                        <div id="custAddressBox" class="hidden mt-2">
-                            <div class="flex gap-2">
-                                <input id="custAddress" maxlength="120" placeholder="Dirección de entrega" class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
-                                <button id="custLocBtn" type="button" title="Usar mi ubicación" aria-label="Usar mi ubicación" class="shrink-0 w-11 rounded-xl btn-add text-white hover:opacity-90"><i class="fa-solid fa-location-dot"></i></button>
+                    </div>
+                    <div id="custFields" class="space-y-4">
+                        <div>
+                            <label for="custName" class="block text-[11px] font-bold text-slate-500 mb-1">Nombre</label>
+                            <input id="custName" maxlength="60" placeholder="Tu nombre" class="w-full border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                        </div>
+                        <div id="custPhoneBox" class="hidden">
+                            <label for="custPhone" class="block text-[11px] font-bold text-slate-500 mb-1">Teléfono</label>
+                            <input id="custPhone" type="tel" inputmode="tel" maxlength="20" placeholder="Ej: 04141234567" class="w-full border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-bold text-slate-500 mb-1">Entrega</p>
+                            <div class="opt flex gap-2">
+                                <label><input type="radio" name="custDelivery" value="retiro" checked class="sr-only"><span class="opt-solid flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 transition"><i class="fa-solid fa-store text-xl"></i>Retiro en tienda</span></label>
+                                <label><input type="radio" name="custDelivery" value="delivery" class="sr-only"><span class="opt-solid flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 transition"><i class="fa-solid fa-motorcycle text-xl"></i>Delivery</span></label>
                             </div>
-                            <p id="custLocMsg" class="hidden mt-1 text-[11px] font-bold"></p>
+                            <div id="custAddressBox" class="hidden mt-2">
+                                <div class="flex gap-2">
+                                    <input id="custAddress" maxlength="120" placeholder="Dirección de entrega" aria-label="Dirección de entrega" class="flex-1 min-w-0 border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
+                                    <button id="custLocBtn" type="button" title="Usar mi ubicación" aria-label="Usar mi ubicación" class="shrink-0 w-12 rounded-xl btn-add text-white hover:opacity-90"><i class="fa-solid fa-location-dot"></i></button>
+                                </div>
+                                <p id="custLocMsg" class="hidden mt-1 text-[11px] font-bold"></p>
+                            </div>
                         </div>
+                        <input id="custNote" maxlength="200" placeholder="Nota (opcional)" aria-label="Nota (opcional)" class="w-full border border-slate-200 rounded-xl px-3 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
                     </div>
                     <div id="custPayBox" class="hidden">
                         <p class="text-[11px] font-bold text-slate-500 mb-1">¿Cómo pagas?</p>
-                        <div class="seg flex gap-1 bg-slate-100 rounded-2xl p-1">
-                            <label><input type="radio" name="custPay" value="contado" checked class="sr-only"><span><i class="fa-solid fa-money-bill-wave"></i>Contado</span></label>
-                            <label id="custPayCreditLbl" class="hidden"><input type="radio" name="custPay" value="fiado" class="sr-only"><span><i class="fa-solid fa-handshake"></i>Fiado</span></label>
+                        <div class="opt flex gap-2">
+                            <label><input type="radio" name="custPay" value="contado" checked class="sr-only"><span class="opt-soft flex items-center gap-2 p-3 rounded-2xl border-2 border-slate-200 transition"><i class="fa-solid fa-money-bill-wave th-text text-lg"></i><span class="min-w-0"><span class="block text-sm font-bold">Contado</span><span class="block text-[11px] text-slate-500">Pagas ahora</span></span></span></label>
+                            <label id="custPayCreditLbl" class="hidden"><input type="radio" name="custPay" value="fiado" class="sr-only"><span class="opt-soft flex items-center gap-2 p-3 rounded-2xl border-2 border-slate-200 transition"><i class="fa-solid fa-clock th-text text-lg"></i><span class="min-w-0"><span class="block text-sm font-bold">Fiado</span><span class="block text-[11px] text-slate-500">Pagas después</span></span></span></label>
                         </div>
                     </div>
-                    <input id="custNote" maxlength="200" placeholder="Nota (opcional)" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-300">
                     <p id="custError" class="text-xs text-red-600 font-bold empty:hidden"></p>
-                    <div class="flex gap-2">
-                        <button id="custCancel" type="button" class="flex-1 bg-slate-100 rounded-xl py-3 text-sm font-bold">Cancelar</button>
-                        <button id="custSend" type="button" class="flex-[2] btn-add text-white rounded-xl py-3 text-sm font-bold shadow"><i class="fa-solid fa-paper-plane mr-1"></i>Enviar pedido</button>
-                    </div>
-                    <p id="custPrivacy" class="hidden text-[10px] text-slate-400 text-center">Tu nombre y teléfono se envían solo a esta tienda para atender tu pedido.</p>
+                    <button id="custSend" type="button" class="w-full btn-add text-white rounded-2xl min-h-[48px] text-sm font-bold shadow"></button>
+                    <button id="custWaSwitch" type="button" class="hidden w-full text-xs font-bold text-slate-500 underline min-h-[40px]"></button>
+                    <button id="custCancel" type="button" class="w-full text-sm font-bold text-slate-500 min-h-[40px]">Cancelar</button>
+                    <p id="custPrivacy" class="hidden text-[10px] text-slate-400 text-center"><i class="fa-solid fa-lock"></i> Tu nombre y teléfono se envían solo a esta tienda para atender tu pedido.</p>
+                    <p id="cartNote" class="text-[10px] text-slate-400 text-center">El negocio confirmará disponibilidad y precio</p>
                 </div>
-                <div id="custDone" class="hidden space-y-3 text-center">
-                    <p class="font-bold text-green-700"><i class="fa-solid fa-circle-check mr-1"></i>¡Pedido enviado! La tienda lo revisará y te contactará.</p>
-                    <button id="custClose" type="button" class="w-full bg-slate-100 rounded-xl py-3 text-sm font-bold">Cerrar</button>
+                <div id="custDone" class="anim-fwd hidden text-center py-4">
+                    <svg viewBox="0 0 96 96" class="mx-auto w-28 h-28" aria-hidden="true" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <circle class="done-circle" cx="48" cy="48" r="28" stroke="#16a34a" stroke-width="4" transform="rotate(-90 48 48)"/>
+                        <path class="done-check" d="M37 49l8 8 15-17" stroke="#16a34a" stroke-width="5"/>
+                        <circle class="done-spark" style="--x:-32px;--y:-18px;animation-delay:0.9s" cx="16" cy="30" r="3" fill="#facc15"/>
+                        <circle class="done-spark" style="--x:34px;--y:-24px;animation-delay:0.95s" cx="82" cy="24" r="4" fill="#38bdf8"/>
+                        <circle class="done-spark" style="--x:32px;--y:26px;animation-delay:1.0s" cx="80" cy="74" r="3" fill="#f472b6"/>
+                        <circle class="done-spark" style="--x:-34px;--y:24px;animation-delay:1.05s" cx="14" cy="72" r="4" fill="#a3e635"/>
+                    </svg>
+                    <p class="font-extrabold text-lg mt-3">¡Pedido enviado!</p>
+                    <p class="text-sm text-slate-500">La tienda lo revisará y te contactará.</p>
                 </div>
-                <button id="custWaAlert" type="button" class="hidden mt-3 w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Avisar por WhatsApp</button>
+                <button id="custWaAlert" type="button" class="hidden mt-3 w-full bg-green-600 text-white rounded-2xl min-h-[48px] text-sm font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>Avisar por WhatsApp</button>
+                <button id="custClose" type="button" class="hidden mt-3 w-full bg-slate-100 rounded-2xl min-h-[48px] text-sm font-bold">Cerrar</button>
             </div>
+        </div>
+    </div>
+
+    <div id="infoModal" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
+        <div class="sheet-in bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
+            <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2 shrink-0 sm:hidden"></div>
+            <div class="px-4 pt-3 pb-2 flex items-center gap-3 shrink-0">
+                <div id="infoLogo" class="w-12 h-12 rounded-2xl acc-bg font-extrabold text-xl flex items-center justify-center shrink-0 overflow-hidden"></div>
+                <div class="min-w-0 flex-1">
+                    <h2 id="infoName" class="font-extrabold text-lg leading-tight truncate"></h2>
+                    <p id="infoSlogan" class="text-xs text-slate-500 truncate"></p>
+                </div>
+                <button id="infoClose" type="button" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="infoBody" class="px-4 pb-5 overflow-y-auto space-y-3"></div>
         </div>
     </div>
 
@@ -159,6 +224,18 @@
     const cart = new Map(); // id -> cantidad
 
     const fmt = (n) => Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const fmtBs = (n) => Number(n).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    // Vista del cliente (solo en su teléfono): moneda principal y cuadrícula/lista
+    let mainBs = false, listView = false;
+    try { const v = JSON.parse(localStorage.getItem('vitrina_vista')); if (v && typeof v === 'object') { mainBs = v.bs === true; listView = v.list === true; } } catch (e) { /* sin datos o dañados: valores por defecto */ }
+    const saveView = () => { try { localStorage.setItem('vitrina_vista', JSON.stringify({ bs: mainBs, list: listView })); } catch (e) { /* modo privado */ } };
+
+    // Solo muestra: precio principal y alterno. El mensaje de WhatsApp (orderText) sigue en la moneda de la tienda.
+    function priceParts(usd) {
+        const cur = `${currency} ${fmt(usd)}`, bs = rate ? `Bs ${fmtBs(usd * rate)}` : '';
+        return mainBs && rate ? { main: bs, alt: cur } : { main: cur, alt: bs };
+    }
 
     function showMessage(text, retry) {
         $('message').textContent = text;
@@ -166,6 +243,8 @@
         $('retryBtn').classList.toggle('hidden', !retry);
         $('list').innerHTML = '';
         $('controls').classList.add('hidden');
+        $('tabsBar').classList.add('hidden');
+        $('listHead').classList.add('hidden');
         $('cartBar').classList.add('hidden');
     }
 
@@ -202,6 +281,7 @@
 
     function renderUpdated() {
         const el = $('updatedAt');
+        $('updDot').classList.toggle('hidden', !updatedAt);
         if (!updatedAt) { el.textContent = ''; return; }
         const min = Math.floor((Date.now() - updatedAt) / 60000);
         const time = updatedAt.toLocaleTimeString('es', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -249,19 +329,16 @@
         $('message').classList.add('hidden');
         $('retryBtn').classList.add('hidden');
         $('controls').classList.remove('hidden');
+        $('listHead').classList.remove('hidden');
         activeCat = '';
+        renderToolbar();
         renderChips();
-        render();
+        render(true);
     }
 
-    // Tema, logo y lema de la vitrina; sin logo (o si no carga) se muestra la inicial del negocio
-    function applyTheme() {
-        const t = THEMES[shop.color];
-        ['--h1', '--h2', '--h3', '--acc', '--btn', '--cat'].forEach((v, i) => document.documentElement.style.setProperty(v, t[i]));
-        document.querySelector('meta[name=theme-color]').content = t[0];
-        $('shopSlogan').textContent = shop.slogan || DEFAULT_SLOGAN;
-        const box = $('shopInitial');
-        const initial = () => { box.className = box.className.replace(' bg-white', ''); box.textContent = shop.title.trim().charAt(0).toUpperCase() || '?'; };
+    // Logo (o inicial del negocio si no hay o no carga) dentro de una caja
+    function paintLogo(box) {
+        const initial = () => { box.classList.remove('bg-white'); box.textContent = shop.title.trim().charAt(0).toUpperCase() || '?'; };
         if (shop.logo) {
             box.classList.add('bg-white');
             box.innerHTML = '';
@@ -274,53 +351,95 @@
         } else initial();
     }
 
-    function renderChips() {
-        const cats = [...new Set(products.map(p => p.category))].sort((a, b) => a === 'Otros' ? 1 : b === 'Otros' ? -1 : a.localeCompare(b, 'es'));
-        const chip = (c, label) => `<button data-cat="${escapeHtml(c)}" class="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition ${c === activeCat ? 'acc-bg' : 'bg-white/10 text-white hover:bg-white/20'}">${escapeHtml(label)}</button>`;
-        $('chips').innerHTML = cats.length > 1 ? chip('', 'Todo') + cats.map(c => chip(c, c)).join('') : '';
+    // Tema, logo y lema de la vitrina
+    function applyTheme() {
+        const t = THEMES[shop.color];
+        ['--h1', '--h2', '--h3', '--acc', '--btn', '--cat'].forEach((v, i) => document.documentElement.style.setProperty(v, t[i]));
+        document.querySelector('meta[name=theme-color]').content = t[0];
+        $('shopSlogan').textContent = shop.slogan || DEFAULT_SLOGAN;
+        paintLogo($('shopInitial'));
     }
 
-    function render() {
+    // Fila «Productos»: tasa, interruptor de moneda y de vista
+    function renderToolbar() {
+        $('rateLine').textContent = rate ? `Tasa: Bs ${fmtBs(rate)} por ${currency}1` : '';
+        $('curToggle').classList.toggle('hidden', !rate);
+        const bsOn = mainBs && !!rate;
+        const [b0, b1] = $('curToggle').querySelectorAll('button');
+        b0.textContent = currency;
+        [[b0, !bsOn], [b1, bsOn]].forEach(([b, on]) => { b.classList.toggle('pill-on', on); b.classList.toggle('text-slate-600', !on); b.setAttribute('aria-pressed', String(on)); });
+        $('viewToggle').innerHTML = `<i class="fa-solid ${listView ? 'fa-table-cells-large' : 'fa-list'}"></i>`;
+        $('viewToggle').setAttribute('aria-label', listView ? 'Ver en cuadrícula' : 'Ver en lista');
+    }
+
+    function renderChips() {
+        const cats = [...new Set(products.map(p => p.category))].sort((a, b) => a === 'Otros' ? 1 : b === 'Otros' ? -1 : a.localeCompare(b, 'es'));
+        const chip = (c, label) => `<button data-cat="${escapeHtml(c)}" role="tab" aria-selected="${c === activeCat}" class="shrink-0 px-4 py-3 text-sm font-bold border-b-[3px] transition ${c === activeCat ? 'tab-on' : 'border-transparent text-slate-500'}">${escapeHtml(label)}</button>`;
+        $('chips').innerHTML = cats.length > 1 ? chip('', 'Todo') + cats.map(c => chip(c, c)).join('') : '';
+        $('tabsBar').classList.toggle('hidden', cats.length <= 1);
+    }
+
+    // Control de cantidad: «+» redondo sin cantidad; con cantidad, «− N +». Mismos data-act / data-id de siempre.
+    function qtyControl(p, qty, onPhoto) {
+        const id = escapeHtml(p.id), name = escapeHtml(p.name), full = p.stock !== null && qty >= p.stock;
+        if (!qty) return `<button data-act="inc" data-id="${id}" ${full ? 'disabled' : ''} aria-label="Añadir ${name}" class="btn-add w-11 h-11 rounded-full text-white ${onPhoto ? 'shadow-lg' : 'shadow'} active:scale-95 transition disabled:opacity-40"><i class="fa-solid fa-plus"></i></button>`;
+        return `<div class="inline-flex items-center gap-1 bg-white rounded-full p-0.5 ${onPhoto ? 'shadow-lg' : 'border border-slate-200'}"><button data-act="dec" data-id="${id}" aria-label="Quitar uno de ${name}" class="w-10 h-10 rounded-full font-bold text-lg active:scale-95">−</button><span class="font-extrabold min-w-[1.25rem] text-center">${qty}</span><button data-act="inc" data-id="${id}" ${full ? 'disabled' : ''} aria-label="Añadir uno más de ${name}" class="btn-add w-10 h-10 rounded-full text-white font-bold text-lg active:scale-95 disabled:opacity-40">+</button></div>`;
+    }
+
+    function render(anim) {
         const q = $('search').value.trim().toLowerCase();
         const shown = products.filter(p => (!activeCat || p.category === activeCat) && (!q || p.name.toLowerCase().includes(q)));
-        $('list').innerHTML = shown.length ? shown.map(p => {
-            const qty = cart.get(p.id) || 0, id = escapeHtml(p.id), full = p.stock !== null && qty >= p.stock;
-            const left = p.stock !== null ? `<div class="text-[11px] font-bold ${p.stock <= 5 ? 'text-amber-600' : 'text-slate-400'}">Quedan ${p.stock}</div>` : '';
-            const bs = rate ? `<div class="text-[11px] text-slate-400">Bs ${fmt(p.price * rate)}</div>` : '';
+        $('list').className = listView
+            ? 'bg-white rounded-3xl shadow-sm border border-slate-100 divide-y divide-slate-100 overflow-hidden'
+            : 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3';
+        $('list').classList.toggle('stagger', anim === true);
+        $('list').innerHTML = shown.length ? shown.map((p, idx) => {
+            const qty = cart.get(p.id) || 0, pr = priceParts(p.price), d = `style="--d:${Math.min(idx, 10) * 35}ms"`;
+            const low = p.stock !== null && p.stock <= 5;
+            const price = `<span class="text-lg font-extrabold text-slate-900 whitespace-nowrap">${escapeHtml(pr.main)}</span>${pr.alt ? ` <span class="text-[11px] text-slate-400 whitespace-nowrap">${escapeHtml(pr.alt)}</span>` : ''}`;
+            const cat = `<div class="text-[10px] uppercase tracking-wide cat-label font-bold truncate">${escapeHtml(p.category)}</div>`;
+            const name = `<div class="text-sm font-bold leading-snug line-clamp-2">${escapeHtml(p.name)}</div>`;
+            if (listView) {
+                const thumb = p.photo
+                    ? `<img src="${escapeHtml(p.photo)}" loading="lazy" alt="" class="w-16 h-16 rounded-2xl object-cover bg-slate-100 shrink-0">`
+                    : '<div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-300 text-2xl shrink-0"><i class="fa-solid fa-box-open"></i></div>';
+                const left = p.stock !== null ? `<div class="text-[11px] font-bold ${low ? 'text-amber-600' : 'text-slate-400'}">Quedan ${p.stock}</div>` : '';
+                return `<div ${d} class="flex items-center gap-3 p-3">${thumb}<div class="min-w-0 flex-1">${cat}${name}<div class="mt-0.5">${price}</div>${left}</div><div class="shrink-0">${qtyControl(p, qty, false)}</div></div>`;
+            }
             const img = p.photo
                 ? `<img src="${escapeHtml(p.photo)}" loading="lazy" alt="" class="card-img w-full object-cover bg-slate-100">`
                 : '<div class="card-img w-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-300 text-4xl"><i class="fa-solid fa-box-open"></i></div>';
-            const action = qty
-                ? `<div class="flex items-center justify-between bg-slate-100 rounded-xl p-1"><button data-act="dec" data-id="${id}" class="w-9 h-9 rounded-lg bg-white shadow-sm font-bold text-lg active:scale-95">−</button><span class="font-extrabold">${qty}</span><button data-act="inc" data-id="${id}" ${full ? 'disabled' : ''} class="w-9 h-9 rounded-lg bg-green-600 text-white shadow-sm font-bold text-lg active:scale-95 disabled:opacity-40">+</button></div>`
-                : `<button data-act="inc" data-id="${id}" class="btn-add w-full hover:opacity-90 text-white rounded-xl py-2.5 text-sm font-bold active:scale-95 transition"><i class="fa-solid fa-plus mr-1 text-xs"></i>Añadir</button>`;
-            return `<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">${img}
-                <div class="p-3 flex-1 flex flex-col gap-0.5"><div class="text-[10px] uppercase tracking-wide cat-label font-bold truncate">${escapeHtml(p.category)}</div>
-                <div class="text-sm font-bold leading-snug line-clamp-2">${escapeHtml(p.name)}</div>
-                <div class="mt-1 text-lg font-extrabold text-slate-900">${escapeHtml(currency)} ${fmt(p.price)}</div>${bs}${left}
-                <div class="mt-auto pt-2">${action}</div></div></div>`;
+            const tag = low ? `<span class="absolute top-2 left-2 bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">Quedan ${p.stock}</span>` : '';
+            const left = p.stock !== null && !low ? `<div class="text-[11px] font-bold text-slate-400">Quedan ${p.stock}</div>` : '';
+            return `<div ${d} class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col"><div class="relative">${img}${tag}<div class="absolute bottom-2 right-2">${qtyControl(p, qty, true)}</div></div>
+                <div class="p-3 flex-1 flex flex-col gap-0.5">${cat}${name}<div class="mt-1">${price}</div>${left}</div></div>`;
         }).join('') : '<p class="col-span-full text-center text-slate-500 py-16">Sin resultados</p>';
         renderCart();
     }
 
+    const cartItems = () => [...cart].map(([id, n]) => ({ p: products.find(x => x.id === id), n })).filter(x => x.p);
+    const custOpen = () => !$('custModal').classList.contains('hidden');
+    const closeCust = () => $('custModal').classList.add('hidden');
+
     function renderCart() {
-        const items = [...cart].map(([id, n]) => ({ p: products.find(x => x.id === id), n })).filter(x => x.p);
+        const items = cartItems();
         $('cartBar').classList.toggle('hidden', !items.length);
-        if (!items.length) return;
-        const total = items.reduce((s, x) => s + x.p.price * x.n, 0);
-        $('cartCount').textContent = items.reduce((s, x) => s + x.n, 0);
-        $('cartDetail').innerHTML = items.map(x => `<div class="flex justify-between gap-3 px-4 py-2"><span class="min-w-0 truncate">${x.n}× ${escapeHtml(x.p.name)}</span><span class="font-bold shrink-0">${escapeHtml(currency)}${fmt(x.p.price * x.n)}</span></div>`).join('');
-        $('cartTotal').textContent = `${currency}${fmt(total)}`;
+        if (!items.length) { if (custOpen() && !$('custForm').classList.contains('hidden')) closeCust(); return; }
+        const total = items.reduce((s, x) => s + x.p.price * x.n, 0), units = items.reduce((s, x) => s + x.n, 0), tp = priceParts(total);
+        if ($('cartCount').textContent !== String(units)) { $('cartCount').classList.remove('bump'); void $('cartCount').offsetWidth; $('cartCount').classList.add('bump'); }
+        $('cartCount').textContent = units;
+        $('cartLabel').textContent = `${units} ${units === 1 ? 'producto' : 'productos'} · total aprox.`;
+        $('cartTotal').textContent = tp.main;
+        $('cartAlt').textContent = tp.alt;
         orderText = `Hola ${shop.title}, quiero hacer este pedido:\n` +
             items.map(x => `- ${x.n}x ${x.p.name} (${currency}${fmt(x.p.price * x.n)})`).join('\n') +
             `\nTotal aproximado: ${currency}${fmt(total)}`;
         $('cartNote').textContent = products.some(p => p.stock !== null)
             ? 'La tienda podrá cumplir tu pedido según la disponibilidad de los productos.'
             : 'El negocio confirmará disponibilidad y precio';
-        // Un botón por vía: WhatsApp (si hay número) y/o el carrito de la página; con ambos, el de WhatsApp se llama «WhatsApp»
-        $('orderBtn').classList.toggle('hidden', shop.orderMode === 'app' || !shop.whatsapp);
-        $('orderBtnText').textContent = shop.orderMode === 'both' ? 'WhatsApp' : 'Pedir';
-        $('orderAppBtn').classList.toggle('hidden', shop.orderMode === 'whatsapp');
-        $('custSummary').textContent = `${shop.title} · ${items.reduce((s, x) => s + x.n, 0)} producto(s) · ${currency}${fmt(total)}`;
+        // Sin vía de pedido (solo WhatsApp y sin número) no hay botón, como antes
+        $('orderOpenBtn').classList.toggle('hidden', shop.orderMode === 'whatsapp' && !shop.whatsapp);
+        if (custOpen() && !$('custForm').classList.contains('hidden')) paintModal();
     }
 
     let orderText = '';
@@ -353,40 +472,71 @@
 
     let modalApp = false; // true: el pedido va a la bandeja de la tienda; false: por WhatsApp
     let lastWaExtra = '';
+    const fieldsHidden = () => $('custFields').classList.contains('hidden');
 
+    // Resumen (productos, cantidades, total) y texto del botón principal de la hoja
+    function paintModal() {
+        const items = cartItems(), total = items.reduce((s, x) => s + x.p.price * x.n, 0), tp = priceParts(total);
+        $('custSummary').textContent = shop.title;
+        $('custItems').innerHTML = items.map(({ p, n }) => {
+            const pr = priceParts(p.price * n), id = escapeHtml(p.id), name = escapeHtml(p.name), full = p.stock !== null && n >= p.stock;
+            const thumb = p.photo
+                ? `<img src="${escapeHtml(p.photo)}" alt="" class="w-12 h-12 rounded-xl object-cover bg-slate-100 shrink-0">`
+                : '<div class="w-12 h-12 rounded-xl bg-white flex items-center justify-center text-slate-300 shrink-0"><i class="fa-solid fa-box-open"></i></div>';
+            return `<div class="flex items-center gap-3">${thumb}<div class="min-w-0 flex-1"><div class="text-sm font-bold truncate">${name}</div>
+                <div class="mt-1 inline-flex items-center gap-1 bg-white rounded-full border border-slate-200 p-0.5"><button data-act="dec" data-id="${id}" aria-label="Quitar uno de ${name}" class="w-10 h-10 rounded-full font-bold text-lg active:scale-95">−</button><span class="font-extrabold min-w-[1.25rem] text-center">${n}</span><button data-act="inc" data-id="${id}" ${full ? 'disabled' : ''} aria-label="Añadir uno más de ${name}" class="btn-add w-10 h-10 rounded-full text-white font-bold text-lg active:scale-95 disabled:opacity-40">+</button></div></div>
+                <div class="text-right shrink-0"><div class="text-sm font-extrabold">${escapeHtml(pr.main)}</div><div class="text-[11px] text-slate-500">${escapeHtml(pr.alt)}</div></div></div>`;
+        }).join('');
+        $('custTotal').textContent = tp.main;
+        $('custTotalAlt').textContent = tp.alt;
+        $('custSend').innerHTML = (modalApp ? '<i class="fa-solid fa-paper-plane mr-1"></i>Enviar pedido' : '<i class="fa-brands fa-whatsapp mr-1"></i>Enviar por WhatsApp') + ' · ' + escapeHtml(tp.main);
+    }
+
+    // No borra lo ya escrito al cambiar de vía: solo rellena los campos vacíos con lo guardado
     function openOrderModal(app) {
+        const fresh = !custOpen(), both = shop.orderMode === 'both' && !!shop.whatsapp;
         modalApp = app;
         const sv = getSaved();
-        $('custName').value = sv.name || '';
-        $('custPhone').value = sv.phone || '';
-        $('custAddress').value = (sv.address || '').replace(/https:\/\/maps\.google\.com\S*/, '').trim();
-        custLoc = '';
+        if (!$('custName').value) $('custName').value = sv.name || '';
+        if (!$('custPhone').value) $('custPhone').value = sv.phone || '';
+        if (!$('custAddress').value) $('custAddress').value = (sv.address || '').replace(/https:\/\/maps\.google\.com\S*/, '').trim();
+        if (fresh) {
+            custLoc = '';
+            setLocMsg('', true);
+            document.querySelector('input[name=custPay][value=contado]').checked = true;
+            document.querySelector('input[name=custDelivery][value=retiro]').checked = true;
+        }
         syncAddressLimit();
-        setLocMsg('', true);
         $('custError').textContent = '';
+        // Solo WhatsApp y sin «pedir datos del cliente»: la hoja solo muestra el resumen y el mensaje es el de siempre
+        $('custFields').classList.toggle('hidden', !app && !shop.askCustomer);
         // En la app: teléfono obligatorio, forma de pago y aviso de privacidad; la nota solo va por WhatsApp
         $('custPhoneBox').classList.toggle('hidden', !app);
         $('custPayBox').classList.toggle('hidden', !app);
         $('custPayCreditLbl').classList.toggle('hidden', !shop.allowCredit);
-        document.querySelector('input[name=custPay][value=contado]').checked = true;
-        document.querySelector('input[name=custDelivery][value=retiro]').checked = true;
         syncAddress();
         $('custPrivacy').classList.toggle('hidden', !app);
         $('custNote').classList.toggle('hidden', app);
         $('custIcon').className = app ? 'fa-solid fa-cart-shopping' : 'fa-brands fa-whatsapp';
-        $('custSend').className = 'flex-[2] text-white rounded-xl py-3 text-sm font-bold shadow ' + (app ? 'btn-add' : 'bg-green-600');
-        $('custSend').innerHTML = app ? '<i class="fa-solid fa-paper-plane mr-1"></i>Enviar pedido' : '<i class="fa-brands fa-whatsapp mr-1"></i>Enviar por WhatsApp';
+        $('custSend').className = 'w-full text-white rounded-2xl min-h-[48px] text-sm font-bold shadow ' + (app ? 'btn-add' : 'bg-green-600');
+        $('custWaSwitch').classList.toggle('hidden', !both);
+        $('custWaSwitch').textContent = app ? 'Prefiero pedir por WhatsApp' : 'Enviar a la tienda sin WhatsApp';
         $('custWaAlert').classList.add('hidden');
-        $('custForm').classList.remove('hidden');
-        $('custDone').classList.add('hidden');
+        setDone(false);
+        paintModal();
         $('custModal').classList.remove('hidden');
     }
+    function setDone(done) {
+        $('custForm').classList.toggle('hidden', done);
+        $('custDone').classList.toggle('hidden', !done);
+        $('custClose').classList.toggle('hidden', !done);
+    }
 
-    $('orderBtn').addEventListener('click', () => { if (shop.askCustomer) openOrderModal(false); else sendOrder(''); });
-    $('orderAppBtn').addEventListener('click', () => openOrderModal(true));
+    $('orderOpenBtn').addEventListener('click', () => openOrderModal(shop.orderMode !== 'whatsapp'));
+    $('custWaSwitch').addEventListener('click', () => openOrderModal(!modalApp));
     document.querySelectorAll('input[name=custDelivery]').forEach(r => r.addEventListener('change', syncAddress));
-    $('custCancel').addEventListener('click', () => $('custModal').classList.add('hidden'));
-    $('custClose').addEventListener('click', () => $('custModal').classList.add('hidden'));
+    ['custCancel', 'custX', 'custClose'].forEach(id => $(id).addEventListener('click', closeCust));
+    $('custModal').addEventListener('click', (e) => { if (e.target === $('custModal')) closeCust(); });
     $('custWaAlert').addEventListener('click', () => sendOrder(lastWaExtra));
 
     const fsStr = (v) => ({ stringValue: String(v) });
@@ -404,6 +554,7 @@
     }
 
     $('custSend').addEventListener('click', async () => {
+        if (fieldsHidden()) { sendOrder(''); closeCust(); return; } // sin datos que pedir: igual que antes, directo a WhatsApp
         const name = $('custName').value.trim(), address = fullAddress(), note = $('custNote').value.trim();
         const phone = $('custPhone').value.replace(/\D/g, '');
         const isDelivery = delivery() === 'delivery';
@@ -415,23 +566,22 @@
         const extra = `\nNombre: ${name}\nEntrega: ${isDelivery ? 'Delivery — Dirección: ' + address : 'Retiro en tienda'}` + (note ? `\nNota: ${note}` : '');
         if (!modalApp) {
             sendOrder(extra);
-            $('custModal').classList.add('hidden');
+            closeCust();
             return;
         }
-        const items = [...cart].map(([id, n]) => ({ p: products.find(x => x.id === id), n })).filter(x => x.p).map(x => ({ id: x.p.id, n: x.n, name: x.p.name }));
+        const items = cartItems().map(x => ({ id: x.p.id, n: x.n, name: x.p.name }));
         if (!items.length || items.length > 50) return $('custError').textContent = items.length ? 'Son demasiados productos en un pedido (máximo 50)' : 'Tu pedido está vacío';
         const btn = $('custSend'), both = shop.orderMode === 'both' && !!shop.whatsapp;
         btn.disabled = true;
         $('custError').textContent = 'Enviando...';
         try {
             await postOrder({ name, phone, address, delivery: isDelivery ? 'delivery' : 'retiro', pay: shop.allowCredit && document.querySelector('input[name=custPay]:checked').value === 'fiado' ? 'fiado' : 'contado', items });
-            cart.clear();
-            render();
             lastWaExtra = extra;
             $('custError').textContent = '';
             $('custWaAlert').classList.toggle('hidden', !both);
-            $('custForm').classList.add('hidden');
-            $('custDone').classList.remove('hidden');
+            setDone(true); // antes de vaciar el pedido: renderCart cierra la hoja solo si aún se ve el formulario
+            cart.clear();
+            render();
         } catch (e) {
             console.warn('Pedido no enviado:', e);
             // 403 también ocurre si la hora del teléfono está desfasada más de 10 minutos
@@ -440,7 +590,30 @@
         } finally { btn.disabled = false; }
     });
 
-    $('list').addEventListener('click', (e) => {
+    // Hoja de información de la tienda: solo lee `shop` (ya normalizado)
+    function openInfo() {
+        $('infoName').textContent = shop.title;
+        $('infoSlogan').textContent = shop.slogan || DEFAULT_SLOGAN;
+        paintLogo($('infoLogo'));
+        const row = (icon, title, body) => `<div class="flex gap-3 bg-slate-50 rounded-2xl p-3"><span class="w-9 h-9 rounded-xl soft th-text flex items-center justify-center shrink-0"><i class="${icon}"></i></span><div class="min-w-0 flex-1"><p class="text-xs font-bold text-slate-500">${title}</p>${body}</div></div>`;
+        const txt = (t) => `<p class="text-sm font-bold">${escapeHtml(t)}</p>`;
+        const rows = [];
+        if (shop.whatsapp) rows.push(row('fa-brands fa-whatsapp', 'WhatsApp', `<a href="https://wa.me/${escapeHtml(shop.whatsapp)}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 mt-1 bg-green-600 text-white text-sm font-bold px-4 min-h-[40px] rounded-xl">Escribir a la tienda</a>`));
+        if (shop.askCustomer || shop.orderMode !== 'whatsapp') rows.push(row('fa-solid fa-motorcycle', 'Entrega', txt('Retiro en tienda · Delivery')));
+        if (shop.orderMode !== 'whatsapp') rows.push(row('fa-solid fa-money-bill-wave', 'Pago', txt(shop.allowCredit ? 'Contado · Fiado' : 'Contado')));
+        const upd = $('updatedAt').textContent;
+        if (rate || upd) rows.push(row('fa-solid fa-tags', 'Precios', (rate ? txt(`Tasa del día: Bs ${fmtBs(rate)} por ${currency}1`) : '') + (upd ? `<p class="text-xs text-slate-500">${escapeHtml(upd)}</p>` : '')));
+        $('infoBody').innerHTML = rows.join('') + '<p class="text-[11px] text-slate-400 text-center pt-1">La tienda confirma tu pedido según la disponibilidad.</p>';
+        $('infoModal').classList.remove('hidden');
+    }
+    const closeInfo = () => $('infoModal').classList.add('hidden');
+    $('infoBtn').addEventListener('click', openInfo);
+    $('infoClose').addEventListener('click', closeInfo);
+    $('infoModal').addEventListener('click', (e) => { if (e.target === $('infoModal')) closeInfo(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeInfo(); closeCust(); } });
+
+    // Mismo manejador para la lista y para el resumen de la hoja
+    function onQtyClick(e) {
         const b = e.target.closest('button[data-act]');
         if (!b) return;
         const id = b.dataset.id, p = products.find(x => x.id === id);
@@ -448,16 +621,26 @@
         if (p && p.stock !== null) n = Math.min(n, p.stock);
         if (n > 0) cart.set(id, n); else cart.delete(id);
         render();
-    });
+    }
+    $('list').addEventListener('click', onQtyClick);
+    $('custItems').addEventListener('click', onQtyClick);
     $('chips').addEventListener('click', (e) => {
         const b = e.target.closest('button[data-cat]');
         if (!b) return;
         activeCat = b.dataset.cat;
         renderChips();
-        render();
+        render(true);
     });
-    $('cartToggle').addEventListener('click', () => $('cartDetail').classList.toggle('hidden'));
-    $('search').addEventListener('input', render);
+    $('curToggle').addEventListener('click', (e) => {
+        const b = e.target.closest('button[data-bs]');
+        if (!b) return;
+        mainBs = b.dataset.bs === '1';
+        saveView();
+        renderToolbar();
+        render(true);
+    });
+    $('viewToggle').addEventListener('click', () => { listView = !listView; saveView(); renderToolbar(); render(true); });
+    $('search').addEventListener('input', () => render(true));
     $('retryBtn').addEventListener('click', load);
     load();
 </script>
