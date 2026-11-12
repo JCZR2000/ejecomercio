@@ -63,6 +63,7 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
   - **No escribe código.**
   - Guarda cada plan en la bóveda, en `Proyecto/Planes/AAAA-MM-DD — Fase N — Título.md`, con `estado: listo para ejecutar`.
   - Cada plan dice qué funciones de `index.html` se tocan, cómo se prueba y si cambia la forma de los datos guardados (ver sección 5).
+  - Cada plan lleva un apartado **«Qué puede afectar»**, hecho con la revisión de impacto de la sección 5: quién llama a lo que se toca, qué otros módulos y pantallas lo usan y qué se prueba de ellos.
   - Entrega al usuario el **prompt** para la sesión de ejecución.
 - **Sesión de ejecución:**
   - Recibe ese prompt, lee `REGLAS.md` y el plan, y lo implementa tal cual.
@@ -99,6 +100,16 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
 - `localStorage` (`inv_*`) e IndexedDB son **copia local y caché**, no la única copia. Solo viven en el teléfono: los cambios aún sin subir (`inv_cloud_dirty`), la clave maestra de cifrado (`inv_enc_key`), las fotos pendientes de subir y ajustes menores (calculadora, último método de pago).
 - La app es una PWA con Service Worker **caché primero**: un cambio de dominio o de ruta deja a los teléfonos instalados en la versión vieja si no se planifica (ver la Fase 31 en la bóveda).
 - Antes de afirmar algo sobre datos, sincronización u origen, compruébalo en el código o en la bóveda (`Proyecto/Módulos/Sincronización y cifrado.md`); no lo supongas.
+
+### Revisión de impacto (antes de planificar o cambiar código)
+Lo que se toca no debe romper otra parte sin que se sepa. Antes de cambiar una función, una pantalla o la forma de un dato, revisa qué más depende de eso, con la herramienta más barata que responda:
+1. **Bóveda:** la nota del módulo (`Proyecto/Módulos/`) y las `Decisiones` relacionadas. Dicen por qué está hecho así y qué se probó.
+2. **Grep:** todos los llamadores de la función y los usos del dato o del `id` del HTML (en `js/`, `index.html`, `catalogo.html`, `pagar.html` y `sw.js`).
+3. **graphify** (si existe `graphify-out/`): `graphify path` o `graphify query` para las relaciones que Grep no muestra fácil (por dónde pasa un flujo, qué depende de qué).
+4. **Lee el código alrededor** de cada uso que pueda cambiar de comportamiento.
+- Anota lo encontrado en el plan («Qué puede afectar») o en el resultado, y prueba también esas partes, no solo la que se cambió.
+- Es más importante acertar que ahorrar, pero sin leer de más: busca primero, lee solo los rangos que hagan falta.
+- Si algo del dinero, los fiados, la sincronización o la factura puede verse afectado, dilo al usuario antes de seguir.
 
 - La interfaz y los textos para el usuario van en español. Los nombres de variables y funciones, en inglés.
 - Se mantiene la estructura actual (un `index.html` con JS vanilla) salvo que un plan decida otra cosa con el usuario.
