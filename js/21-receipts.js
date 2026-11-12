@@ -583,9 +583,7 @@
             const originalContent = btn.innerHTML;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Procesando...';
 
-            // En PC se abre la pestaña de WhatsApp ahora, con el clic: después de generar la imagen el navegador ya la bloquearía como emergente
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const waWin = isMobile ? null : window.open('', '_blank');
 
             try {
                 const imgData = await generateReceiptImage();
@@ -609,23 +607,20 @@
                     }
                 }
 
-                // Paso A: Descargar la imagen primero
-                const link = document.createElement('a');
-                link.download = `recibo_para_enviar.png`;
-                link.href = imgData;
-                link.click();
-
-                // Paso B: Instruir al usuario. WhatsApp se abre en el callback, es decir, en el clic de «Entendido»
-                // (así lee las instrucciones antes y el navegador no lo bloquea como emergente).
+                // Primero las instrucciones; al tocar «Entendido» se descarga la imagen y se abre WhatsApp.
+                // Las dos cosas salen de ese clic, así el navegador no bloquea la pestaña nueva.
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
                 const waUrl = `https://wa.me/${(tempReceiptData && tempReceiptData.waPhone) || ''}?text=${encodeURIComponent(text)}`; // waPhone: pedido en línea (Fase 19)
-                customAlert('Imagen descargada', 'La imagen del recibo se ha descargado en tu PC.\n\nINSTRUCCIONES:\n1. Acepta este mensaje.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.', 'success', () => {
-                    if (waWin) waWin.location.href = waUrl; else window.open(waUrl, '_blank');
+                customAlert('Enviar por WhatsApp', 'Al tocar «Entendido»:\n1. Se descargará la imagen del recibo.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.', 'info', () => {
+                    const link = document.createElement('a');
+                    link.download = `recibo_para_enviar.png`;
+                    link.href = imgData;
+                    link.click();
+                    window.open(waUrl, '_blank');
                 }, 'sale');
 
             } catch (e) {
                 console.error(e);
-                if (waWin) waWin.close();
                 customAlert('Error en la imagen', 'Ocurrió un error al procesar la imagen.', 'error');
             } finally {
                 btn.innerHTML = originalContent;

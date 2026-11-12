@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v65.0</title>
+    <title>EjeComercio v65.1</title>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -158,7 +158,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.1</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -1273,8 +1273,9 @@
 
     <div id="successModal" class="fixed inset-0 modal-bg z-[100] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs p-6 text-center animate-bounce-in">
-            <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i class="fa-solid fa-check text-3xl text-green-600"></i>
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <!-- Mismo check animado que customAlert 'success' (css/app.css .dlg-ico); se repite cada vez que el modal deja de estar oculto -->
+                <svg class="dlg-ico" viewBox="0 0 64 64" aria-hidden="true"><circle class="d-draw" pathLength="100" cx="32" cy="32" r="26"/><path class="d-draw d2" pathLength="100" d="M20 33l9 9 16-18"/></svg>
             </div>
             <h3 id="successTitle" class="text-xl font-bold text-gray-800 mb-2">¡Operación Exitosa!</h3>
             <p id="successMsg" class="text-sm text-gray-500 mb-6">Los datos se han guardado correctamente.</p>
