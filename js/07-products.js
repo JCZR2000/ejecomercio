@@ -19,9 +19,9 @@
                 const priceVal = $('prodPrice').value;
                 
                 // 2. Validación
-                if (!name) return alert('El nombre es obligatorio');
-                if (qtyVal === '' || isNaN(qtyVal)) return alert('Stock inválido');
-                if (priceVal === '' || isNaN(priceVal)) return alert('Precio inválido');
+                if (!name) return customAlert('Falta el nombre', 'El nombre es obligatorio.', 'error', null, 'box');
+                if (qtyVal === '' || isNaN(qtyVal)) return customAlert('Stock inválido', 'Escribe una cantidad válida.', 'error', null, 'box');
+                if (priceVal === '' || isNaN(priceVal)) return customAlert('Precio inválido', 'Escribe un precio válido.', 'error', null, 'box');
 
                 const qty = parseInt(qtyVal);
                 const price = parseFloat(priceVal);
@@ -226,11 +226,11 @@
 
         function requestDelete(id) {
             checkAuth('edit', () => {
-                if (confirm('¿Borrar producto?')) {
+                customConfirm('Borrar producto', '¿Borrar producto?', 'danger', () => {
                     state.products = state.products.filter(p => p.id != id);
                     saveData();
                     renderAll();
-                }
+                }, 'Sí, borrar');
             });
         }
 

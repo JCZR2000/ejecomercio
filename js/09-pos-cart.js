@@ -126,7 +126,7 @@
             const inCart = state.cart.find(c => c.id == id && !c.isStub);
             const currentQty = inCart ? inCart.qty : 0;
             
-            if (currentQty + qty > p.qty) return alert('Stock insuficiente');
+            if (currentQty + qty > p.qty) return customAlert('Stock insuficiente', 'No hay más existencias de este producto.', 'warning', null, 'box');
             
             if (inCart) {
                 inCart.qty += qty;
@@ -160,7 +160,7 @@
             const currentQty = inCart ? inCart.qty : 0;
 
             if (currentQty + 1 > p.qty) {
-                return alert('Stock insuficiente (Máximo alcanzado)');
+                return customAlert('Stock insuficiente', 'Máximo alcanzado.', 'warning', null, 'box');
             }
 
             if (inCart) {
@@ -198,7 +198,7 @@
             // 2. Lógica para SUMAR (Verificar Stock)
             if (change === 1) {
                 if (item.qty + 1 > product.qty) {
-                    return alert('Stock máximo alcanzado para este producto');
+                    return customAlert('Stock máximo', 'Stock máximo alcanzado para este producto.', 'warning', null, 'box');
                 }
             }
 
@@ -328,9 +328,12 @@
 
             function executeCheckout() {
                 // A. Validación
-                if (isCredit && !state.activeCreditId && !customerName) return alert('Escribe el nombre del cliente');
-                if (!confirm('¿Confirmar transacción?')) return;
+                if (isCredit && !state.activeCreditId && !customerName) return customAlert('Falta el cliente', 'Escribe el nombre del cliente.', 'error');
+                customConfirm('Confirmar venta', '¿Confirmar transacción?', 'warning', confirmedCheckout, 'Confirmar', 'sale');
+            }
 
+            // Se ejecuta solo al confirmar (el cuadro ya se cerró: no se puede confirmar dos veces)
+            function confirmedCheckout() {
                 // Fase 13b: un abono inicial mayor que lo que se debe deja el sobrante como saldo a favor (pide confirmación)
                 const current = isCredit && state.activeCreditId ? state.credits.find(c => c.id == state.activeCreditId) : null;
                 const debtNow = roundMoney(totalUSD + (current ? creditPending(current) : 0));

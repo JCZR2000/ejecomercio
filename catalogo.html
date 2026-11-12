@@ -45,6 +45,24 @@
         .done-spark { animation: spark 2.4s ease-out both; transform-origin: center; transform-box: fill-box; }
         .done-circle { stroke-dasharray: 176; stroke-dashoffset: 176; animation: draw .6s ease-out .1s forwards; }
         .done-check { stroke-dasharray: 40; stroke-dashoffset: 40; animation: draw .35s ease-out .6s forwards; }
+        /* Ilustraciones de los estados (una pasada; solo «cargando» se repite mientras se espera) */
+        .ill { width: 96px; height: 96px; fill: none; stroke: currentColor; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; color: var(--btn); display: inline-block; }
+        .ill .f { fill: currentColor; stroke: none; }
+        .ill .dot { animation: ill-hop 1s ease-in-out infinite; }
+        .ill .d2 { animation-delay: .15s; } .ill .d3 { animation-delay: .3s; }
+        .ill .shut { transform-box: fill-box; transform-origin: 50% 0; animation: ill-shut .8s ease-in .1s both; }
+        .ill .wave { animation: ill-wave .9s ease-in .2s forwards; }
+        .ill .w2 { animation-delay: .45s; } .ill .w1 { animation-delay: .7s; }
+        .ill .flap { animation: ill-flap .7s ease-out .1s both; }
+        .ill .mag { animation: ill-mag 1s ease-in-out .1s 1; }
+        .ill .la { animation: ill-la .7s ease-out .1s both; } .ill .lb { animation: ill-lb .7s ease-out .1s both; }
+        @keyframes ill-hop { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-14px); } }
+        @keyframes ill-shut { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        @keyframes ill-wave { to { opacity: .25; } }
+        @keyframes ill-flap { from { transform: none; } to { transform: translateY(-5px) rotate(-6deg); } }
+        @keyframes ill-mag { 0%, 100% { transform: none; } 30% { transform: translate(-8px, -6px); } 65% { transform: translate(6px, 4px); } }
+        @keyframes ill-la { from { transform: none; } to { transform: translate(-5px, 5px); } }
+        @keyframes ill-lb { from { transform: none; } to { transform: translate(5px, -5px); } }
         @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } .done-circle, .done-check { stroke-dashoffset: 0 !important; } }
     </style>
 </head>
@@ -106,7 +124,7 @@
         </div>
     </div>
 
-    <div id="custModal" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
+    <div id="custModal" role="dialog" aria-modal="true" aria-labelledby="custTitle" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
         <div class="sheet-in bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
             <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2 shrink-0 sm:hidden"></div>
             <div class="px-4 pt-3 pb-2 flex items-center gap-3 shrink-0">
@@ -184,7 +202,7 @@
         </div>
     </div>
 
-    <div id="infoModal" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
+    <div id="infoModal" role="dialog" aria-modal="true" aria-labelledby="infoName" class="fade-in hidden fixed inset-0 z-30 bg-black/50 flex items-end sm:items-center justify-center">
         <div class="sheet-in bg-white rounded-t-3xl sm:rounded-3xl w-full max-w-md shadow-2xl max-h-[92vh] flex flex-col">
             <div class="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-2 shrink-0 sm:hidden"></div>
             <div class="px-4 pt-3 pb-2 flex items-center gap-3 shrink-0">
@@ -237,8 +255,21 @@
         return mainBs && rate ? { main: bs, alt: cur } : { main: cur, alt: bs };
     }
 
-    function showMessage(text, retry) {
-        $('message').textContent = text;
+    // Ilustraciones de 96 px para los estados (colores del tema con --btn)
+    const ill = body => '<svg class="ill" viewBox="0 0 96 96" aria-hidden="true">' + body + '</svg>';
+    const ILL = {
+        loading: ill('<circle class="f dot" cx="28" cy="60" r="6"/><circle class="f dot d2" cx="48" cy="60" r="6"/><circle class="f dot d3" cx="68" cy="60" r="6"/>'),
+        off: ill('<path d="M16 42l6-18h52l6 18z"/><path d="M20 42v36h56V42"/><rect class="shut" x="26" y="48" width="44" height="30" rx="2"/>'),
+        offline: ill('<path class="wave" d="M10 38a54 54 0 0176 0"/><path class="wave w2" d="M22 52a36 36 0 0152 0"/><path class="wave w1" d="M34 66a18 18 0 0128 0"/><circle class="f" cx="48" cy="78" r="3.5"/>'),
+        empty: ill('<path d="M18 40v34l30 12 30-12V40M48 54v32"/><path class="flap" d="M18 40l30-16 30 16-30 14z"/>'),
+        search: ill('<g class="mag"><circle cx="42" cy="42" r="20"/><path d="M57 57l20 20"/></g>'),
+        link: ill('<path class="la" d="M42 54l-6 6a11 11 0 01-16-16l10-10a11 11 0 0116 0"/><path class="lb" d="M54 42l6-6a11 11 0 0116 16L66 62a11 11 0 01-16 0"/><path d="M48 18v8M36 22l4 6M60 22l-4 6"/>')
+    };
+
+    // kind: loading | off | offline | empty (ilustración animada sobre el texto)
+    function showMessage(text, retry, kind) {
+        $('message').innerHTML = (ILL[kind] || '') + '<span id="messageText" class="block mt-3"></span>';
+        $('messageText').textContent = text;
         $('message').classList.remove('hidden');
         $('retryBtn').classList.toggle('hidden', !retry);
         $('list').innerHTML = '';
@@ -299,33 +330,32 @@
         const slug = params.get('t') || '';
         let uid = params.get('u') || '';
         // ?t= es el nombre corto (tienda/{nombre}.json = { u: uid }); ?u= es el enlace de siempre
-        if (slug ? !/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(slug) : !/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
-        showMessage('Cargando...');
-        $('message').innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Cargando...';
+        if (slug ? !/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(slug) : !/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible', false, 'off');
+        showMessage('Cargando...', false, 'loading');
         try {
             // El parámetro t cambia cada minuto (igual que max-age del archivo): evita que una caché vieja sirva un catálogo desactualizado
             const t = Math.floor(Date.now() / 60000);
             if (slug) {
                 const r = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/tienda%2F${slug}.json?alt=media&t=${t}`);
-                if (r.status === 404 || r.status === 403) return showMessage('Esta vitrina no está disponible');
+                if (r.status === 404 || r.status === 403) return showMessage('Esta vitrina no está disponible', false, 'off');
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 uid = String((await r.json()).u || '');
-                if (!/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible');
+                if (!/^[A-Za-z0-9]+$/.test(uid)) return showMessage('Esta vitrina no está disponible', false, 'off');
             }
             const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/catalogo%2F${uid}.json?alt=media&t=${t}`);
-            if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible');
+            if (res.status === 404 || res.status === 403) return showMessage('Esta vitrina no está disponible', false, 'off');
             if (!res.ok) throw new Error('HTTP ' + res.status);
             normalize(await res.json());
             shopUid = uid;
         } catch (e) {
             console.warn('Vitrina:', e);
-            return showMessage('Sin conexión. Intenta de nuevo', true);
+            return showMessage('Sin conexión. Intenta de nuevo', true, 'offline');
         }
         $('shopTitle').textContent = shop.title;
         applyTheme();
         renderUpdated();
         document.title = shop.title;
-        if (!products.length) return showMessage('No hay productos disponibles por ahora');
+        if (!products.length) return showMessage('No hay productos disponibles por ahora', false, 'empty');
         $('message').classList.add('hidden');
         $('retryBtn').classList.add('hidden');
         $('controls').classList.remove('hidden');
@@ -413,7 +443,7 @@
             const left = p.stock !== null && !low ? `<div class="text-[11px] font-bold text-slate-400">Quedan ${p.stock}</div>` : '';
             return `<div ${d} class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden flex flex-col"><div class="relative">${img}${tag}<div class="absolute bottom-2 right-2">${qtyControl(p, qty, true)}</div></div>
                 <div class="p-3 flex-1 flex flex-col gap-0.5">${cat}${name}<div class="mt-1">${price}</div>${left}</div></div>`;
-        }).join('') : '<p class="col-span-full text-center text-slate-500 py-16">Sin resultados</p>';
+        }).join('') : `<div class="col-span-full text-center text-slate-500 py-12">${ILL.search}<p class="mt-3">Sin resultados</p></div>`;
         renderCart();
     }
 
@@ -525,6 +555,7 @@
         setDone(false);
         paintModal();
         $('custModal').classList.remove('hidden');
+        $('custX').focus();
     }
     function setDone(done) {
         $('custForm').classList.toggle('hidden', done);
@@ -605,6 +636,7 @@
         if (rate || upd) rows.push(row('fa-solid fa-tags', 'Precios', (rate ? txt(`Tasa del día: Bs ${fmtBs(rate)} por ${currency}1`) : '') + (upd ? `<p class="text-xs text-slate-500">${escapeHtml(upd)}</p>` : '')));
         $('infoBody').innerHTML = rows.join('') + '<p class="text-[11px] text-slate-400 text-center pt-1">La tienda confirma tu pedido según la disponibilidad.</p>';
         $('infoModal').classList.remove('hidden');
+        $('infoClose').focus();
     }
     const closeInfo = () => $('infoModal').classList.add('hidden');
     $('infoBtn').addEventListener('click', openInfo);
@@ -640,7 +672,7 @@
         render(true);
     });
     $('viewToggle').addEventListener('click', () => { listView = !listView; saveView(); renderToolbar(); render(true); });
-    $('search').addEventListener('input', () => render(true));
+    $('search').addEventListener('input', () => render()); // sin animación: no se reanima la lista al escribir
     $('retryBtn').addEventListener('click', load);
     load();
 </script>

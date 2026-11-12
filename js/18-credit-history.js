@@ -73,11 +73,11 @@
         }
 
         function permanentDeleteCredit(id) {
-            if(confirm('¿Eliminar este registro del historial permanentemente?')) {
+            customConfirm('Eliminar registro', '¿Eliminar este registro del historial permanentemente?', 'danger', () => {
                 state.credits = state.credits.filter(c => c.id != id);
                 saveData();
                 renderCreditHistory();
-            }
+            }, 'Sí, eliminar');
         }
 
         // Función de Limpieza Automática (El recolector de basura)

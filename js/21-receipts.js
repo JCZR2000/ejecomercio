@@ -95,7 +95,7 @@
 
             toggleReceiptConfig();
             updateReceiptPreview();
-            alert('Configuración guardada y sincronizada ☁️');
+            customAlert('Configuración guardada', 'Configuración guardada y sincronizada.', 'success', null, 'cloud');
         }
 
         // --- APERTURA DE MODALES ---
@@ -515,7 +515,7 @@
                 });
             } catch (error) {
                 console.error('Error generando recibo:', error);
-                alert('Hubo un error generando la imagen. Por favor intenta de nuevo.');
+                customAlert('Error en la imagen', 'Hubo un error generando la imagen. Por favor intenta de nuevo.', 'error');
                 throw error;
             }
         }
@@ -570,7 +570,7 @@
 
             } catch (e) {
                 console.error(e);
-                alert('Error generando recibo. Por favor intenta de nuevo.');
+                customAlert('Error en el recibo', 'Error generando recibo. Por favor intenta de nuevo.', 'error');
             } finally {
                 // 3. Restaurar botón siempre
                 btn.innerHTML = originalContent;
@@ -615,20 +615,18 @@
                 link.href = imgData;
                 link.click();
 
-                // Paso B: Instruir al usuario (Bloqueante)
-                // El alert detiene la ejecución del código hasta que el usuario da "Aceptar".
-                // Esto garantiza que lea las instrucciones ANTES de que se abra la nueva pestaña.
-                alert('✅ La imagen del recibo se ha descargado en tu PC.\n\n👉 INSTRUCCIONES:\n1. Acepta este mensaje.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.');
-
-                // Paso C: Abrir WhatsApp Web (Solo ocurre después de cerrar la alerta)
+                // Paso B: Instruir al usuario. WhatsApp se abre en el callback, es decir, en el clic de «Entendido»
+                // (así lee las instrucciones antes y el navegador no lo bloquea como emergente).
                 const text = `Hola ${$('receiptCustomerName').value}, aquí tienes tu recibo.`;
                 const waUrl = `https://wa.me/${(tempReceiptData && tempReceiptData.waPhone) || ''}?text=${encodeURIComponent(text)}`; // waPhone: pedido en línea (Fase 19)
-                if (waWin) waWin.location.href = waUrl; else window.open(waUrl, '_blank');
+                customAlert('Imagen descargada', 'La imagen del recibo se ha descargado en tu PC.\n\nINSTRUCCIONES:\n1. Acepta este mensaje.\n2. Se abrirá WhatsApp Web.\n3. Arrastra o adjunta la imagen descargada en el chat.', 'success', () => {
+                    if (waWin) waWin.location.href = waUrl; else window.open(waUrl, '_blank');
+                }, 'sale');
 
             } catch (e) {
                 console.error(e);
                 if (waWin) waWin.close();
-                alert('Ocurrió un error al procesar la imagen.');
+                customAlert('Error en la imagen', 'Ocurrió un error al procesar la imagen.', 'error');
             } finally {
                 btn.innerHTML = originalContent;
             }

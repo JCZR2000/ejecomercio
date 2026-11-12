@@ -133,7 +133,7 @@
 
                     if (!ignoredErrors.includes(error.code)) {
                         console.error("Login Error:", error);
-                        alert("Aviso: " + error.message);
+                        customAlert('Inicio de sesión', error.message, 'error');
                     } else {
                         console.log("Aviso menor de login:", error.code);
                     }
@@ -147,14 +147,13 @@
 
         // Cierre de sesión (único). Opción: borrar los datos de este dispositivo (solo si no hay cambios sin subir).
         function confirmSignOut() {
-            customConfirm('Cerrar sesión', 'Se detendrá la sincronización.', 'warning', () => signOutNow(cb.checked));
             const label = document.createElement('label');
             label.className = 'flex items-start gap-2 text-left text-xs text-slate-600 mt-3';
             const cb = document.createElement('input');
             cb.type = 'checkbox';
             cb.className = 'mt-0.5';
             label.append(cb, document.createTextNode('Borrar los datos de este dispositivo'));
-            $('dialogMsg').appendChild(label);
+            customConfirm('Cerrar sesión', 'Se detendrá la sincronización.', 'warning', () => signOutNow(cb.checked), 'Cerrar sesión', null, label);
         }
 
         function signOutNow(wipe) {
@@ -281,9 +280,10 @@
                                     hydrateCloudData(success, doc);
                                 } else {
                                     // FALLO
-                                    alert("❌ Clave incorrecta.");
-                                    document.getElementById('secModalInput').value = '';
-                                    document.getElementById('secModalInput').focus();
+                                    customAlert('Clave incorrecta', 'La clave que escribiste no es correcta.', 'error', () => {
+                                        document.getElementById('secModalInput').value = '';
+                                        document.getElementById('secModalInput').focus();
+                                    }, 'lock');
                                     // No cerramos el modal, lo dejamos intentar de nuevo
                                 }
                             };

@@ -68,7 +68,7 @@
                     dataToExport = JSON.stringify(secureBackup);
                     fileName += '_SECURE'; // Etiqueta visual para el usuario
                 } catch (e) {
-                    alert("Error al encriptar respaldo. Verifica tu clave.");
+                    customAlert('Error al cifrar', 'Error al encriptar respaldo. Verifica tu clave.', 'error', null, 'lock');
                     return;
                 }
             }
@@ -91,39 +91,28 @@
             reader.onload = async (e) => {
                 try {
                     let jsonContent = JSON.parse(e.target.result);
-                    let finalData = jsonContent; // Asumimos texto plano por defecto
 
-                    // DETECCIÓN INTELIGENTE: ¿Es un backup encriptado? 🔒
-                    if (jsonContent.isEncryptedBackup) {
-                        let currentKey = encryptionKey;
-                
-                        // Si no tenemos la clave en memoria, la pedimos
-                        if (!currentKey) {
-                            currentKey = prompt("📂 ARCHIVO BLINDADO DETECTADO\n\nIntroduce la Clave Maestra con la que se creó este respaldo:");
-                            if (!currentKey) return alert("Restauración cancelada.");
-                        }
-
+                    // Devuelve los datos descifrados, o null (y avisa) si la clave no sirve
+                    const decryptBackup = (json, key) => {
                         try {
-                            // Intentamos desencriptar
-                            const bytes = CryptoJS.AES.decrypt(jsonContent.payload, currentKey);
-                            const decryptedStr = bytes.toString(CryptoJS.enc.Utf8);
-                    
+                            const decryptedStr = CryptoJS.AES.decrypt(json.payload, key).toString(CryptoJS.enc.Utf8);
                             if (!decryptedStr) throw new Error("Bad Key");
-                    
-                            finalData = JSON.parse(decryptedStr);
-                    
+                            const data = JSON.parse(decryptedStr);
                             // Si funcionó y no teníamos clave en sesión, guardamos esta
                             if (!encryptionKey) {
-                                encryptionKey = currentKey;
-                                localStorage.setItem('inv_enc_key', currentKey);
+                                encryptionKey = key;
+                                localStorage.setItem('inv_enc_key', key);
                             }
+                            return data;
                         } catch (err) {
-                            return alert("❌ Error: La clave es incorrecta o el archivo está dañado.");
+                            customAlert('Clave incorrecta', 'La clave es incorrecta o el archivo está dañado.', 'error', null, 'lock');
+                            return null;
                         }
-                    }
+                    };
 
                     // Confirmación final antes de sobrescribir
-                    if (confirm('¿Restaurar este respaldo?\nSe sobrescribirán los datos actuales y se subirán a la nube.')) {
+                    const confirmRestore = finalData => customConfirm('Restaurar respaldo', '¿Restaurar este respaldo?\nSe sobrescribirán los datos actuales y se subirán a la nube.', 'warning', async () => {
+                      try {
                         // Copia de la nube antes de pisarla; si falla no se cambia nada
                         if (!await ensureCloudBackup('Antes de restaurar un respaldo')) return;
                 
@@ -150,11 +139,30 @@
                 
                         renderAll();
                         $('restoreInput').value = ''; // Limpiar input file
-                        alert('¡Restauración exitosa y sincronizada! ☁️✅');
+                        customAlert('Restauración exitosa', 'Restauración exitosa y sincronizada.', 'success', null, 'cloud');
+                      } catch (err) {
+                        console.error(err);
+                        customAlert('Respaldo no válido', 'El archivo no tiene un formato válido.', 'error');
+                      }
+                    }, 'Restaurar', 'cloud');
+
+                    // DETECCIÓN INTELIGENTE: ¿Es un backup encriptado?
+                    if (!jsonContent.isEncryptedBackup) return confirmRestore(jsonContent);
+                    if (encryptionKey) {
+                        const data = decryptBackup(jsonContent, encryptionKey);
+                        if (data) confirmRestore(data);
+                        return;
                     }
+                    // Sin clave en memoria: se pide. Si es incorrecta el cuadro sigue abierto para reintentar.
+                    askForMasterKey('Respaldo cifrado', 'Introduce la Clave Maestra con la que se creó este respaldo.', true, key => {
+                        const data = decryptBackup(jsonContent, key);
+                        if (!data) return;
+                        closeSecurityModal();
+                        confirmRestore(data);
+                    });
                 } catch (err) {
                     console.error(err);
-                    alert('Error: El archivo no tiene un formato válido.');
+                    customAlert('Respaldo no válido', 'El archivo no tiene un formato válido.', 'error');
                 }
             };
             reader.readAsText(file);

@@ -33,7 +33,7 @@
                 bar.classList.add('bg-red-600', 'animate-pulse'); // ¡PELIGRO!
                 if (!storageWarned) {
                     storageWarned = true;
-                    alert("⚠️ ¡ADVERTENCIA DE ESPACIO! ⚠️\n\nTu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.");
+                    customAlert('¡Poco espacio!', 'Tu base de datos está cerca del límite de 1MB.\nPor favor, borra historial o comprime imágenes.', 'warning', null, 'cloud');
                 }
             }
         }

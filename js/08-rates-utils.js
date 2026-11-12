@@ -226,7 +226,7 @@
         function clearData(action) {
             // 1. REINICIO DE FÁBRICA (NUCLEAR) ☢️
             if (action === 'factory_reset') {
-                if (confirm('⚠️ ¡PELIGRO! ⚠️\n\n¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.')) {
+                customConfirm('¡Peligro!', '¿Estás seguro de que quieres BORRAR TODO?\n\n- Se borrarán todos los productos.\n- Se borrará el historial.\n- Se borrarán los clientes y deudas.\n\nEsta acción NO se puede deshacer.', 'danger', () => {
                     
                     const user = auth.currentUser;
                     const slug = normalizeCatalogConfig().slug; // se lee antes de borrar nada
@@ -288,19 +288,18 @@
                         })
                         .catch(error => {
                             console.error("Error borrando nube:", error);
-                            alert("Hubo un error al borrar la nube. Sin embargo, se borrarán los datos locales.");
-                            wipeLocalAndReload();
+                            customAlert('Error al borrar la nube', 'Hubo un error al borrar la nube. Sin embargo, se borrarán los datos locales.', 'error', wipeLocalAndReload, 'cloud');
                         });
                     } else {
                         // Si es modo offline, borramos directo
                         wipeLocalAndReload();
                     }
-                }
+                }, 'Sí, borrar todo');
             } 
             
             // 2. VACIAR SOLO INVENTARIO
             else if (action === 'clean_inv') {
-                if (confirm('¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)')) {
+                customConfirm('Vaciar inventario', '¿Vaciar todo el inventario de productos?\n(Las ventas y deudas se mantendrán)', 'danger', () => {
                     ensureCloudBackup('Antes de vaciar el inventario').then(ok => {
                         if (!ok) return;
                         state.products = [];
@@ -308,14 +307,14 @@
                         forceClearCloud('products');
                         renderAll();
                         toggleMenu('config');
-                        alert('Inventario vaciado.');
+                        customAlert('Inventario vaciado', 'Inventario vaciado.', 'success', null, 'box');
                     });
-                }
+                }, 'Sí, vaciar');
             } 
             
             // 3. BORRAR SOLO HISTORIAL
             else if (action === 'clean_hist') {
-                if (confirm('¿Borrar todo el historial de ventas?')) {
+                customConfirm('Borrar historial', '¿Borrar todo el historial de ventas?', 'danger', () => {
                     ensureCloudBackup('Antes de borrar el historial').then(ok => {
                         if (!ok) return;
                         state.sales = [];
@@ -324,14 +323,14 @@
                         forceClearCloud('sales');
                         renderAll();
                         toggleMenu('config');
-                        alert('Historial borrado.');
+                        customAlert('Historial borrado', 'Historial borrado.', 'success');
                     });
-                }
+                }, 'Sí, borrar');
             }
 
             // 4. BORRAR SOLO FIADOS
             else if (action === 'clean_credits') {
-                if (confirm('¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nLos clientes (agenda) no se borran.\nEsta acción no se puede deshacer.')) {
+                customConfirm('Eliminar fiados', '¿Eliminar TODAS las cuentas por cobrar (Fiados)?\n\nLos clientes (agenda) no se borran.\nEsta acción no se puede deshacer.', 'danger', () => {
                     ensureCloudBackup('Antes de borrar los fiados').then(ok => {
                         if (!ok) return;
                         state.credits = [];
@@ -339,9 +338,9 @@
                         forceClearCloud('credits');
                         renderAll();
                         toggleMenu('config');
-                        alert('Lista de fiados eliminada.');
+                        customAlert('Fiados eliminados', 'Lista de fiados eliminada.', 'success');
                     });
-                }
+                }, 'Sí, eliminar');
             }
         }
 

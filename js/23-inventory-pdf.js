@@ -1,7 +1,7 @@
         // --- FUNCIÓN PARA EXPORTAR INVENTARIO A PDF (DISEÑO Y ALINEACIÓN CORREGIDOS) ---
         function exportInventoryPDF() {
             if (!window.jspdf || !window.jspdf.jsPDF) {
-                alert("Las librerías de PDF aún se están cargando o estás offline. Intenta en unos segundos.");
+                customAlert('PDF no disponible', 'Las librerías de PDF aún se están cargando o estás offline. Intenta en unos segundos.', 'warning', null, 'offline');
                 return;
             }
 
