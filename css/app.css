@@ -73,12 +73,12 @@
 .modal-bg:not(.hidden) > *, .modal-in:not(.hidden) > *, .animate-bounce-in { animation: modal-pop .24s cubic-bezier(.2, .9, .3, 1.1) backwards; }
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-pop { from { opacity: 0; transform: translateY(10px) scale(.95); } }
-/* Móvil: la tarjeta sube desde abajo; al cerrar, una copia (.modal-closing, js/22-ui.js) baja */
+/* Móvil: solo las hojas inferiores (ventana con items-end: carrito, Ajustes) suben al abrir; al cerrar, una copia (.modal-closing, js/22-ui.js) baja */
 @keyframes sheet-up { from { transform: translateY(100vh); } }
 @keyframes sheet-down { to { transform: translateY(100vh); } }
 @keyframes modal-fade-out { to { opacity: 0; } }
 @media (max-width: 639px) {
-    .modal-bg:not(.hidden) > *, .modal-in:not(.hidden) > * { animation: sheet-up .32s cubic-bezier(.2, .8, .2, 1) backwards; }
+    .modal-bg.items-end:not(.hidden) > *, .modal-in.items-end:not(.hidden) > * { animation: sheet-up .32s cubic-bezier(.2, .8, .2, 1) backwards; }
 }
 .modal-closing.modal-closing { pointer-events: none; animation: modal-fade-out .28s ease-in forwards; }
 .modal-closing.modal-closing > * { animation: sheet-down .28s cubic-bezier(.4, 0, 1, 1) forwards; }
