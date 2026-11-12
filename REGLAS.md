@@ -92,6 +92,14 @@ Si una sesión recibe una tarea que no corresponde a su modelo, lo dice al usuar
   - Las pruebas en local usan el **mismo Firebase que los usuarios reales**: inicia sesión solo con una cuenta de Google de prueba o la del dueño, nunca con la de otra persona.
 
 ## 5. Código
+
+### Dónde viven los datos (datos clave; compruébalos antes de planificar)
+- **La sesión con Google es obligatoria**: la pantalla de entrada solo tiene «Entrar con Google». No hay modo sin cuenta.
+- **Todo lo importante se sube a Firestore** (`buildCloudPayload` en `js/05-storage.js`): productos, ventas, fiados, clientes, ganancias, métodos de pago, PIN (`security`), recibos, datos fiscales, vitrina y tasas. Las fotos van a Firebase Storage. Por eso hay varios dispositivos sincronizados.
+- `localStorage` (`inv_*`) e IndexedDB son **copia local y caché**, no la única copia. Solo viven en el teléfono: los cambios aún sin subir (`inv_cloud_dirty`), la clave maestra de cifrado (`inv_enc_key`), las fotos pendientes de subir y ajustes menores (calculadora, último método de pago).
+- La app es una PWA con Service Worker **caché primero**: un cambio de dominio o de ruta deja a los teléfonos instalados en la versión vieja si no se planifica (ver la Fase 31 en la bóveda).
+- Antes de afirmar algo sobre datos, sincronización u origen, compruébalo en el código o en la bóveda (`Proyecto/Módulos/Sincronización y cifrado.md`); no lo supongas.
+
 - La interfaz y los textos para el usuario van en español. Los nombres de variables y funciones, en inglés.
 - Se mantiene la estructura actual (un `index.html` con JS vanilla) salvo que un plan decida otra cosa con el usuario.
 - **Compatibilidad de datos:** los usuarios ya tienen datos en su teléfono (`localStorage`, claves `inv_*`) y en Firestore. Todo cambio en la forma de `state` o de lo guardado debe seguir leyendo los datos viejos sin perderlos ni romperlos.

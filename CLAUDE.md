@@ -7,6 +7,7 @@ Las reglas de trabajo de este proyecto están en [REGLAS.md](REGLAS.md). Síguel
 2. Si la tarea es de una fase, lee solo el plan de esa fase en `Proyecto/Planes/` (estado "listo para ejecutar").
 3. Lee otras notas solo si la tarea las necesita. No leas `Proyecto/Planes/` completa ni todo el `Diario/`.
 
+- Antes de planificar algo que toque datos, sincronización, dominio o Service Worker, lee «Dónde viven los datos» (REGLAS.md, sección 5) y compruébalo en el código. No supongas que los datos solo están en el teléfono: la sesión es obligatoria y todo se sube a Firebase.
 - Al terminar, registra el trabajo según REGLAS.md, sección 1.
 - No uses subagentes (Agent, graphify como subagente) salvo que el usuario lo pida explícitamente.
 - Para buscar en la bóveda y en el código usa Grep o Glob directamente: es lo más barato y exacto. `index.html` es muy grande: lee solo los rangos de líneas que necesites.
