@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v65.1</title>
+    <title>EjeComercio v65.2</title>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -73,7 +73,7 @@
     </div>
 
     <div id="securityModal"
-        class="fixed inset-0 z-[210] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        class="modal-in fixed inset-0 z-[210] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div
             class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100 animate-bounce-in">
     
@@ -110,7 +110,7 @@
     </div>
 
     <div id="dialogModal" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMsg"
-        class="fixed inset-0 z-[450] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+        class="modal-in fixed inset-0 z-[450] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div
             class="bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all scale-100 animate-bounce-in text-center p-6">
     
@@ -158,7 +158,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.1</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.2</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -890,7 +890,7 @@
         </div>
     </div>
 
-    <div id="conflictModal" class="fixed inset-0 z-[300] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
+    <div id="conflictModal" class="modal-in fixed inset-0 z-[300] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform scale-100 animate-bounce-in relative">
             
             <div class="bg-gradient-to-r from-orange-500 to-red-600 p-6 text-white text-center">
@@ -937,7 +937,7 @@
     </div>
 
     <div id="diffModal"
-        class="fixed inset-0 z-[310] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        class="modal-in fixed inset-0 z-[310] bg-slate-900/95 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div
             class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-slide-up">
     
@@ -1057,13 +1057,14 @@
     </div>
 
     <div id="deleteCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all p-5 text-center">
-            <div class="mb-3">
-                <div class="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2">
-                    <i class="fa-solid fa-trash-can text-red-600 text-xl"></i>
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden p-6 text-center">
+            <div class="mb-4">
+                <!-- Misma papelera animada que customConfirm 'danger' (css/app.css .dlg-ico) -->
+                <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <svg class="dlg-ico" viewBox="0 0 64 64" aria-hidden="true"><g class="d-lid"><path d="M12 18h40M25 18v-5h14v5"/></g><path d="M17 24l3 31h24l3-31M27 30v18M37 30v18"/></svg>
                 </div>
-                <h3 class="text-lg font-bold text-gray-800">¿Eliminar Cliente?</h3>
-                <p class="text-xs text-gray-500 px-2 leading-tight">Esta acción borrará la deuda permanentemente.</p>
+                <h3 class="text-xl font-black text-slate-800 mb-2">¿Eliminar Cliente?</h3>
+                <p class="text-sm text-gray-500 leading-relaxed">Esta acción borrará la deuda permanentemente.</p>
             </div>
             
             <input type="hidden" id="deleteTargetId">
@@ -1081,9 +1082,9 @@
                 <span>No se puede devolver stock porque existen abonos o recargos.</span>
             </div>
 
-            <div class="flex gap-2">
-                <button onclick="closeDeleteCreditModal()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded text-sm hover:bg-gray-300 font-bold">Cancelar</button>
-                <button onclick="confirmDeleteCredit()" class="flex-1 bg-red-600 text-white py-2 rounded text-sm hover:bg-red-700 font-bold shadow">Borrar</button>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeDeleteCreditModal()" class="flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50 py-3 rounded-xl font-bold transition text-sm">Cancelar</button>
+                <button type="button" onclick="confirmDeleteCredit()" class="flex-1 bg-red-600 hover:bg-red-700 text-white shadow-lg py-3 rounded-xl font-bold transition text-sm">Sí, borrar</button>
             </div>
         </div>
     </div>

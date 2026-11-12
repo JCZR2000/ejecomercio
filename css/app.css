@@ -67,7 +67,23 @@
 @keyframes dlg-scan { 0% { transform: translateY(-8px); } 50% { transform: translateY(8px); } 100% { transform: translateY(0); } }
 @keyframes dlg-wave { to { opacity: .25; } }
 @keyframes dlg-flap { from { transform: rotate(0) scaleY(1); } to { transform: rotate(-14deg) translateY(-3px); } }
+/* ===== Entrada suave de las ventanas: el fondo aparece y la tarjeta crece un poco. Se repite cada vez que se quita .hidden. ===== */
+/* fill-mode backwards: al terminar no pisa el transform propio de la tarjeta */
+.modal-bg:not(.hidden), .modal-in:not(.hidden) { animation: modal-fade .2s ease-out; }
+.modal-bg:not(.hidden) > *, .modal-in:not(.hidden) > *, .animate-bounce-in { animation: modal-pop .24s cubic-bezier(.2, .9, .3, 1.1) backwards; }
+@keyframes modal-fade { from { opacity: 0; } }
+@keyframes modal-pop { from { opacity: 0; transform: translateY(10px) scale(.95); } }
+/* Móvil: la tarjeta sube desde abajo; al cerrar, una copia (.modal-closing, js/22-ui.js) baja */
+@keyframes sheet-up { from { transform: translateY(100vh); } }
+@keyframes sheet-down { to { transform: translateY(100vh); } }
+@keyframes modal-fade-out { to { opacity: 0; } }
+@media (max-width: 639px) {
+    .modal-bg:not(.hidden) > *, .modal-in:not(.hidden) > * { animation: sheet-up .32s cubic-bezier(.2, .8, .2, 1) backwards; }
+}
+.modal-closing.modal-closing { pointer-events: none; animation: modal-fade-out .28s ease-in forwards; }
+.modal-closing.modal-closing > * { animation: sheet-down .28s cubic-bezier(.4, 0, 1, 1) forwards; }
 @media (prefers-reduced-motion: reduce) {
+    .modal-bg, .modal-bg > *, .modal-in, .modal-in > *, .modal-closing, .modal-closing > *, .animate-bounce-in { animation: none !important; }
     .dlg-ico, .dlg-ico * { animation: none !important; }
     .dlg-ico .d-draw { stroke-dashoffset: 0; }
 }

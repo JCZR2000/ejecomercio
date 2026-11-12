@@ -322,3 +322,41 @@
             });
         }
 
+
+        // ==========================================
+        // Salida de las ventanas en móvil: baja hacia abajo
+        // ==========================================
+        // Las ventanas se ocultan desde muchos sitios con classList.add('hidden'). La ventana real se oculta al
+        // instante (la lógica no cambia); encima se pone una copia de lo que se veía y esa copia baja y se borra.
+        (function () {
+            const isModal = el => el.classList && (el.classList.contains('modal-bg') || el.classList.contains('modal-in'));
+            const animate = () => matchMedia('(max-width: 639px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+            new MutationObserver(records => {
+                if (!animate()) return;
+                records.forEach(r => {
+                    const el = r.target;
+                    if (!isModal(el) || el.classList.contains('modal-closing')) return;
+                    const wasHidden = /(^|\s)hidden(\s|$)/.test(r.oldValue || '');
+                    if (wasHidden || !el.classList.contains('hidden')) return;
+                    // Copia ahora, antes de que el código cambie el contenido (p. ej. el siguiente cuadro de la cola)
+                    const ghost = el.cloneNode(true);
+                    ghost.classList.remove('hidden');
+                    ghost.classList.add('modal-closing');
+                    ghost.setAttribute('aria-hidden', 'true');
+                    ghost.removeAttribute('id');
+                    const src = el.querySelectorAll('*'), dst = ghost.querySelectorAll('*');
+                    dst.forEach((d, i) => {
+                        d.removeAttribute('id'); // sin ids repetidos mientras dura la copia
+                        if ('value' in src[i] && d.tagName !== 'BUTTON') { try { d.value = src[i].value; d.checked = src[i].checked; } catch (e) { /* input de archivo */ } }
+                    });
+                    requestAnimationFrame(() => {
+                        if (!el.classList.contains('hidden')) return; // se volvió a abrir enseguida: sin salida
+                        document.body.appendChild(ghost);
+                        dst.forEach((d, i) => { if (src[i].scrollTop) d.scrollTop = src[i].scrollTop; });
+                        const done = () => ghost.remove();
+                        ghost.addEventListener('animationend', e => { if (e.target === ghost) done(); });
+                        setTimeout(done, 600); // por si no llega animationend
+                    });
+                });
+            }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
+        })();
