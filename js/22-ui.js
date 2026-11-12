@@ -54,19 +54,18 @@
         function clearCart() {
             if (state.cart.length === 0) return; // No hacer nada si ya está vacío
             
-            // Preguntar solo si hay cosas importantes
-            if (!confirm('¿Estás seguro de vaciar todo el carrito?')) return;
+            customConfirm('Vaciar carrito', '¿Estás seguro de vaciar todo el carrito?', 'danger', () => {
+                state.cart = [];
 
-            state.cart = [];
-            
-            // Limpiezas adicionales
-            $('stockHint').textContent = '';
-            $('saleProductSelect').value = '';
-            $('posSearchInput').value = '';
-            
-            renderCart();
-            // Feedback vibración (móvil)
-            if(navigator.vibrate) navigator.vibrate(50);
+                // Limpiezas adicionales
+                $('stockHint').textContent = '';
+                $('saleProductSelect').value = '';
+                $('posSearchInput').value = '';
+
+                renderCart();
+                // Feedback vibración (móvil)
+                if(navigator.vibrate) navigator.vibrate(50);
+            }, 'Sí, vaciar');
         }
 
         // ==========================================
@@ -121,79 +120,126 @@
         });
 
         // ==========================================
-        // SISTEMA DE DIÁLOGOS (Reemplazo de Alert/Confirm)
+        // SISTEMA DE DIÁLOGOS (Reemplazo de Alert/Confirm/Prompt del navegador)
         // ==========================================
-        
-        // 1. Alerta Simple (Éxito o Error)
-        function customAlert(title, msg, type = 'success', callback = null) {
-            const modal = $('dialogModal');
-            const iconBg = $('dialogIconBg');
-            const icon = $('dialogIcon');
-            const btnContainer = $('dialogButtons');
+        const DIALOG_COLORS = { success: 'bg-green-100 text-green-600', error: 'bg-red-100 text-red-600', warning: 'bg-yellow-100 text-yellow-600', info: 'bg-blue-100 text-blue-600', danger: 'bg-red-100 text-red-600' };
+        // Dibujos de 64x64; las animaciones (una sola pasada) están en css/app.css (.dlg-ico).
+        const DIALOG_ICONS = {
+            success: '<circle class="d-draw" pathLength="100" cx="32" cy="32" r="26"/><path class="d-draw d2" pathLength="100" d="M20 33l9 9 16-18"/>',
+            error: '<circle class="d-draw" pathLength="100" cx="32" cy="32" r="26"/><path class="d-draw d2" pathLength="100" d="M23 23l18 18M41 23L23 41"/>',
+            warning: '<g class="d-pop"><path d="M32 8L58 54H6z"/></g><g class="d-blink"><path d="M32 24v15"/><circle class="d-fill" cx="32" cy="46" r="2"/></g>',
+            info: '<circle cx="32" cy="32" r="26"/><path d="M32 30v15"/><circle class="d-fill d-drop" cx="32" cy="21" r="2.5"/>',
+            danger: '<g class="d-lid"><path d="M12 18h40M25 18v-5h14v5"/></g><path d="M17 24l3 31h24l3-31M27 30v18M37 30v18"/>',
+            sale: '<g class="d-hop"><path d="M14 26h36l-3 28H17z"/><path d="M24 26v-5a8 8 0 0116 0v5"/></g><path class="d-spark" d="M8 12l4 4M56 12l-4 4M32 4v5"/>',
+            cloud: '<path d="M17 42a10 10 0 010-20 14 14 0 0128 2 9 9 0 010 18z"/><g class="d-up"><path d="M32 38V25M26 30l6-6 6 6"/></g>',
+            lock: '<path class="d-shackle" d="M22 28v-7a10 10 0 0120 0v7"/><rect x="14" y="28" width="36" height="26" rx="5"/><circle class="d-fill" cx="32" cy="41" r="3"/>',
+            camera: '<rect x="8" y="18" width="48" height="34" rx="6"/><path d="M22 18l3-6h14l3 6"/><circle cx="32" cy="35" r="9"/><path class="d-scan" d="M20 35h24"/>',
+            offline: '<path class="d-wave w3" d="M6 26a36 36 0 0152 0"/><path class="d-wave w2" d="M14 34a25 25 0 0136 0"/><path class="d-wave w1" d="M22 42a14 14 0 0120 0"/><circle class="d-fill" cx="32" cy="51" r="2.5"/>',
+            box: '<path d="M10 28v22l22 9 22-9V28M32 38v21"/><path class="d-flap" d="M10 28l22-12 22 12-22 10z"/>'
+        };
+        const dialogIconSvg = name => '<svg class="dlg-ico' + (name === 'error' ? ' d-shake' : '') + '" viewBox="0 0 64 64" aria-hidden="true">' + (DIALOG_ICONS[name] || DIALOG_ICONS.info) + '</svg>';
 
-            $('dialogTitle').textContent = title;
-            $('dialogMsg').textContent = msg;
+        let dialogCurrent = null, dialogQueue = [], dialogFocusBack = null;
 
-            // Configuración Visual
-            if (type === 'success') {
-                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-green-100";
-                icon.className = "fa-solid fa-check text-3xl text-green-600";
-            } else if (type === 'error') {
-                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-red-100";
-                icon.className = "fa-solid fa-xmark text-3xl text-red-600";
+        function showDialog(d) {
+            dialogCurrent = d;
+            dialogFocusBack = document.activeElement;
+            const btns = $('dialogButtons');
+            $('dialogTitle').textContent = d.title;
+            $('dialogMsg').textContent = d.msg;
+            $('dialogIconBg').className = 'w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm ' + (DIALOG_COLORS[d.type] || DIALOG_COLORS.info);
+            $('dialogIconBg').innerHTML = dialogIconSvg(d.icon || d.type);
+            btns.textContent = '';
+            const mk = (text, cls, fn) => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = cls + ' py-3 rounded-xl font-bold transition text-sm';
+                b.textContent = text;
+                b.onclick = fn;
+                btns.appendChild(b);
+                return b;
+            };
+            let focusBtn;
+            if (d.confirm) {
+                const cancel = mk('Cancelar', 'flex-1 border border-slate-200 text-slate-600 hover:bg-slate-50', () => closeDialog(false));
+                const ok = mk(d.okLabel || 'Confirmar', 'flex-1 text-white shadow-lg ' + (d.type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-800 hover:bg-slate-900'),
+                    () => { if (closeDialog(true) && d.onConfirm) d.onConfirm(); }); // cierra antes de actuar: no se confirma dos veces
+                focusBtn = d.type === 'danger' ? cancel : ok;
+                window.dialogCallback = null;
             } else {
-                iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-blue-100";
-                icon.className = "fa-solid fa-info text-3xl text-blue-600";
+                focusBtn = mk('Entendido', 'w-full bg-slate-800 text-white shadow-lg hover:bg-slate-900', () => closeDialog(true));
+                window.dialogCallback = d.callback; // otros módulos lo leen y lo encadenan (warnStorageFull)
             }
-
-            // Botón Aceptar
-            btnContainer.innerHTML = `
-                <button onclick="closeDialog()" class="w-full py-3 rounded-xl bg-slate-800 text-white font-bold shadow-lg hover:bg-slate-900 transition text-sm">
-                    Entendido
-                </button>
-            `;
-
-            // Guardamos callback para ejecutar al cerrar (si existe)
-            window.dialogCallback = callback;
-            
-            modal.classList.remove('hidden');
+            if (d.extra) $('dialogMsg').appendChild(d.extra);
+            $('dialogModal').classList.remove('hidden');
+            focusBtn.focus();
         }
 
-        // 2. Confirmación (Si / No)
-        function customConfirm(title, msg, type = 'warning', onConfirm) {
-            const modal = $('dialogModal');
-            const iconBg = $('dialogIconBg');
-            const icon = $('dialogIcon');
-            const btnContainer = $('dialogButtons');
+        function queueDialog(d) {
+            d.promise = new Promise(r => { d.resolve = r; });
+            if (!d.confirm) { // un aviso idéntico al abierto o en cola no se repite
+                const same = x => !x.confirm && x.title === d.title && x.msg === d.msg;
+                const dup = (dialogCurrent && same(dialogCurrent)) ? dialogCurrent : dialogQueue.find(same);
+                if (dup) return dup.promise;
+            }
+            if (dialogCurrent) dialogQueue.push(d); else showDialog(d);
+            return d.promise;
+        }
 
-            $('dialogTitle').textContent = title;
-            $('dialogMsg').textContent = msg;
+        // 1. Aviso. Devuelve una promesa que se resuelve al cerrar; el callback también se ejecuta al cerrar.
+        function customAlert(title, msg, type = 'success', callback = null, icon = null) {
+            return queueDialog({ title, msg, type, callback, icon });
+        }
 
-            // Estilo de Advertencia
-            iconBg.className = "w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm bg-yellow-100";
-            icon.className = "fa-solid fa-triangle-exclamation text-3xl text-yellow-600";
+        // 2. Confirmación. Promise<boolean>; onConfirm se ejecuta al confirmar. extra: nodo opcional bajo el mensaje.
+        function customConfirm(title, msg, type = 'warning', onConfirm = null, okLabel = 'Confirmar', icon = null, extra = null) {
+            return queueDialog({ title, msg, type, onConfirm, okLabel, icon, extra, confirm: true });
+        }
 
-            // Botones Cancelar / Confirmar
-            btnContainer.innerHTML = '';
-            
-            const btnCancel = document.createElement('button');
-            btnCancel.className = "flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition text-sm";
-            btnCancel.textContent = "Cancelar";
-            btnCancel.onclick = closeDialog;
-
-            const btnOk = document.createElement('button');
-            btnOk.className = "flex-1 py-3 rounded-xl bg-slate-800 text-white font-bold shadow-lg hover:bg-slate-900 transition text-sm";
-            btnOk.textContent = "Confirmar";
-            btnOk.onclick = () => {
-                closeDialog();
-                if (onConfirm) onConfirm();
-            };
-
-            btnContainer.appendChild(btnCancel);
-            btnContainer.appendChild(btnOk);
-            
+        function closeDialog(result = false) {
+            const d = dialogCurrent;
+            if (!d) return false;
+            dialogCurrent = null;
+            $('dialogModal').classList.add('hidden');
+            const cb = window.dialogCallback;
             window.dialogCallback = null;
-            modal.classList.remove('hidden');
+            const back = dialogFocusBack;
+            dialogFocusBack = null;
+            try { if (back && back.isConnected && back.focus) back.focus(); } catch (e) { /* sin foco que devolver */ }
+            d.resolve(d.confirm ? !!result : undefined);
+            queueMicrotask(() => { if (!dialogCurrent && dialogQueue.length) showDialog(dialogQueue.shift()); });
+            if (cb) cb();
+            return true;
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && dialogCurrent) { e.preventDefault(); e.stopPropagation(); closeDialog(false); }
+        }, true);
+
+        // Autoprueba: ejecutar a mano desde la consola. Con un cuadro ya abierto no es fiable.
+        async function selfTestDialogs() {
+            const order = [], title = () => $('dialogTitle').textContent;
+            const p1 = customAlert('T1', 'm1', 'info', () => order.push(1));
+            const p2 = customAlert('T2', 'm2', 'info', () => order.push(2));
+            customAlert('T1', 'm1', 'info', () => order.push(99));
+            console.assert(dialogQueue.length === 1, 'un aviso repetido no debe encolarse');
+            console.assert(title() === 'T1', 'el primero se muestra primero');
+            closeDialog(true); await p1; await Promise.resolve();
+            console.assert(title() === 'T2', 'el segundo sale al cerrar el primero');
+            closeDialog(true); await p2;
+            console.assert(order.join() === '1,2', 'los dos callback se ejecutan en orden: ' + order);
+            let n = 0, c = customConfirm('C', 'x', 'warning', () => n++);
+            $('dialogButtons').lastChild.click(); $('dialogButtons').lastChild.click();
+            console.assert(await c === true && n === 1, 'confirmar resuelve true y actúa una sola vez');
+            c = customConfirm('C', 'x', 'danger', () => n++);
+            console.assert(document.activeElement === $('dialogButtons').firstChild, 'en danger el foco empieza en Cancelar');
+            $('dialogButtons').firstChild.click();
+            console.assert(await c === false && n === 1, 'cancelar resuelve false sin actuar');
+            c = customConfirm('C', 'x');
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+            console.assert(await c === false, 'Escape resuelve false');
+            console.assert($('dialogModal').classList.contains('hidden'), 'queda cerrado');
+            console.log('selfTestDialogs terminada');
         }
 
         // Aviso de progreso que bloquea la pantalla mientras la nube trabaja. Se puede anidar.
@@ -225,13 +271,6 @@
             while (isUploadingToCloud) await new Promise(r => setTimeout(r, 300));
         }
 
-        function closeDialog() {
-            $('dialogModal').classList.add('hidden');
-            if (window.dialogCallback) {
-                window.dialogCallback();
-                window.dialogCallback = null;
-            }
-        }
 
         // ==========================================
         // 25. REINICIO DE RED (SOLUCIÓN NUCLEAR)
@@ -276,7 +315,7 @@
                 
             }).catch(err => {
                 console.error("Error reiniciando red:", err);
-                alert("Error al reiniciar la red. Por favor recarga la página.");
+                customAlert('Error de red', 'Error al reiniciar la red. Por favor recarga la página.', 'error', null, 'offline');
                 btn.innerHTML = originalIcon;
                 btn.classList.replace('bg-red-600', 'bg-indigo-600');
                 btn.disabled = false;

@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v63.2</title>
+    <title>EjeComercio v65.0</title>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -109,17 +109,15 @@
         </div>
     </div>
 
-    <div id="dialogModal"
+    <div id="dialogModal" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogMsg"
         class="fixed inset-0 z-[450] bg-slate-900/90 backdrop-blur-sm hidden flex items-center justify-center p-4 transition-opacity duration-300">
         <div
             class="bg-white rounded-3xl shadow-2xl w-full max-w-xs overflow-hidden transform transition-all scale-100 animate-bounce-in text-center p-6">
     
-            <div id="dialogIconBg" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                <i id="dialogIcon" class="text-3xl"></i>
-            </div>
+            <div id="dialogIconBg" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm"></div>
     
             <h3 id="dialogTitle" class="text-xl font-black text-slate-800 mb-2"></h3>
-            <p id="dialogMsg" class="text-sm text-gray-500 mb-6 leading-relaxed"></p>
+            <p id="dialogMsg" class="text-sm text-gray-500 mb-6 leading-relaxed whitespace-pre-line break-words select-text"></p>
     
             <div class="flex gap-3" id="dialogButtons">
             </div>
@@ -160,7 +158,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v63.2</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada

@@ -27,6 +27,24 @@
         .anim-back { animation: slideBack .3s ease-out; }
         .anim-pop { animation: pop .35s ease-out; }
         .stagger > * { animation: fadeUp .35s ease-out both; animation-delay: calc(var(--i, 0) * 60ms); }
+        /* Ilustraciones de los estados (una pasada; solo «cargando» se repite mientras se espera) */
+        .ill { width: 96px; height: 96px; fill: none; stroke: currentColor; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; overflow: visible; color: var(--btn); display: inline-block; }
+        .ill .f { fill: currentColor; stroke: none; }
+        .ill .dot { animation: ill-hop 1s ease-in-out infinite; }
+        .ill .d2 { animation-delay: .15s; } .ill .d3 { animation-delay: .3s; }
+        .ill .shut { transform-box: fill-box; transform-origin: 50% 0; animation: ill-shut .8s ease-in .1s both; }
+        .ill .wave { animation: ill-wave .9s ease-in .2s forwards; }
+        .ill .w2 { animation-delay: .45s; } .ill .w1 { animation-delay: .7s; }
+        .ill .flap { animation: ill-flap .7s ease-out .1s both; }
+        .ill .mag { animation: ill-mag 1s ease-in-out .1s 1; }
+        .ill .la { animation: ill-la .7s ease-out .1s both; } .ill .lb { animation: ill-lb .7s ease-out .1s both; }
+        @keyframes ill-hop { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-14px); } }
+        @keyframes ill-shut { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+        @keyframes ill-wave { to { opacity: .25; } }
+        @keyframes ill-flap { from { transform: none; } to { transform: translateY(-5px) rotate(-6deg); } }
+        @keyframes ill-mag { 0%, 100% { transform: none; } 30% { transform: translate(-8px, -6px); } 65% { transform: translate(6px, 4px); } }
+        @keyframes ill-la { from { transform: none; } to { transform: translate(-5px, 5px); } }
+        @keyframes ill-lb { from { transform: none; } to { transform: translate(5px, -5px); } }
         @media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation: none !important; transition: none !important; } }
     </style>
 </head>
@@ -56,7 +74,7 @@
         </section>
 
         <div id="errorBox" class="hidden text-center py-12">
-            <i class="fa-solid fa-link-slash text-4xl text-slate-300"></i>
+            <span id="errIll"></span>
             <p id="errTitle" class="font-bold mt-3">Enlace de pago no válido</p>
             <p id="errText" class="text-xs text-slate-500 mt-1">Pídele a la tienda que te envíe el enlace de nuevo.</p>
             <button id="retryBtn" class="hidden mt-4 bg-slate-800 text-white font-bold text-sm px-5 py-2 rounded-xl">Reintentar</button>
@@ -367,7 +385,15 @@
         };
     }
 
+    // Ilustraciones de 96 px (colores del tema con --btn)
+    const ill = body => '<svg class="ill" viewBox="0 0 96 96" aria-hidden="true">' + body + '</svg>';
+    const ILL = {
+        offline: ill('<path class="wave" d="M10 38a54 54 0 0176 0"/><path class="wave w2" d="M22 52a36 36 0 0152 0"/><path class="wave w1" d="M34 66a18 18 0 0128 0"/><circle class="f" cx="48" cy="78" r="3.5"/>'),
+        link: ill('<path class="la" d="M42 54l-6 6a11 11 0 01-16-16l10-10a11 11 0 0116 0"/><path class="lb" d="M54 42l6-6a11 11 0 0116 16L66 62a11 11 0 01-16 0"/><path d="M48 18v8M36 22l4 6M60 22l-4 6"/>')
+    };
+
     function showError(title, text, retry) {
+        $('errIll').innerHTML = retry ? ILL.offline : ILL.link; // con «Reintentar» es falta de conexión; si no, enlace no válido
         $('errTitle').textContent = title;
         $('errText').textContent = text;
         $('retryBtn').classList.toggle('hidden', !retry);

@@ -56,8 +56,8 @@
             state.fiscalConfig.zip = $('fiscCfgZip').value.trim();
             state.fiscalConfig.ivaIncluded = $('fiscCfgIva').checked;
             
-            if (!state.fiscalConfig.companyName) return alert("La Razón Social es obligatoria."); // VALIDACIÓN
-            if (!state.fiscalConfig.rif) return alert("El RIF es obligatorio.");
+            if (!state.fiscalConfig.companyName) return customAlert('Falta la razón social', 'La Razón Social es obligatoria.', 'error'); // VALIDACIÓN
+            if (!state.fiscalConfig.rif) return customAlert('Falta el RIF', 'El RIF es obligatorio.', 'error');
             
             saveData();
             closeFiscalConfig();
@@ -66,7 +66,7 @@
             if (tempReceiptData && !document.getElementById('fiscalReceiptModal').classList.contains('hidden') === false) {
                 prepareFiscalReceiptModal(tempReceiptData);
             } else {
-                alert("Configuración Fiscal Guardada.");
+                customAlert('Configuración guardada', 'Configuración Fiscal Guardada.', 'success');
             }
         }
 
@@ -526,11 +526,11 @@
             const extras = credit.extraInvoices || [];
             const from = extras.length ? extras[extras.length - 1].cutAt : (credit.invoice.cutAt || credit.date);
             const to = new Date().toISOString();
-            if (!invoiceItems(credit.items, to, from).length) { alert('No hay productos nuevos para facturar.'); return false; }
-            if (!(currentBcvRate() > 0)) { alert('No hay tasa BCV del día para esta factura.'); return false; }
+            if (!invoiceItems(credit.items, to, from).length) { customAlert('Nada que facturar', 'No hay productos nuevos para facturar.', 'info'); return false; }
+            if (!(currentBcvRate() > 0)) { customAlert('Falta la tasa BCV', 'No hay tasa BCV del día para esta factura.', 'error'); return false; }
             let n;
             try { n = await reserveFiscalNumber(); } catch (e) { console.warn('No se pudo reservar el número:', e); n = null; }
-            if (n === null) { alert('Conéctate para emitir esta factura: el número se asigna en línea.'); return false; }
+            if (n === null) { customAlert('Sin conexión', 'Conéctate para emitir esta factura: el número se asigna en línea.', 'error', null, 'offline'); return false; }
             const cfg = state.fiscalConfig;
             const view = buildInvoiceView({ kind: 'credit', items: credit.items, creditDate: credit.date, cutFrom: from, cutTo: to }, {
                 ivaIncluded: cfg.ivaIncluded, bcvRate: currentBcvRate(), note: '',
@@ -554,7 +554,7 @@
         async function emitInvoice(data) {
             if (fiscalSel > 0) return true; // las facturas de «lo agregado» ya salen emitidas
             const rec = (data.isCredit ? state.credits : state.sales).find(x => x.id == data.id);
-            if (!rec) { alert('No se encontró la operación de esta factura.'); return false; }
+            if (!rec) { customAlert('Operación no encontrada', 'No se encontró la operación de esta factura.', 'error'); return false; }
             if (rec.invoice) return true;
             if (!rec.fiscalNum) {
                 rec.numPending = true;
@@ -562,7 +562,7 @@
                 if (!rec.fiscalNum) await assignPendingNumbers(); // había otra asignación en curso
                 if (!rec.fiscalNum) {
                     delete rec.numPending;
-                    alert('No se pudo asignar el número de la factura. Conéctate e inténtalo de nuevo.');
+                    customAlert('Sin número de factura', 'No se pudo asignar el número de la factura. Conéctate e inténtalo de nuevo.', 'error', null, 'offline');
                     return false;
                 }
             }
@@ -704,7 +704,7 @@
                 btn.innerHTML = originalText; btn.disabled = false;
                 return dataUrl;
             } catch (error) {
-                alert('Error generando la imagen.');
+                customAlert('Error en la imagen', 'Error generando la imagen.', 'error');
                 btn.innerHTML = originalText; btn.disabled = false; throw error;
             }
         }
@@ -743,8 +743,10 @@
                     await navigator.share({ files: [file], title: 'Factura', text: `Factura ${num}` });
                 } else {
                     const link = document.createElement('a'); link.download = `factura_para_enviar.png`; link.href = imgData; link.click();
-                    alert('Imagen descargada. Se abrirá WhatsApp para que la adjuntes.');
-                    window.open(`https://wa.me/?text=Factura%20${num}`, '_blank');
+                    // window.open dentro del callback: sale en el clic de «Entendido» y el navegador no lo bloquea
+                    customAlert('Imagen descargada', 'Imagen descargada. Se abrirá WhatsApp para que la adjuntes.', 'success', () => {
+                        window.open(`https://wa.me/?text=Factura%20${num}`, '_blank');
+                    }, 'sale');
                 }
             } catch (e) { console.error(e); } finally { btn.innerHTML = original; }
         }

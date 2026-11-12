@@ -34,3 +34,40 @@
             background-color: #f3f4f6;
             color: #1d4ed8;
         }
+
+/* ===== Iconos animados de los cuadros (customAlert / customConfirm). Una sola pasada. ===== */
+.dlg-ico { width: 40px; height: 40px; fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; overflow: visible; }
+.dlg-ico .d-fill { fill: currentColor; stroke: none; }
+.dlg-ico .d-draw { stroke-dasharray: 100; stroke-dashoffset: 100; animation: dlg-draw .6s ease-out .05s forwards; }
+.dlg-ico .d-draw.d2 { animation-delay: .35s; }
+.dlg-ico.d-shake { animation: dlg-shake .4s ease-in-out .6s 1; }
+.dlg-ico .d-pop { transform-origin: 32px 56px; animation: dlg-pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+.dlg-ico .d-blink { animation: dlg-blink .5s ease-in-out .5s 1; }
+.dlg-ico .d-drop { animation: dlg-drop .6s cubic-bezier(.3,1.5,.5,1) .1s both; }
+.dlg-ico .d-lid { transform-origin: 46px 18px; animation: dlg-lid .7s ease-in-out .1s 1; }
+.dlg-ico .d-hop { animation: dlg-hop .6s ease-out .1s 1; }
+.dlg-ico .d-spark { animation: dlg-spark .7s ease-out .2s both; transform-origin: 32px 20px; }
+.dlg-ico .d-up { animation: dlg-up .7s ease-out .1s both; }
+.dlg-ico .d-shackle { animation: dlg-shackle .6s ease-in .1s both; }
+.dlg-ico .d-scan { animation: dlg-scan .9s ease-in-out .1s 1; }
+.dlg-ico .d-wave { animation: dlg-wave .9s ease-in .2s forwards; }
+.dlg-ico .d-wave.w2 { animation-delay: .45s; }
+.dlg-ico .d-wave.w1 { animation-delay: .7s; }
+.dlg-ico .d-flap { transform-origin: 10px 28px; animation: dlg-flap .7s ease-out .1s both; }
+@keyframes dlg-draw { to { stroke-dashoffset: 0; } }
+@keyframes dlg-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes dlg-pop { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes dlg-blink { 0%,100% { opacity: 1; } 50% { opacity: .15; } }
+@keyframes dlg-drop { from { transform: translateY(-14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes dlg-lid { 0%,100% { transform: rotate(0); } 45% { transform: rotate(-22deg) translateY(-3px); } }
+@keyframes dlg-hop { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-8px); } 70% { transform: translateY(0); } 85% { transform: translateY(-2px); } }
+@keyframes dlg-spark { from { transform: scale(.3); opacity: 0; } 50% { opacity: 1; } to { transform: scale(1); opacity: 1; } }
+@keyframes dlg-up { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes dlg-shackle { from { transform: translateY(-9px); } to { transform: translateY(0); } }
+@keyframes dlg-scan { 0% { transform: translateY(-8px); } 50% { transform: translateY(8px); } 100% { transform: translateY(0); } }
+@keyframes dlg-wave { to { opacity: .25; } }
+@keyframes dlg-flap { from { transform: rotate(0) scaleY(1); } to { transform: rotate(-14deg) translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) {
+    .dlg-ico, .dlg-ico * { animation: none !important; }
+    .dlg-ico .d-draw { stroke-dashoffset: 0; }
+}

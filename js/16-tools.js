@@ -169,7 +169,7 @@
                 $('prodPrice').scrollIntoView({ behavior: 'smooth', block: 'center' });
                 $('prodPrice').focus();
             } else {
-                alert("Calcula un precio válido primero.");
+                customAlert('Falta el precio', 'Calcula un precio válido primero.', 'error');
             }
         }
 

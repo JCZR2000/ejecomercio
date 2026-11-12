@@ -126,7 +126,7 @@
                     $('scannerModal').classList.add('hidden');
                     
                     // Mostramos el error después de cerrar
-                    alert("No se pudo acceder a la cámara. Verifica los permisos.");
+                    customAlert('Sin acceso a la cámara', 'No se pudo acceder a la cámara. Verifica los permisos.', 'error', null, 'camera');
                 });
             }, 300); // Retraso de 300ms necesario para renderizar el modal y la visualización del videofeed.
         }
@@ -207,14 +207,15 @@
                     btn.innerHTML = `<i class="fa-solid fa-check text-green-500"></i> ${escapeHtml(p.name)} Agregado`;
                     setTimeout(() => btn.innerHTML = original, 2000);
                 } else {
-                    if(confirm(`El código ${decodedText} no está registrado. ¿Ir a Gestión para crearlo?`)) {
+                    // stopScanner() ya detuvo la cámara arriba: mientras el cuadro está abierto no llegan más lecturas
+                    customConfirm('Código no registrado', `El código ${decodedText} no está registrado. ¿Ir a Gestión para crearlo?`, 'info', () => {
                         // Cambiamos al tab de gestión y preparamos el formulario
                         $('prodBarcode').value = decodedText;
                         $('searchInput').value = decodedText; // También lo ponemos en búsqueda
                         renderAll();
                         $('prodName').focus();
                         window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
+                    }, 'Ir a Gestión', 'camera');
                 }
             }
         }
@@ -284,17 +285,17 @@
                     }
                     
                     // Feedback de éxito
-                    alert(`¡Producto encontrado en base de datos de ${sourceName}! 🌍`);
+                    customAlert('Producto encontrado', `¡Producto encontrado en base de datos de ${sourceName}!`, 'success', null, 'box');
                 } else {
                     // Feedback de fallo
-                    if(confirm('El producto no aparece en las bases de datos públicas (Comida, Belleza, Mascotas o Productos).\n\n¿Deseas buscarlo en Google?')) {
-                        window.open(`https://www.google.com/search?q=${barcode}`, '_blank');
-                    }
+                    customConfirm('Producto no encontrado', 'El producto no aparece en las bases de datos públicas (Comida, Belleza, Mascotas o Productos).\n\n¿Deseas buscarlo en Google?', 'info', () => {
+                        window.open(`https://www.google.com/search?q=${barcode}`, '_blank'); // dentro del clic de confirmar: el navegador no lo bloquea
+                    }, 'Buscar en Google');
                 }
 
             } catch (e) {
                 console.error("Error general API:", e);
-                alert("Error de conexión al buscar el producto.");
+                customAlert('Sin conexión', 'Error de conexión al buscar el producto.', 'error', null, 'offline');
             } finally {
                 // 5. Restaurar UI
                 if(btn) {

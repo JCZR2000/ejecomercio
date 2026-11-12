@@ -65,8 +65,8 @@
             const amount = roundMoney(parseFloat(inputUSD.value));
             const [v] = validateCreditPayments([{ id, amount }]);
             if (v.error === 'Fiado no encontrado') return;
-            if (v.error.startsWith('Excede')) return alert('El monto excede la deuda');
-            if (v.error) return alert(v.error);
+            if (v.error.startsWith('Excede')) return customAlert('Monto excedido', 'El monto excede la deuda.', 'error', null, 'sale');
+            if (v.error) return customAlert('Abono no válido', v.error, 'error', null, 'sale');
 
             const c = state.credits.find(x => x.id == id);
             const finish = () => {
@@ -104,7 +104,7 @@
 
         function startPayCredits(id) {
             const entries = collectCreditPayments();
-            if (entries.length === 0) return alert('Monto inválido');
+            if (entries.length === 0) return customAlert('Monto inválido', 'Escribe un monto mayor que cero.', 'error', null, 'sale');
             if (entries.length === 1) return payCredit(entries[0].id);
             openMultiPayModal(entries);
         }
@@ -163,9 +163,9 @@
             saveData();
             assignPendingNumbers();
             renderAll();
-            setTimeout(() => alert(`${rows.length} abonos registrados por ${formatMoney(roundMoney(total))}.` +
+            setTimeout(() => customAlert('Abonos registrados', `${rows.length} abonos registrados por ${formatMoney(roundMoney(total))}.` +
                 (settledNames.length ? ` Saldados: ${settledNames.join(', ')}` : '') +
-                (toBalance > 0 ? ` A saldo a favor: ${formatMoney(roundMoney(toBalance))}.` : '')), 100);
+                (toBalance > 0 ? ` A saldo a favor: ${formatMoney(roundMoney(toBalance))}.` : ''), 'success', null, 'sale'), 100);
         }
 
         function selfTestCreditPayments() {

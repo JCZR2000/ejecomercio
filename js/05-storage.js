@@ -169,7 +169,7 @@
             } catch (err) {
                 console.error("Error crítico:", err);
                 updateCloudStatus('OFFLINE');
-                alert("⚠️ Error al subir datos. Revisa tu conexión.");
+                customAlert('Error al subir', 'Error al subir datos. Revisa tu conexión.', 'error', null, 'cloud');
             } finally {
                 isUploadingToCloud = false;
             }
@@ -181,28 +181,22 @@
         function askBigLoss(loss) {
             const base = getCloudBaseCounts() || {}, now = cloudCounts(state);
             const msg = loss.map(t => `${LOSS_LABELS[t]}: ${base[t] || 0} → ${now[t] || 0}`).join('\n') + '\n\n¿Subir este cambio? Se guardará una copia de la nube antes. Si cancelas, se descartan los cambios de este dispositivo.';
-            let answered = false;
             customConfirm('Se van a borrar datos de la nube', msg, 'warning', async () => {
-                answered = true;
                 busyStart('Subiendo a la nube...');
                 try {
                     if (await ensureCloudBackup('Antes de una pérdida grande de datos')) { saveData({ skipLossCheck: true }); await waitForUpload(); }
                 } finally { busyEnd(); }
-            });
-            $('dialogMsg').style.whiteSpace = 'pre-line';
-            // closeDialog llama a este aviso antes que a "Confirmar": se espera un instante para saber cuál botón fue
-            window.dialogCallback = () => setTimeout(async () => {
-                $('dialogMsg').style.whiteSpace = '';
-                if (answered) return;
+            }, 'Subir', 'cloud').then(async ok => {
+                if (ok) return;
                 try {
                     const full = await readCloudFull({ photos: true });
                     if (full) { setCloudManifest(full.manifest); finishLoadingData(full.data, full.snap); }
                     else safeSetItem('inv_cloud_dirty', '');
                 } catch (e) {
                     console.error('No se pudo recargar la nube:', e);
-                    customAlert('Sin conexión', 'No se pudo recargar la nube. Los cambios de este dispositivo siguen sin subir.', 'error');
+                    customAlert('Sin conexión', 'No se pudo recargar la nube. Los cambios de este dispositivo siguen sin subir.', 'error', null, 'offline');
                 }
-            }, 0);
+            });
         }
 
         // Devuelve true, false (el freno de tamaño impidió subir) o 'CONFLICT' (la nube cambió; no se escribió el documento principal).

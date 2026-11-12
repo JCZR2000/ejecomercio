@@ -239,11 +239,9 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             const last = at ? 'Última publicación: ' + new Date(at).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Aún no se ha publicado.';
             const msg = [text, last, catalogError].filter(Boolean).join('\n');
             if (getCatalogQueue() && !isPublishingCatalog) {
-                customConfirm('Vitrina en línea', msg + '\n\n¿Publicar ahora?', 'warning', () => runCatalogQueue(true));
-                $('dialogMsg').style.whiteSpace = 'pre-line';
+                customConfirm('Vitrina en línea', msg + '\n\n¿Publicar ahora?', 'warning', () => runCatalogQueue(true), 'Publicar', 'cloud');
             } else {
-                customAlert('Vitrina en línea', msg, catalogError ? 'error' : 'success');
-                $('dialogMsg').style.whiteSpace = 'pre-line';
+                customAlert('Vitrina en línea', msg, catalogError ? 'error' : 'success', null, 'cloud');
             }
         }
 
@@ -462,8 +460,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
 
         function copyCatalogLink(kind) {
             const url = catalogPublicUrl(kind);
-            if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => customAlert('Enlace copiado', url, 'success'), () => prompt('Copia el enlace:', url));
-            else prompt('Copia el enlace:', url);
+            if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => customAlert('Enlace copiado', url, 'success'), () => customAlert('Copia el enlace', url, 'info'));
+            else customAlert('Copia el enlace', url, 'info');
         }
 
         function shareCatalogLink() {

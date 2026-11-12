@@ -339,7 +339,7 @@
 
             localStorage.setItem('inv_payment_methods', JSON.stringify(state.paymentMethods));
             saveData();
-            alert('Datos de pago guardados y sincronizados.');
+            customAlert('Datos de pago guardados', 'Datos de pago guardados y sincronizados.', 'success', null, 'cloud');
             ['formTransfer', 'formMobile', 'formBinance', 'formCustom'].forEach(f => $(f).classList.add('hidden'));
             renderShareMethodCards();
             if (isShareMethodConfigured(method)) { $('chkM_' + method).checked = true; onShareMethodToggle(); }
@@ -538,7 +538,7 @@
         // --- MODO SIMPLE: Agrega un solo item genérico ---
         function addSimpleDebt() {
             const amount = parseFloat($('migSimpleAmount').value);
-            if (!amount || amount <= 0) return alert('Ingresa un monto válido');
+            if (!amount || amount <= 0) return customAlert('Monto inválido', 'Ingresa un monto válido.', 'error', null, 'sale');
 
             state.cart.push({
                 id: 'stub_simple_' + Date.now(),
@@ -659,7 +659,7 @@
         }
 
         function addAdvancedDebt() {
-            if (tempMigCart.length === 0) return alert('Lista vacía');
+            if (tempMigCart.length === 0) return customAlert('Lista vacía', 'Agrega al menos un producto a la lista.', 'error', null, 'box');
             state.cart.push(...tempMigCart);
             renderCart();
             closeMigrationModal();
@@ -775,7 +775,7 @@
                         // Usamos setTimeout(50ms) para dar tiempo al navegador de eliminar el modal visualmente
                         // antes de congelar la pantalla con la alerta del sistema.
                         setTimeout(() => {
-                            alert("Cliente eliminado correctamente.");
+                            customAlert('Cliente eliminado', 'Cliente eliminado correctamente.', 'success');
                         }, 50);
                     }
                 } else {
@@ -827,7 +827,7 @@
         function openEditCreditModal(id) {
             const c = state.credits.find(x => x.id == id);
             if (!c) return;
-            if (c.paidDate) return alert('El fiado ya está saldado');
+            if (c.paidDate) return customAlert('Fiado saldado', 'El fiado ya está saldado.', 'info', null, 'sale');
             editCreditId = id;
             $('authModal').classList.add('hidden');
             renderEditCreditModal();
@@ -862,28 +862,28 @@
             if (!c) return;
             const qty = parseInt($(`editQty_${itemIdx}`).value, 10);
             const plan = planCreditItemRemoval(c, itemIdx, qty);
-            if (plan.error) return alert(plan.error);
+            if (plan.error) return customAlert('No se puede quitar', plan.error, 'error', null, 'box');
 
             const item = c.items[itemIdx];
             const prod = item.isStub ? null : state.products.find(p => p.id == plan.productId);
             const stockMsg = item.isStub ? 'Es deuda anterior: no se devuelven existencias.'
                 : prod ? `Vuelven ${plan.returnQty} al inventario.`
                 : 'El producto ya no está en el inventario: no se devuelven existencias.';
-            if (!confirm(`¿Quitar ${qty}x ${item.name} del fiado de ${c.customer}? ${stockMsg} Nueva deuda: ${formatMoney(roundMoney(plan.totalDebt - c.paid))}`)) return;
-
-            c.items = plan.items;
-            c.totalDebt = plan.totalDebt;
-            if (prod) prod.qty = (Number(prod.qty) || 0) + plan.returnQty;
-            if (plan.settled) {
-                c.paidDate = new Date().toISOString();
-                setTimeout(autoPruneCredits, 500);
-            }
-            saveData();
-            renderAll();
-            if (plan.settled) {
-                closeEditCreditModal();
-                setTimeout(() => alert('¡Deuda saldada!'), 100);
-            } else renderEditCreditModal();
+            customConfirm('Quitar producto', `¿Quitar ${qty}x ${item.name} del fiado de ${c.customer}? ${stockMsg} Nueva deuda: ${formatMoney(roundMoney(plan.totalDebt - c.paid))}`, 'warning', () => {
+                c.items = plan.items;
+                c.totalDebt = plan.totalDebt;
+                if (prod) prod.qty = (Number(prod.qty) || 0) + plan.returnQty;
+                if (plan.settled) {
+                    c.paidDate = new Date().toISOString();
+                    setTimeout(autoPruneCredits, 500);
+                }
+                saveData();
+                renderAll();
+                if (plan.settled) {
+                    closeEditCreditModal();
+                    setTimeout(() => customAlert('¡Deuda saldada!', 'La deuda quedó saldada.', 'success', null, 'sale'), 100);
+                } else renderEditCreditModal();
+            }, 'Sí, quitar', 'box');
         }
 
         function selfTestCreditEdit() {

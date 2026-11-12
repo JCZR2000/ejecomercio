@@ -65,7 +65,7 @@
 
         function setPin() {
             const pin = $('newPinInput').value.trim();
-            if (pin.length < 4) return alert('Min 4 caracteres');
+            if (pin.length < 4) return customAlert('Contraseña corta', 'Mínimo 4 caracteres.', 'error', null, 'lock');
             applyPin(pin);
             // Configuración por defecto al crear PIN
             state.security.lockAdd = false;
@@ -75,7 +75,7 @@
             $('newPinInput').value = '';
             saveData();
             updateSecurityUI();
-            alert('Contraseña establecida');
+            customAlert('Contraseña establecida', 'La seguridad quedó activada.', 'success', null, 'lock');
         }
 
         function checkAuth(actionType, callback) {
@@ -102,9 +102,10 @@
                 if (pendingAction) pendingAction();
                 pendingAction = null;
             } else {
-                alert('Incorrecto');
-                $('authPinInput').value = '';
-                $('authPinInput').focus();
+                customAlert('Incorrecto', 'La contraseña no es correcta.', 'error', () => {
+                    $('authPinInput').value = '';
+                    $('authPinInput').focus();
+                }, 'lock');
             }
         }
 
@@ -115,22 +116,23 @@
 
         function changePin() {
             checkAuth('admin', () => {
-                const newPin = prompt('Nueva contraseña:');
-                if (newPin && newPin.length >= 4) {
+                askForMasterKey('Nueva contraseña', 'Escribe la nueva contraseña (mínimo 4 caracteres).', true, newPin => {
+                    if (newPin.length < 4) return customAlert('Contraseña corta', 'Mínimo 4 caracteres.', 'error', null, 'lock');
+                    closeSecurityModal();
                     applyPin(newPin);
                     saveData();
-                    alert('Actualizada');
-                }
+                    customAlert('Contraseña actualizada', 'La contraseña nueva ya está activa.', 'success', null, 'lock');
+                });
             });
         }
 
         function removePin() {
             checkAuth('admin', () => {
-                if (confirm('¿Eliminar seguridad?')) {
+                customConfirm('Eliminar seguridad', '¿Eliminar seguridad?', 'danger', () => {
                     state.security = { pinHash: null, pinSalt: null, lockAdd: false, lockEdit: false, lockCreditAdd: false, lockCreditPay: false };
                     saveData();
                     updateSecurityUI();
-                }
+                }, 'Sí, eliminar', 'lock');
             });
         }
 
@@ -141,7 +143,7 @@
                 state.security.lockCreditAdd = $('chkLockCreditAdd').checked;
                 state.security.lockCreditPay = $('chkLockCreditPay').checked;
                 saveData();
-                alert('Guardado');
+                customAlert('Guardado', 'Preferencias de seguridad guardadas.', 'success', null, 'lock');
             });
         }
 

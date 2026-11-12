@@ -123,7 +123,7 @@
         function applySurcharge() {
             const id = $('surchargeTargetId').value;
             const val = parseFloat($('surchargeInput').value);
-            if (!val || val <= 0) return alert('Monto inválido');
+            if (!val || val <= 0) return customAlert('Monto inválido', 'Escribe un monto mayor que cero.', 'error');
             const idx = state.credits.findIndex(c => c.id == id);
             if (idx === -1) return;
 
@@ -143,7 +143,7 @@
             saveData();
             closeSurchargeModal();
             renderAll();
-            alert('Recargo aplicado.');
+            customAlert('Recargo aplicado', 'El recargo se agregó a la deuda.', 'success', null, 'sale');
         }
 
         function removeSurcharge() {
@@ -154,17 +154,17 @@
             const currentSurcharge = state.credits[idx].surcharge || 0;
 
             if (currentSurcharge <= 0) {
-                return alert('Este cliente no tiene recargos activos.');
+                return customAlert('Sin recargos', 'Este cliente no tiene recargos activos.', 'info');
             }
 
-            if (confirm('¿Estás seguro de PERDONAR la deuda de recargo? Esto restará el monto del recargo a la deuda total.')) {
+            customConfirm('Perdonar recargo', '¿Estás seguro de PERDONAR la deuda de recargo? Esto restará el monto del recargo a la deuda total.', 'warning', () => {
                 state.credits[idx].totalDebt -= currentSurcharge;
                 if (state.credits[idx].totalDebt < state.credits[idx].paid) state.credits[idx].totalDebt = state.credits[idx].paid;
                 state.credits[idx].surcharge = 0;
                 saveData();
                 renderAll();
                 closeSurchargeModal();
-                alert('Recargo eliminado. Deuda ajustada.');
-            }
+                customAlert('Recargo eliminado', 'Deuda ajustada.', 'success', null, 'sale');
+            }, 'Sí, perdonar');
         }
 
