@@ -443,7 +443,35 @@
         renderPage();
     }
 
+    // Copia de js/15-credits.js
+    const SHORT_CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
+
+    // Fase 31a: cobro/{CÓDIGO}.json = { v: 1, q } con el mismo texto del enlace #u=
+    async function initCode(code) {
+        $('errorBox').classList.add('hidden');
+        $('steps').classList.remove('hidden');
+        $('totalCard').classList.remove('hidden');
+        $('totalBs').textContent = '…';
+        let data;
+        try {
+            const res = await fetch(`https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o/cobro%2F${code}.json?alt=media`);
+            if (res.status === 404 || res.status === 403) return showError('Enlace de pago vencido', 'Este enlace ya no está disponible. Pídele a la tienda uno nuevo.');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            data = await res.json();
+        } catch (e) {
+            return showError('Sin conexión', 'No se pudieron cargar los datos del cobro.', true);
+        }
+        const s = data && data.v === 1 && typeof data.q === 'string' && data.q.length < 400 ? parseShortPaymentLink('#' + data.q) : null;
+        if (!s) return showError('Enlace de pago no válido', 'Pídele a la tienda que te envíe el enlace de nuevo.');
+        return initShort(s);
+    }
+
     function init() {
+        const code = location.hash.slice(1);
+        if (SHORT_CODE_RE.test(code)) {
+            $('retryBtn').onclick = () => initCode(code);
+            return initCode(code);
+        }
         if (/(?:^|[#&])u=/.test(location.hash)) {
             const s = parseShortPaymentLink(location.hash);
             if (!s) return showError('Enlace de pago no válido', 'Pídele a la tienda que te envíe el enlace de nuevo.');

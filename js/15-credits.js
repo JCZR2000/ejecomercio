@@ -154,11 +154,45 @@
             payProfileTimer = setTimeout(() => publishPayProfile().catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e)), 3000);
         }
 
-        function buildShortPaymentLink({ uid, usd, rate, rateName, date, keys, wa }) {
+        function buildShortPaymentQuery({ uid, usd, rate, rateName, date, keys, wa }) {
             const q = new URLSearchParams({ u: uid, a: String(usd), r: String(rate), n: SHORT_RATE_LETTER[rateName] || 'b',
                 f: formatShareDate(date).replace(/\//g, ''), m: keys.map(k => SHORT_METHOD_LETTER[k]).join('') });
             if (wa) q.set('w', wa);
-            return publicPageUrl('pagar') + '#' + q.toString();
+            return q.toString();
+        }
+
+        function buildShortPaymentLink(o) {
+            return publicPageUrl('pagar') + '#' + buildShortPaymentQuery(o);
+        }
+
+        // Fase 31a: código de 6 letras → cobro/{CÓDIGO}.json = { v: 1, q } (q es el mismo texto del enlace #u=). pagar.html tiene una copia de SHORT_CODE_RE
+        const SHORT_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+        const SHORT_CODE_RE = /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}$/;
+        const shortCodeCache = new Map(); // q → código ya publicado
+        const shortCodeTried = new Set(); // q con subida ya lanzada: una sola por cobro
+
+        function randomShortCode() {
+            return [...crypto.getRandomValues(new Uint8Array(6))].map(b => SHORT_CODE_ALPHABET[b % SHORT_CODE_ALPHABET.length]).join('');
+        }
+
+        async function publishShortCode(q) {
+            const user = auth.currentUser;
+            if (!user || !navigator.onLine) return null;
+            for (let i = 0; i < 3; i++) {
+                const code = randomShortCode();
+                const ref = storage.ref(`cobro/${code}.json`);
+                // No depende de las reglas: si el código ya existe (get es público) se prueba con otro
+                try { await ref.getMetadata(); continue; } catch (e) { if (!e || e.code !== 'storage/object-not-found') throw e; }
+                try {
+                    await ref.putString(JSON.stringify({ v: 1, q }), 'raw',
+                        { contentType: 'application/json', cacheControl: 'public, max-age=86400', customMetadata: { owner: user.uid } });
+                    shortCodeCache.set(q, code);
+                    return code;
+                } catch (e) {
+                    if (!e || e.code !== 'storage/unauthorized') throw e; // unauthorized = el código ya existe: otro código
+                }
+            }
+            return null;
         }
 
         function parseShortPaymentLink(hash) {
@@ -397,8 +431,22 @@
                 const canCloud = !!user && navigator.onLine;
                 const profile = canCloud ? buildPayProfile() : null;
                 if (canCloud && localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, profile)) {
-                    opts.link = buildShortPaymentLink({ uid: user.uid, usd: amount, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now,
+                    const q = buildShortPaymentQuery({ uid: user.uid, usd: amount, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now,
                         keys: getSelectedShareMethods(), wa: getShareWhatsapp() ? '' : normalizeCatalogWhatsapp($('shareWhatsapp').value) });
+                    const base = publicPageUrl('pagar') + '#';
+                    if (shortCodeCache.has(q)) opts.link = base + shortCodeCache.get(q);
+                    else {
+                        opts.link = base + q;
+                        // Sale el enlace #u=; al terminar la subida solo se cambia el enlace dentro del texto actual (lo escrito a mano se conserva)
+                        if (!shortCodeTried.has(q)) {
+                            shortCodeTried.add(q);
+                            const oldLink = opts.link;
+                            publishShortCode(q).then(code => {
+                                const input = $('shareMessageInput');
+                                if (code && shareDraft.step === 3 && !$('shareModal').classList.contains('hidden') && input.value.includes(oldLink)) input.value = input.value.replace(oldLink, base + code);
+                            }).catch(e => console.warn('Código de cobro no publicado:', e.code || e.message || e));
+                        }
+                    }
                 } else {
                     opts.link = buildPaymentLink({
                         v: 1,
@@ -493,6 +541,16 @@
                 && back.keys.join() === sl.keys.join() && back.wa === sl.wa, 'enlace corto de ida y vuelta');
             t(parseShortPaymentLink(new URL(buildShortPaymentLink({ ...sl, wa: '', keys: ['BINANCE'], rateName: 'BCV' })).hash).wa === '', 'enlace corto sin w');
             t(buildShortPaymentLink(sl).length < 140, 'el enlace corto es corto');
+            // Código corto (Fase 31a)
+            for (let i = 0; i < 200; i++) { const c = randomShortCode(); if (!SHORT_CODE_RE.test(c)) { t(false, 'código inválido: ' + c); break; } }
+            const sq = buildShortPaymentQuery(sl);
+            const fileJson = JSON.stringify({ v: 1, q: sq });
+            const viaFile = parseShortPaymentLink('#' + JSON.parse(fileJson).q);
+            t(JSON.stringify(viaFile) === JSON.stringify(back), 'el cobro guardado da lo mismo que el enlace #u=');
+            t(calcBsFromLink(viaFile.usd, viaFile.rate) === calcBs(sl.usd, sl.rate), 'monto en Bs del cobro guardado');
+            t(Object.keys(JSON.parse(fileJson)).sort().join() === 'q,v' && !/customer|Cliente Ficticio/.test(fileJson), 'el cobro guardado no lleva datos del cliente');
+            const codeLink = publicPageUrl('pagar') + '#K7P2QX';
+            t(codeLink.indexOf('#K7P2QX') > 0 && (!location.hostname.endsWith('github.io') || codeLink.length < 70), 'el enlace con código es corto');
             ['', '#', '#u=abc&a=1&r=1&n=b&f=30102026&m=P', '#u=AbC123xyz789&a=0&r=1&n=b&f=30102026&m=P', '#u=AbC123xyz789&a=1&r=1&n=x&f=30102026&m=P',
              '#u=AbC123xyz789&a=1&r=1&n=b&f=3010&m=P', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=PP', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=Z',
              '#u=AbC123xyz789&a=1e3&r=1&n=b&f=30102026&m=P'].forEach(h => t(parseShortPaymentLink(h) === null, 'enlace corto dañado da null: ' + h));
