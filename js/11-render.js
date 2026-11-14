@@ -33,13 +33,13 @@
 
             // 5. Lógica de Ordenamiento (CANT, PRECIO, NOMBRE)
             displayProds.sort((a, b) => {
-                let valA = a[state.sortCol];
-                let valB = b[state.sortCol];
+                let valA = state.sortCol === 'qty' ? availableQty(a) : a[state.sortCol];
+                let valB = state.sortCol === 'qty' ? availableQty(b) : b[state.sortCol];
 
                 // Corrección para columnas numéricas (Stock y Precio)
                 if (state.sortCol === 'qty' || state.sortCol === 'price') {
-                    valA = parseFloat(valA) || 0;
-                    valB = parseFloat(valB) || 0;
+                    valA = state.sortCol === 'qty' ? valA : (parseFloat(valA) || 0);
+                    valB = state.sortCol === 'qty' ? valB : (parseFloat(valB) || 0);
                 } 
                 // Corrección para texto (Nombre)
                 else if (typeof valA === 'string' && typeof valB === 'string') {
@@ -71,7 +71,7 @@
                 invBody.innerHTML += `<tr class="border-b hover:bg-gray-50">
                     <td class="p-2">${img}</td>
                     <td class="p-2 font-medium">${escapeHtml(p.name)}</td>
-                    <td class="p-2 text-center ${p.qty < 5 ? 'text-red-500 font-bold':''}">${p.qty}</td>
+                    <td class="p-2 text-center ${!isUnlimited(p) && p.qty < 5 ? 'text-red-500 font-bold':''}">${isUnlimited(p) ? '∞' : p.qty}</td>
                     <td class="p-2 text-right font-bold text-gray-600">${formatMoney(p.price)}</td>
                     <td class="p-2 text-right text-blue-700 text-xs">Bs ${(p.price * activeRate).toFixed(2)}</td>
                     <td class="p-2 text-center whitespace-nowrap">

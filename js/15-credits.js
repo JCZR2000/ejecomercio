@@ -806,7 +806,7 @@
                                         // PROTECCIÓN MATEMÁTICA: 
                                         // Usamos parseInt para asegurar que sumamos números y no texto.
                                         // Evita errores como: "10" (stock) + "2" (devuelto) = "102".
-                                        if (prod) prod.qty = (parseInt(prod.qty) || 0) + (parseInt(item.qty) || 0);
+                                        if (prod && !isUnlimited(prod)) prod.qty = (parseInt(prod.qty) || 0) + (parseInt(item.qty) || 0);
                                     }
                                 });
                             }
@@ -924,13 +924,15 @@
 
             const item = c.items[itemIdx];
             const prod = item.isStub ? null : state.products.find(p => p.id == plan.productId);
+            const back = prod && !isUnlimited(prod);
             const stockMsg = item.isStub ? 'Es deuda anterior: no se devuelven existencias.'
+                : prod && !back ? 'Siempre disponible: no se tocan existencias.'
                 : prod ? `Vuelven ${plan.returnQty} al inventario.`
                 : 'El producto ya no está en el inventario: no se devuelven existencias.';
             customConfirm('Quitar producto', `¿Quitar ${qty}x ${item.name} del fiado de ${c.customer}? ${stockMsg} Nueva deuda: ${formatMoney(roundMoney(plan.totalDebt - c.paid))}`, 'warning', () => {
                 c.items = plan.items;
                 c.totalDebt = plan.totalDebt;
-                if (prod) prod.qty = (Number(prod.qty) || 0) + plan.returnQty;
+                if (back) prod.qty = (Number(prod.qty) || 0) + plan.returnQty;
                 if (plan.settled) {
                     c.paidDate = new Date().toISOString();
                     setTimeout(autoPruneCredits, 500);

@@ -111,10 +111,10 @@
             if (r.noCost > 0) h += `<p class="text-[11px] text-orange-600 font-bold">${money(r.noCost)} vendido sin costo. <button onclick="openCosts()" class="underline">Completa los costos</button></p>`;
 
             // Dinero en mercancía (no depende del periodo)
-            const withCost = state.products.filter(p => p.cost > 0 && p.qty > 0);
+            const withCost = state.products.filter(p => !isUnlimited(p) && p.cost > 0 && p.qty > 0);
             const atCost = roundMoney(withCost.reduce((a, p) => a + p.qty * p.cost, 0));
             const atPrice = roundMoney(withCost.reduce((a, p) => a + p.qty * p.price, 0));
-            const noCostN = state.products.filter(p => !(p.cost > 0) && p.qty > 0).length;
+            const noCostN = state.products.filter(p => !isUnlimited(p) && !(p.cost > 0) && p.qty > 0).length;
             h += `<div class="border rounded-lg p-3 bg-indigo-50"><p class="text-[10px] text-indigo-700 font-bold uppercase">Dinero en mercancía</p>
                 <p class="text-sm text-gray-800">A costo: <b>${money(atCost)}</b> · A precio de venta: <b>${money(atPrice)}</b></p>
                 <p class="text-xs text-gray-600">Ganancia posible: <b>${money(roundMoney(atPrice - atCost))}</b>${noCostN ? ` · ${noCostN} producto(s) sin costo` : ''}</p></div>`;
@@ -127,7 +127,7 @@
             h += list('Vendidos por debajo del costo', prods.filter(b => b.profit < 0).sort((a, b) => a.profit - b.profit).slice(0, 5).map(b => row(b.name, money(b.profit), 'text-red-600')), 'Ninguno.');
             const since = new Date(Date.now() - 30 * 86400000), sold30 = new Set();
             profitLines(state.sales, state.credits).forEach(({ item, date }) => { if (date >= since) sold30.add(String(item.id)); });
-            const idle = state.products.filter(p => p.qty > 0 && !sold30.has(String(p.id)))
+            const idle = state.products.filter(p => !isUnlimited(p) && p.qty > 0 && !sold30.has(String(p.id)))
                 .sort((a, b) => (b.qty * (b.cost || 0)) - (a.qty * (a.cost || 0))).slice(0, 5);
             h += list('Sin ventas en 30 días', idle.map(p => row(p.name, p.cost > 0 ? money(roundMoney(p.qty * p.cost)) : `${p.qty} u.`)), 'Todo se movió.');
             $('profitBody').innerHTML = h;

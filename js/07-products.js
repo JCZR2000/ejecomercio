@@ -7,6 +7,26 @@
         // Reemplaza a: attemptSubmit, editProduct, clearForm
         // ==========================================
 
+        // Unidades que se pueden vender: sin límite si el producto es «Siempre disponible».
+        // Infinity solo se usa para comparar; nunca se guarda en state (JSON lo vuelve null).
+        const isUnlimited = p => !!p && p.unlimited === true;
+        const availableQty = p => isUnlimited(p) ? Infinity : (Number(p && p.qty) || 0);
+
+        function toggleUnlimitedField() {
+            $('prodQtyBox').classList.toggle('hidden', $('prodUnlimited').checked);
+        }
+
+        function selfTestUnlimited() {
+            console.assert(availableQty({ qty: 3 }) === 3, 'selfTestUnlimited: qty 3');
+            console.assert(availableQty({ qty: '2' }) === 2, 'selfTestUnlimited: qty texto');
+            console.assert(availableQty({}) === 0, 'selfTestUnlimited: sin qty');
+            console.assert(availableQty({ qty: 0, unlimited: true }) === Infinity, 'selfTestUnlimited: ilimitado');
+            console.assert(availableQty(null) === 0, 'selfTestUnlimited: null');
+            console.assert(isUnlimited({ unlimited: 'true' }) === false, 'selfTestUnlimited: solo booleano');
+            console.assert(!JSON.stringify({ qty: 0, unlimited: true }).includes('null'), 'selfTestUnlimited: sin Infinity guardado');
+            console.log('selfTestUnlimited listo');
+        }
+
         function attemptSubmit() {
             const isEdit = state.editingId !== null;
             
@@ -15,15 +35,18 @@
                 const name = $('prodName').value.trim();
                 const barcode = $('prodBarcode').value.trim();
                 const category = $('prodCategory').value.trim();
+                const unlimited = $('prodUnlimited').checked;
                 const qtyVal = $('prodQty').value;
                 const priceVal = $('prodPrice').value;
                 
                 // 2. Validación
                 if (!name) return customAlert('Falta el nombre', 'El nombre es obligatorio.', 'error', null, 'box');
-                if (qtyVal === '' || isNaN(qtyVal)) return customAlert('Stock inválido', 'Escribe una cantidad válida.', 'error', null, 'box');
+                if (!unlimited && (qtyVal === '' || isNaN(qtyVal))) return customAlert('Stock inválido', 'Escribe una cantidad válida.', 'error', null, 'box');
                 if (priceVal === '' || isNaN(priceVal)) return customAlert('Precio inválido', 'Escribe un precio válido.', 'error', null, 'box');
 
-                const qty = parseInt(qtyVal);
+                // Siempre disponible: con el campo vacío o inválido se conserva el qty anterior (0 en alta)
+                const prevProd = isEdit ? state.products.find(p => p.id == state.editingId) : null;
+                const qty = (unlimited && (qtyVal === '' || isNaN(qtyVal))) ? (Number(prevProd && prevProd.qty) || 0) : parseInt(qtyVal);
                 const price = parseFloat(priceVal);
                 // Costo opcional (viene de la calculadora de precios); vacío no toca el que ya tenía
                 const costVal = parseFloat($('prodCost').value);
@@ -37,6 +60,7 @@
                         const prod = { ...state.products[idx], name, qty, price, barcode };
                         if (category) prod.category = category; else delete prod.category;
                         if (cost) prod.cost = cost;
+                        if (unlimited) prod.unlimited = true; else delete prod.unlimited;
                         // La casilla solo se ve con la opción activa; oculta, no se toca la marca guardada
                         if (!$('prodHideBox').classList.contains('hidden')) { if ($('prodHideCatalog').checked) prod.hideInCatalog = true; else delete prod.hideInCatalog; }
                         // Foto nueva o quitada: se olvida la de Storage (el archivo lo borra pruneStorageImages)
@@ -57,7 +81,8 @@
                     };
                     if (category) prod.category = category;
                     if (cost) prod.cost = cost;
-                    if ($('prodHideCatalog').checked && !$('prodHideBox').classList.contains('hidden')) prod.hideInCatalog = true;
+                    if (unlimited) prod.unlimited = true;
+                    if ($('prodHideCatalog').checked &&!$('prodHideBox').classList.contains('hidden')) prod.hideInCatalog = true;
                     state.products.unshift(prod);
                 }
 
@@ -85,6 +110,8 @@
             $('prodBarcode').value = p.barcode || '';
             $('prodName').value = p.name;
             $('prodQty').value = p.qty;
+            $('prodUnlimited').checked = isUnlimited(p);
+            toggleUnlimitedField();
             $('prodPrice').value = p.price;
             $('prodCost').value = p.cost ?? '';
             $('prodCategory').value = p.category || '';
@@ -137,6 +164,8 @@
             $('prodName').value = '';
             $('prodBarcode').value = '';
             $('prodQty').value = '';
+            $('prodUnlimited').checked = false;
+            toggleUnlimitedField();
             $('prodPrice').value = '';
             $('prodCost').value = '';
             $('prodCategory').value = '';
