@@ -87,8 +87,8 @@
                 // 📊 PREPARACIÓN DE DATOS Y TABLAS
                 // ==========================================
                 const allProducts = state.products || [];
-                const outOfStock = allProducts.filter(p => (parseFloat(p.qty) || 0) <= 0);
-                const inStock = allProducts.filter(p => (parseFloat(p.qty) || 0) > 0);
+                const outOfStock = allProducts.filter(p => availableQty(p) <= 0);
+                const inStock = allProducts.filter(p => availableQty(p) > 0);
 
                 let currentY = 50; 
 
@@ -121,14 +121,14 @@
                     doc.setFont("helvetica", "bold");
                     doc.text(`Inventario Actual (${inStock.length} items)`, 14, currentY);
                     
-                    const sortedInStock = [...inStock].sort((a, b) => parseFloat(a.qty) - parseFloat(b.qty));
+                    const sortedInStock = [...inStock].sort((a, b) => (availableQty(a) > availableQty(b)) - (availableQty(a) < availableQty(b)));
 
                     doc.autoTable({
                         startY: currentY + 4,
                         head: [['Producto', 'Cant.', 'Precio ($)']],
                         body: sortedInStock.map(p => [
                             p.name, 
-                            p.qty, 
+                            isUnlimited(p) ? 'Siempre' : p.qty,
                             `$${parseFloat(p.price || 0).toFixed(2)}`
                         ]),
                         theme: 'grid',

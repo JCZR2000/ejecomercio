@@ -35,7 +35,7 @@
             order.items.forEach(it => {
                 const p = (products || []).find(x => String(x.id) === it.id);
                 if (!p) { lines.push({ id: it.id, name: it.name, asked: it.n, avail: 0, qty: 0, missing: true }); return; }
-                const avail = Math.max(0, Math.floor(Number(p.qty) || 0)), qty = Math.min(it.n, avail);
+                const avail = isUnlimited(p) ? it.n : Math.max(0, Math.floor(Number(p.qty) || 0)), qty = Math.min(it.n, avail);
                 lines.push({ id: p.id, name: p.name, price: p.price, asked: it.n, avail, qty, short: it.n > avail });
                 if (qty > 0) cart.push({ id: p.id, name: p.name, price: p.price, qty, subtotal: roundMoney(qty * p.price), ...(p.cost > 0 && { cost: p.cost }) });
             });
@@ -265,6 +265,8 @@
             console.assert(r.cart.length === 2 && r.lines[2].missing === true, 'selfTestOrders: id desconocido excluido');
             console.assert(r.lines[1].short === true && r.cart[1].qty === 2 && r.lines[1].avail === 2, 'selfTestOrders: n mayor que existencias');
             console.assert(r.total === 4.3, 'selfTestOrders: total con roundMoney');
+            const ru = buildOrderCart({ items: [{ id: 'u', n: 50, name: 'Plato' }] }, [{ id: 'u', name: 'Plato', qty: 0, price: 1, unlimited: true }]);
+            console.assert(ru.cart[0].qty === 50 && ru.lines[0].short === false, 'selfTestOrders: siempre disponible entra completo');
             const ok = (n, id = 'a') => ({ id, n, name: 'X' });
             const clean = (items) => cleanOrder({ name: 'Ana', phone: '0414-123', items }, 'o1');
             console.assert(clean([ok(0), ok(1000), ok(1.5), { id: 5, n: 1 }, { n: 1 }]) === null, 'selfTestOrders: líneas malas descartadas');

@@ -64,8 +64,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 // nueva aún sin subir y sale sin foto hasta que uploadPendingImages la sube
                 const uploaded = typeof p.imgUrl === 'string' && p.imgUrl.startsWith(CATALOG_PHOTO_PREFIX);
                 const photo = uploaded && (!p.img || (p.imgHash && p.imgHash === hashText(p.img))) ? p.imgUrl : null;
-                const item = { id: String(p.id), name, category: String(p.category || '').trim(), price, photo, available: Number(p.qty) > 0 };
-                if (config.showStock) item.stock = Math.max(0, Math.floor(Number(p.qty) || 0));
+                const item = { id: String(p.id), name, category: String(p.category || '').trim(), price, photo, available: availableQty(p) > 0 };
+                if (config.showStock && !isUnlimited(p)) item.stock = Math.max(0, Math.floor(Number(p.qty) || 0));
                 list.push(item);
             }
             const shop = {
@@ -499,6 +499,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 { id: 4, name: 'D', qty: 2.7, price: 1 }, { id: 5, name: 'E', qty: 4, price: 1, hideInCatalog: true, cost: 9, notes: 'interna' }
             ], opt, { currency: '$', rate: 0 });
             console.assert(stockCat.products.map(p => p.stock).join() === '3,0,0,2' && stockCat.shop.askCustomer === true, 'selfTestCatalog: stock / askCustomer');
+            const unl = buildPublicCatalog([{ id: 9, name: 'Plato', qty: 0, price: 1, unlimited: true }], opt, { currency: '$', rate: 0 }).products[0];
+            console.assert(unl.available === true && !('stock' in unl), 'selfTestCatalog: siempre disponible sin stock');
             stockCat.products.forEach(p => Object.keys(p).forEach(k => console.assert(CATALOG_ALLOWED_FIELDS.includes(k) || CATALOG_OPTIONAL_FIELDS.includes(k), 'selfTestCatalog: campo no permitido ' + k)));
             ['"cost"', '"notes"', '"hideInCatalog"'].forEach(s => console.assert(!JSON.stringify(stockCat).includes(s), 'selfTestCatalog: con opciones apareció ' + s));
             const hid = [{ id: 1, name: 'A', qty: 1, price: 1, hideInCatalog: true }];

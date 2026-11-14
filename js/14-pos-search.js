@@ -20,7 +20,7 @@
             } else {
                 filtered.forEach(p => {
                     // Verificamos stock para estilo visual
-                    const noStock = p.qty < 1;
+                    const noStock = availableQty(p) < 1;
                     const stockClass = noStock ? 'text-red-400 bg-red-50' : 'text-gray-700 hover:bg-indigo-50 cursor-pointer';
                     const stockText = noStock ? '(Agotado)' : '';
 
@@ -46,7 +46,7 @@
             // 2. Llenamos el input oculto con el ID (para que addToCart funcione)
             $('saleProductSelect').value = product.id;
             // 3. Mostramos el stock disponible en el hint
-            if ($('stockHint')) $('stockHint').textContent = `En stock: ${product.qty}`;
+            if ($('stockHint')) $('stockHint').textContent = isUnlimited(product) ? 'Siempre disponible' : `En stock: ${product.qty}`;
             // 4. Ocultamos la lista
             $('posDropdown').classList.add('hidden');
         }

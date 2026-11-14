@@ -126,7 +126,7 @@
             const inCart = state.cart.find(c => c.id == id && !c.isStub);
             const currentQty = inCart ? inCart.qty : 0;
             
-            if (currentQty + qty > p.qty) return customAlert('Stock insuficiente', 'No hay más existencias de este producto.', 'warning', null, 'box');
+            if (currentQty + qty > availableQty(p)) return customAlert('Stock insuficiente', 'No hay más existencias de este producto.', 'warning', null, 'box');
             
             if (inCart) {
                 inCart.qty += qty;
@@ -159,7 +159,7 @@
 
             const currentQty = inCart ? inCart.qty : 0;
 
-            if (currentQty + 1 > p.qty) {
+            if (currentQty + 1 > availableQty(p)) {
                 return customAlert('Stock insuficiente', 'Máximo alcanzado.', 'warning', null, 'box');
             }
 
@@ -197,7 +197,7 @@
             
             // 2. Lógica para SUMAR (Verificar Stock)
             if (change === 1) {
-                if (item.qty + 1 > product.qty) {
+                if (item.qty + 1 > availableQty(product)) {
                     return customAlert('Stock máximo', 'Stock máximo alcanzado para este producto.', 'warning', null, 'box');
                 }
             }
@@ -360,7 +360,7 @@
                 state.cart.forEach(item => {
                     if (!item.isStub) { 
                         const p = state.products.find(x => x.id == item.id);
-                        if (p) p.qty -= item.qty;
+                        if (p && !isUnlimited(p)) p.qty -= item.qty;
                     }
                 });
 
