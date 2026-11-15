@@ -377,6 +377,11 @@
             try { setBasePrints('t', bp); } finally { Storage.prototype.setItem = realSet; }
             console.assert(localStorage.getItem('inv_cloud_base_prints') === null, 'selfTestSync: huella que no cabe se borra');
             if (realPrints !== null) localStorage.setItem('inv_cloud_base_prints', realPrints);
+            // Fase 36: tamaño de los datos, una vez cada 24 h
+            const H = 3600000, nowT = 1700000000000;
+            console.assert(metricDue(null, nowT) && metricDue('basura', nowT) && metricDue(String(nowT - 25 * H), nowT) && metricDue(String(nowT + H), nowT)
+                && !metricDue(String(nowT - 23 * H), nowT) && !metricDue(String(nowT), nowT), 'selfTestSync: metricDue');
+            console.assert(docKB({ a: 'x'.repeat(2048) }) === 2 && docKB({ a: 'ñ'.repeat(1024) }) === 2, 'selfTestSync: docKB mide bytes');
             console.log('selfTestSync terminado');
         }
 

@@ -307,6 +307,7 @@
             setCloudBase(newToken, upCounts, newUserVer);
             if (upPrints) setBasePrints(newToken, upPrints); // sin huellas queda la vieja, con otra ficha, y se ignora
             if (seq === saveSeq) clearCloudDirty(); // si hubo otro cambio durante la subida, sigue pendiente
+            reportDataSize(user.uid, mainDoc, chunks); // sin await: no frena la subida
 
             // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)
             const stale = Object.keys(oldChunks).filter(id => !chunks[id] && !kept.includes(id));
@@ -316,6 +317,26 @@
                 await b.commit();
             }
             return true;
+        }
+
+        // Fase 36: tamaño de los datos de la cuenta para el panel de administración (metricas/{uid}).
+        // Solo tamaños en KB: ni nombres, ni cantidades, ni montos. Como mucho una vez cada 24 h por dispositivo.
+        const docKB = (doc) => Math.round(new Blob([JSON.stringify(doc)]).size / 1024);
+        // last: texto de inv_metric_at. Sin dato, dañado o con fecha futura (reloj cambiado) → toca.
+        function metricDue(last, now) {
+            const d = now - Number(last);
+            return !(d >= 0 && d < 24 * 3600 * 1000);
+        }
+        // Nunca lanza ni avisa: si falla (reglas, red) se reintenta en la siguiente subida.
+        async function reportDataSize(uid, mainDoc, chunks) {
+            try {
+                if (!metricDue(localStorage.getItem('inv_metric_at'), Date.now())) return;
+                // cada trozo de ventas, medido como se guarda en la nube (cifrado si hay cifrado)
+                const sizes = Object.keys(chunks).filter(id => id.startsWith('sales_'))
+                    .map(id => new Blob([encryptionKey ? encryptJsonText(chunks[id].json) : chunks[id].json]).size);
+                await db.collection('metricas').doc(uid).set({ mainKB: docKB(mainDoc), maxChunkKB: Math.round(Math.max(0, ...sizes) / 1024), at: firebase.firestore.FieldValue.serverTimestamp() });
+                safeSetItem('inv_metric_at', String(Date.now()));
+            } catch (e) { console.warn('Tamaño de los datos: no se guardó, se reintenta en la siguiente subida.', (e && e.code) || e); }
         }
 
         function setCloudManifest(m) {
