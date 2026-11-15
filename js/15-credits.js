@@ -425,6 +425,45 @@
             }
         }
 
+        // Enlace de cobro para un monto (Pro). link '' sin Pro. upgrade: promesa opcional que da el mismo enlace con
+        // código corto (o null). ctx: { rate, rateName, waInput (WhatsApp escrito a mano), onProfile (al publicarse el perfil) }
+        function buildShareLinkFor(amount, keys, now, ctx) {
+            if (!hasPro()) return { link: '' };
+            const cfg = state.catalogConfig || {};
+            const user = auth.currentUser;
+            const canCloud = !!user && navigator.onLine;
+            const profile = canCloud ? buildPayProfile() : null;
+            const waInput = ctx.waInput || '';
+            if (canCloud && localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, profile)) {
+                const q = buildShortPaymentQuery({ uid: user.uid, usd: amount, rate: ctx.rate, rateName: ctx.rateName, date: now,
+                    keys, wa: getShareWhatsapp() ? '' : waInput });
+                const base = publicPageUrl('pagar') + '#';
+                if (shortCodeCache.has(q)) return { link: base + shortCodeCache.get(q) };
+                // Sale el enlace #u=; la subida del código se lanza una sola vez por cobro
+                if (shortCodeTried.has(q)) return { link: base + q };
+                shortCodeTried.add(q);
+                return { link: base + q, upgrade: publishShortCode(q).then(code => code ? base + code : null) };
+            }
+            const link = buildPaymentLink({
+                v: 1,
+                shop: clipText(cfg.title) || 'Mi tienda',
+                wa: getShareWhatsapp() || waInput,
+                usd: amount,
+                bs: calcBs(amount, ctx.rate),
+                rate: ctx.rate,
+                rateName: ctx.rateName,
+                date: formatShareDate(now),
+                methods: buildShareMethodList(keys)
+            });
+            // Enlace largo por ahora; al publicarse el perfil el texto pasa al corto (una sola vez por perfil, para no repetir si falla)
+            const key = payProfileStoredKey(user ? user.uid : '', profile || {});
+            if (canCloud && !payProfilePublishing && payProfileTried !== key) {
+                payProfileTried = key;
+                publishPayProfile().then(() => { if (ctx.onProfile) ctx.onProfile(); }).catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e));
+            }
+            return { link };
+        }
+
         function regenerateShareMessage() {
             const c = getShareCredit();
             if (!c || shareDraft.step !== 3) return;
@@ -432,47 +471,15 @@
             const methods = buildShareMethodList(getSelectedShareMethods());
             const now = new Date();
             const opts = { debt: shareDraft.debt, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now, link: '' };
-            if ($('chkIncludeLink').checked && hasPro()) {
-                const cfg = state.catalogConfig || {};
-                const user = auth.currentUser;
-                const canCloud = !!user && navigator.onLine;
-                const profile = canCloud ? buildPayProfile() : null;
-                if (canCloud && localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, profile)) {
-                    const q = buildShortPaymentQuery({ uid: user.uid, usd: amount, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now,
-                        keys: getSelectedShareMethods(), wa: getShareWhatsapp() ? '' : normalizeCatalogWhatsapp($('shareWhatsapp').value) });
-                    const base = publicPageUrl('pagar') + '#';
-                    if (shortCodeCache.has(q)) opts.link = base + shortCodeCache.get(q);
-                    else {
-                        opts.link = base + q;
-                        // Sale el enlace #u=; al terminar la subida solo se cambia el enlace dentro del texto actual (lo escrito a mano se conserva)
-                        if (!shortCodeTried.has(q)) {
-                            shortCodeTried.add(q);
-                            const oldLink = opts.link;
-                            publishShortCode(q).then(code => {
-                                const input = $('shareMessageInput');
-                                if (code && shareDraft.step === 3 && !$('shareModal').classList.contains('hidden') && input.value.includes(oldLink)) input.value = input.value.replace(oldLink, base + code);
-                            }).catch(e => console.warn('Código de cobro no publicado:', e.code || e.message || e));
-                        }
-                    }
-                } else {
-                    opts.link = buildPaymentLink({
-                        v: 1,
-                        shop: clipText(cfg.title) || 'Mi tienda',
-                        wa: getShareWhatsapp() || normalizeCatalogWhatsapp($('shareWhatsapp').value),
-                        usd: amount,
-                        bs: calcBs(amount, shareDraft.rate),
-                        rate: shareDraft.rate,
-                        rateName: shareDraft.rateName,
-                        date: formatShareDate(now),
-                        methods
-                    });
-                    // Enlace largo por ahora; al publicarse el perfil el texto pasa al corto (una sola vez por perfil, para no repetir si falla)
-                    const key = payProfileStoredKey(user ? user.uid : '', profile || {});
-                    if (canCloud && !payProfilePublishing && payProfileTried !== key) {
-                        payProfileTried = key;
-                        publishPayProfile().then(() => regenerateShareMessage()).catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e));
-                    }
-                }
+            if ($('chkIncludeLink').checked) {
+                const r = buildShareLinkFor(amount, getSelectedShareMethods(), now, { rate: shareDraft.rate, rateName: shareDraft.rateName,
+                    waInput: normalizeCatalogWhatsapp($('shareWhatsapp').value), onProfile: regenerateShareMessage });
+                opts.link = r.link;
+                // Al terminar la subida solo se cambia el enlace dentro del texto actual (lo escrito a mano se conserva)
+                if (r.upgrade) r.upgrade.then(link => {
+                    const input = $('shareMessageInput');
+                    if (link && shareDraft.step === 3 && !$('shareModal').classList.contains('hidden') && input.value.includes(r.link)) input.value = input.value.replace(r.link, link);
+                }).catch(e => console.warn('Código de cobro no publicado:', e.code || e.message || e));
             }
             $('shareMessageInput').value = buildShareMessage(c, amount, methods, opts);
         }
@@ -481,8 +488,8 @@
             $('shareModal').classList.add('hidden');
         }
 
-        function copyShareMessage(btn) {
-            const text = $('shareMessageInput');
+        function copyShareMessage(btn, inputId = 'shareMessageInput') {
+            const text = $(inputId);
             const original = btn.innerHTML;
             const done = () => {
                 btn.innerHTML = '<i class="fa-solid fa-check"></i> ¡Copiado!';
@@ -516,6 +523,167 @@
                 window.open(url, '_blank');
             }
         }
+
+        // ---------- Cobro a varios fiados (Fase 33, Pro): cola guiada, un toque por cliente ----------
+        // WhatsApp no deja enviar a varias personas desde una página web: la app prepara cada mensaje y el dueño lo envía.
+        let bulkDraft = null; // { step, picked:Set, queue, idx, sent, skipped, rate, rateName, keys, includeLink }
+        const BULK_METHOD_LABELS = { PAGO_MOVIL: 'Pago Móvil', TRANSFER: 'Transferencia Bancaria', BINANCE: 'Binance Pay', CUSTOM: 'Personalizado' };
+
+        // Fiados con deuda pendiente. filter: 'ALL' | 'OVERDUE' (fecha de pago pasada, como «ATRASADO» en la lista) | 'WA'. Solo lee.
+        // El monto es el mismo del recordatorio individual: pendingDebtOf(calculateRealDebt(c), c.paid).
+        function bulkRemindCandidates(credits, filter, now) {
+            return credits.map(c => {
+                const cl = getClient(c.clientId);
+                return { id: c.id, name: c.customer, debt: pendingDebtOf(calculateRealDebt(c), c.paid), wa: cl ? clientWaNumber(cl.phone) : '',
+                    overdue: !!c.nextPaymentDate && Math.ceil((new Date(c.nextPaymentDate) - now) / 86400000) < 0 };
+            }).filter(x => x.debt > 0.005 && (filter === 'OVERDUE' ? x.overdue : filter === 'WA' ? !!x.wa : true));
+        }
+
+        function openBulkRemind() {
+            if (!hasPro()) return openMyPlan('el cobro a varios fiados');
+            if (!bulkRemindCandidates(state.credits, 'ALL', new Date()).length) return customAlert('Sin deudas', 'No hay fiados con deuda pendiente.', 'info');
+            payProfileTried = '';
+            getPaymentMethods();
+            bulkDraft = { step: 1, picked: new Set(), queue: [], idx: 0, sent: 0, skipped: 0, rate: getFiadosActiveRate(), rateName: getFiadosRateName(), keys: [], includeLink: false };
+            // Métodos: los mismos datos guardados del recordatorio individual, recordando los últimos usados
+            let last = [];
+            try { last = JSON.parse(localStorage.getItem(SHARE_LAST_METHODS_KEY)) || []; } catch (e) { last = []; }
+            const box = $('bulkMethods');
+            box.textContent = '';
+            SHARE_METHOD_KEYS.forEach(k => {
+                const ok = isShareMethodConfigured(k);
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 p-2 border rounded-lg text-xs ' + (ok ? 'cursor-pointer font-bold text-gray-700' : 'text-gray-400');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.id = 'bulkM_' + k; cb.disabled = !ok;
+                cb.checked = ok && Array.isArray(last) && last.includes(k);
+                cb.onchange = bulkRemindCheckStep2;
+                label.append(cb, document.createTextNode(BULK_METHOD_LABELS[k] + (ok ? '' : ' · sin datos (configúralo en un recordatorio individual)')));
+                box.append(label);
+            });
+            $('bulkIncludeLink').checked = true;
+            bulkRemindStep(1);
+            $('bulkRemindModal').classList.remove('hidden');
+        }
+        function closeBulkRemind() { $('bulkRemindModal').classList.add('hidden'); bulkDraft = null; }
+
+        function bulkRemindRenderList() {
+            const box = $('bulkList');
+            box.textContent = '';
+            bulkRemindCandidates(state.credits, 'ALL', new Date()).forEach(x => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 p-2 border rounded-lg cursor-pointer';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.checked = bulkDraft.picked.has(x.id);
+                cb.onchange = () => { if (cb.checked) bulkDraft.picked.add(x.id); else bulkDraft.picked.delete(x.id); bulkRemindCount(); };
+                const name = document.createElement('span');
+                name.className = 'flex-1 min-w-0 truncate text-xs font-bold text-gray-700';
+                name.textContent = x.name; // nombre escrito por el usuario: nunca innerHTML
+                label.append(cb, name);
+                const tag = (text, cls) => { const s = document.createElement('span'); s.className = 'shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ' + cls; s.textContent = text; label.append(s); };
+                if (x.overdue) tag('Vencido', 'bg-red-100 text-red-600');
+                if (x.wa) tag('WhatsApp', 'bg-green-100 text-green-700');
+                const debt = document.createElement('span');
+                debt.className = 'shrink-0 text-xs font-bold text-gray-800';
+                debt.textContent = formatUsdText(x.debt);
+                label.append(debt);
+                box.append(label);
+            });
+            bulkRemindCount();
+        }
+        function bulkRemindCount() {
+            const n = bulkDraft.picked.size;
+            $('bulkCount').textContent = n === 1 ? '1 elegido' : `${n} elegidos`;
+            $('bulkNext').disabled = n === 0;
+        }
+        function bulkRemindPick(filter) {
+            bulkDraft.picked = new Set(filter === 'NONE' ? [] : bulkRemindCandidates(state.credits, filter, new Date()).map(x => x.id));
+            bulkRemindRenderList();
+        }
+
+        const bulkSelectedMethods = () => SHARE_METHOD_KEYS.filter(k => $('bulkM_' + k).checked);
+        function bulkRemindCheckStep2() {
+            const err = !(bulkDraft.rate > 0) ? 'No hay tasa de cambio configurada.' : (bulkSelectedMethods().length ? '' : 'Marca al menos un método de pago.');
+            $('bulkStep2Error').textContent = err;
+            $('bulkStep2Error').classList.toggle('hidden', !err);
+            $('bulkNext').disabled = !!err;
+        }
+
+        function bulkRemindStep(n) {
+            const d = bulkDraft;
+            if (!d || n < 1 || n > 3 || (n > d.step && $('bulkNext').disabled)) return;
+            if (n === 3) {
+                d.keys = bulkSelectedMethods();
+                d.includeLink = $('bulkIncludeLink').checked && hasPro();
+                try { localStorage.setItem(SHARE_LAST_METHODS_KEY, JSON.stringify(d.keys)); } catch (e) { /* sin almacenamiento */ }
+                d.queue = bulkRemindCandidates(state.credits, 'ALL', new Date()).filter(x => d.picked.has(x.id));
+                d.idx = 0; d.sent = 0; d.skipped = 0;
+            }
+            d.step = n;
+            [1, 2, 3].forEach(i => $('bulkStep' + i).classList.toggle('hidden', i !== n));
+            $('bulkDone').classList.add('hidden');
+            $('bulkFooter').classList.toggle('hidden', n === 3);
+            $('bulkBack').classList.toggle('hidden', n !== 2);
+            document.querySelectorAll('#bulkStepper [data-step]').forEach(s => {
+                const on = Number(s.dataset.step) === n;
+                s.classList.toggle('text-blue-600', on);
+                s.classList.toggle('text-gray-400', !on);
+            });
+            if (n === 1) bulkRemindRenderList();
+            if (n === 2) {
+                $('bulkIncludeLink').disabled = !hasPro();
+                $('bulkRateInfo').textContent = d.rate > 0 ? `Tasa ${d.rateName} ${d.rate} para todos los mensajes.` : '';
+                bulkRemindCheckStep2();
+            }
+            if (n === 3) bulkRemindShow();
+        }
+
+        // Muestra el mensaje del cliente actual; el código corto se pide aquí, uno por cliente (no todos al empezar)
+        function bulkRemindShow() {
+            const d = bulkDraft, x = d.queue[d.idx];
+            if (!x) {
+                $('bulkStep3').classList.add('hidden');
+                $('bulkDone').classList.remove('hidden');
+                $('bulkSummary').textContent = `Enviados ${d.sent} · Saltados ${d.skipped}`;
+                return;
+            }
+            const c = state.credits.find(k => k.id == x.id);
+            if (!c) { d.skipped++; d.idx++; return bulkRemindShow(); } // el fiado se borró mientras tanto
+            const now = new Date(), idx = d.idx;
+            const opts = { debt: x.debt, rate: d.rate, rateName: d.rateName, date: now, link: '' };
+            if (d.includeLink) {
+                const r = buildShareLinkFor(x.debt, d.keys, now, { rate: d.rate, rateName: d.rateName });
+                opts.link = r.link;
+                if (r.upgrade) r.upgrade.then(link => {
+                    const input = $('bulkMessage');
+                    if (link && bulkDraft === d && d.step === 3 && d.idx === idx && input.value.includes(r.link)) input.value = input.value.replace(r.link, link);
+                }).catch(e => console.warn('Código de cobro no publicado:', e.code || e.message || e));
+            }
+            $('bulkProgress').textContent = `${d.idx + 1} de ${d.queue.length} · ${x.name} · ${formatUsdText(x.debt)}`;
+            $('bulkMessage').value = buildShareMessage(c, x.debt, buildShareMethodList(d.keys), opts);
+            $('bulkBtnWa').classList.toggle('hidden', !x.wa);
+            $('bulkNoWa').classList.toggle('hidden', !!x.wa);
+            $('bulkBtnShare').classList.toggle('hidden', !!x.wa || !navigator.share);
+            $('bulkBtnCopy').classList.toggle('hidden', !!x.wa);
+            $('bulkBtnNext').classList.toggle('hidden', !!x.wa);
+        }
+        function bulkRemindAdvance(sent) {
+            const d = bulkDraft;
+            if (!d || d.step !== 3 || !d.queue[d.idx]) return;
+            d[sent ? 'sent' : 'skipped']++;
+            d.idx++;
+            bulkRemindShow();
+        }
+        function bulkRemindSend() {
+            const d = bulkDraft, x = d && d.queue[d.idx];
+            if (!x || !x.wa) return;
+            window.open(`https://wa.me/${x.wa}?text=${encodeURIComponent($('bulkMessage').value)}`, '_blank');
+            bulkRemindAdvance(true);
+        }
+        function bulkRemindShare() {
+            if (navigator.share) navigator.share({ title: 'Recordatorio de Pago', text: $('bulkMessage').value }).catch(console.error);
+        }
+        function bulkRemindSkip() { bulkRemindAdvance(false); }
 
         // Autoprueba (datos ficticios). Ejecutar en consola: selfTestPaymentRequest()
         function selfTestPaymentRequest() {
@@ -562,6 +730,27 @@
              '#u=AbC123xyz789&a=1&r=1&n=b&f=3010&m=P', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=PP', '#u=AbC123xyz789&a=1&r=1&n=b&f=30102026&m=Z',
              '#u=AbC123xyz789&a=1e3&r=1&n=b&f=30102026&m=P'].forEach(h => t(parseShortPaymentLink(h) === null, 'enlace corto dañado da null: ' + h));
             [[1234.56, 36.02], [0.01, 40], [99.995, 1]].forEach(([u, r]) => t(calcBsFromLink(u, r) === calcBs(u, r), `monto en Bs de la página = calcBs (${u} x ${r})`));
+            // Cobro a varios (Fase 33): datos ficticios en memoria, se restauran al terminar
+            const bak = { clients: state.clients, creditMode: state.creditMode, lic: localStorage.getItem('inv_license') };
+            try {
+                state.creditMode = 'FIXED';
+                state.clients = [{ id: 'cl_a', name: 'Ana', phone: '0414-000-0000' }, { id: 'cl_b', name: 'Beto', phone: '123' }];
+                const nowB = new Date(2026, 10, 15, 12), dayB = (k) => new Date(2026, 10, 15 + k).toISOString();
+                const list = [
+                    { id: 1, customer: 'Ana', clientId: 'cl_a', totalDebt: 20, paid: 5, items: [], nextPaymentDate: dayB(-3) },
+                    { id: 2, customer: 'Beto', clientId: 'cl_b', totalDebt: 10, paid: 0, items: [], nextPaymentDate: dayB(4) },
+                    { id: 3, customer: 'Sin ficha', totalDebt: 8, paid: 0, items: [], nextPaymentDate: dayB(0) },
+                    { id: 4, customer: 'Pagado', clientId: 'cl_a', totalDebt: 7, paid: 7, items: [], nextPaymentDate: dayB(-9) }];
+                const all = bulkRemindCandidates(list, 'ALL', nowB);
+                t(all.map(x => x.id).join() === '1,2,3' && all[0].debt === 15 && all[0].wa === '584140000000' && all[1].wa === '' && all[2].wa === '', 'cobro a varios: solo con deuda, monto pendiente y WhatsApp válido');
+                t(bulkRemindCandidates(list, 'OVERDUE', nowB).map(x => x.id).join() === '1', 'cobro a varios: «Vencidos» = fecha de pago pasada y con deuda');
+                t(bulkRemindCandidates(list, 'WA', nowB).map(x => x.id).join() === '1', 'cobro a varios: «Con WhatsApp»');
+                localStorage.removeItem('inv_license');
+                t(buildShareLinkFor(15, ['PAGO_MOVIL'], nowB, { rate: 40, rateName: 'BCV' }).link === '', 'sin Pro no hay enlace de cobro');
+            } finally {
+                state.clients = bak.clients; state.creditMode = bak.creditMode;
+                try { if (bak.lic === null) localStorage.removeItem('inv_license'); else localStorage.setItem('inv_license', bak.lic); } catch (e) { /* sin almacenamiento */ }
+            }
             const prof = buildPayProfile();
             t(Object.keys(prof).sort().join() === 'methods,shop,v' && prof.v === 1, 'perfil: solo v, shop y methods');
             t(Object.values(prof.methods).every(m => Object.values(m).some(x => String(x).trim() !== '')), 'perfil: sin métodos vacíos');
