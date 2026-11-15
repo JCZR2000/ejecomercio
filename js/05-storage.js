@@ -179,6 +179,8 @@
             updateCloudStatus('SYNCING');
             try {
                 do {
+                    // Fase 38: si se está numerando una operación, se espera (hasta 4 s) para subirla ya numerada
+                    if (typeof numbersSettled === 'function') await numbersSettled();
                     pendingCloudSave = false;
                     const r = await uploadCloudOnce(user);
                     if (r === 'CONFLICT') {

@@ -508,8 +508,8 @@
                 updatePosPayRow();
 
                 // E. PERSISTENCIA Y CIERRE
+                assignPendingNumbers(); // Fase 21: número de la venta (sin esperar; sin red queda «por asignar»). Va antes de saveData: la subida espera a la asignación en curso (Fase 38)
                 saveData(); // Guardar en Firebase/LocalStorage
-                assignPendingNumbers(); // Fase 21: número de la venta (sin esperar; sin red queda «por asignar»)
                 renderAll(); // Actualizar inventario visual
                 toggleCartModal(false); // CERRAR LA VENTANA (Ahora sí llegará aquí)
             }

@@ -553,6 +553,13 @@
             mt(!mw({ sales: [...m0.sales, ...m0.sales] }, {}).ok && !mw({}, { sales: [{ total: 1 }] }).ok && !mw({}, {}, { ...mp, noId: 1 }).ok, 'id repetido o sin id no se une');
             mt(!mw({}, {}, {}).ok && !mw({}, {}, { ...mp, sales: undefined }).ok, 'sin huellas de una lista no se une');
             mt(JSON.stringify(m0) === m0Text, 'no modifica lo que recibe');
+            // Copias de unión aparte (Fase 38)
+            const bk = (n, merge) => Array.from({ length: n }, (_, i) => ({ id: (merge ? 'm' : 'n') + i, reason: merge ? MERGE_BACKUP_REASON : 'Antes de vaciar' }));
+            const trim = (...l) => backupsToTrim(l.flat()).join();
+            mt(trim(bk(5, false), bk(4, true)) === 'm3', 'copias: 5 normales y 4 de unión borran la unión más vieja');
+            mt(trim(bk(1, true), bk(7, false)) === 'n5,n6', 'copias: 7 normales y 1 de unión borran 2 normales');
+            mt(trim([{ id: 'v1' }, { id: 'v2' }, { id: 'v3' }, { id: 'v4' }, { id: 'v5' }, { id: 'v6' }]) === 'v6', 'copias: sin reason cuentan como normales');
+            mt(trim([]) === '' && trim(bk(5, false), bk(3, true)) === '', 'copias: bajo el límite no se borra nada');
             console.log('selfTestSync terminado');
         }
 
