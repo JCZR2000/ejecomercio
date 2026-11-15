@@ -168,9 +168,12 @@
         const PRINT_LISTS = ['sales', 'products', 'credits', 'clients']; // en el orden en que se nombran en los resúmenes
         const hasKey = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
-        // { products: { id: [huella, qty] }, sales: { id: huella }, credits: { id: [huella, paid, totalDebt] }, clients: { id: huella },
+        // Fase 37: números que se unen cuando los dos lados editaron el mismo elemento; van en la huella en este orden.
+        const MERGE_NUMS = { products: ['qty'], credits: ['paid', 'totalDebt'], clients: ['balance'] };
+
+        // { products: { id: [huella, qty] }, sales: { id: huella }, credits: { id: [huella, paid, totalDebt] }, clients: { id: [huella, balance] },
         //   other: { campo: huella }, noId: cuántos elementos venían sin id (se guardan como '#' + índice) }.
-        // Los números van aparte porque el paso 2 los unirá por diferencia.
+        // Los números van aparte porque mergeThreeWay los une por diferencia. Huellas guardadas antes de la v71.0: clients: { id: huella }.
         function basePrints(data, fields = Object.keys(buildCloudPayload())) {
             const print = (x) => hashText(canonText(x));
             const out = { other: {}, noId: 0 };
@@ -182,7 +185,7 @@
                     const noId = !x || x.id == null;
                     if (noId) out.noId++;
                     const h = print(x);
-                    out[f][noId ? '#' + i : x.id] = f === 'products' ? [h, x.qty] : f === 'credits' ? [h, x.paid, x.totalDebt] : h;
+                    out[f][noId ? '#' + i : x.id] = MERGE_NUMS[f] ? [h, ...MERGE_NUMS[f].map(k => (x || {})[k])] : h;
                 });
             });
             return out;
@@ -190,7 +193,10 @@
 
         // Qué cambió en data respecto a las huellas de la base: por tipo { added, removed, edited } (ids) y other: [campos].
         function sideChanges(prints, data, fields) {
-            const now = basePrints(data, fields);
+            return printChanges(prints, basePrints(data, fields));
+        }
+        // Lo mismo, con las huellas de data ya calculadas (now).
+        function printChanges(prints, now) {
             const h = (v) => Array.isArray(v) ? v[0] : v;
             const out = { other: Object.keys(now.other).filter(f => now.other[f] !== (prints.other || {})[f]) };
             PRINT_LISTS.forEach(t => {
@@ -233,6 +239,104 @@
         function bothSummary(both) {
             return PRINT_LISTS.filter(t => both[t]).map(t => `${both[t]} ${pluralEs(both[t], CHANGE_NOUNS[t][0])}`)
                 .concat(both.other.map(f => USER_DIFF_LABELS[f] || 'Otros')).join(', ') || 'ninguno';
+        }
+
+        // ==========================================
+        // Fase 37: unión de tres vías (paso 2). Función pura: no toca state ni localStorage.
+        // prints = huellas de la base. Devuelve { ok: true, data, summary: { local, cloud }, negatives: [ids de productos] }
+        // o { ok: false, conflicts: [...] } (en la duda, choque: se pregunta como siempre).
+        // - Listas: lo que cambió un solo lado se toma de ese lado. El mismo elemento editado en los dos lados solo se une
+        //   si no difiere en nada más que sus números (MERGE_NUMS): qty, paid y balance = nube + (local − base).
+        // - totalDebt no se suma: en modo dinámico cada abono la vuelve a fijar y sumarla la inflaría. Igual en los dos lados
+        //   o cambiada en uno solo → ese valor; distinta en los dos → choque.
+        // - Otros campos: el lado que cambió; los dos distintos → choque (fiscalConfig: solo contadores → el mayor).
+        // ==========================================
+        const FISCAL_COUNTERS = ['currentNumber', 'currentPayment'];
+        function mergeThreeWay(prints, local, cloud, fields = Object.keys(buildCloudPayload())) {
+            try {
+                const lp = basePrints(local, fields), cp = basePrints(cloud, fields);
+                if (prints.noId || lp.noId || cp.noId) return { ok: false, conflicts: ['elementos sin id'] };
+                const h = (v) => Array.isArray(v) ? v[0] : v;
+                const num = (v) => typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+                const without = (o, keys) => { const r = { ...o }; keys.forEach(k => delete r[k]); return r; };
+                const conflicts = [], negatives = [], data = {};
+
+                // Mismo elemento editado en los dos lados: el de la nube con los números unidos, o null si choca.
+                const mergeNums = (f, id, base, l, c) => {
+                    const keys = MERGE_NUMS[f];
+                    if (!keys) return null;
+                    const rest = (x) => canonText(userPart({ [f]: [without(x, keys)] }, f));
+                    if (rest(l) !== rest(c)) return null;
+                    const out = { ...c };
+                    for (let i = 0; i < keys.length; i++) {
+                        const k = keys[i], lv = num(l[k]), cv = num(c[k]), bv = Array.isArray(base) ? num(base[i + 1]) : NaN;
+                        if (canonText(l[k]) === canonText(c[k]) && (k === 'totalDebt' || !isFinite(lv))) continue; // igual o ausente en los dos
+                        if (![lv, cv, bv].every(isFinite)) return null; // sin el número de la base (huella vieja) no se puede unir
+                        if (k === 'totalDebt') {
+                            if (lv !== bv && cv !== bv) return null;
+                            out[k] = cv !== bv ? cv : lv;
+                        } else {
+                            const n = cv + (lv - bv);
+                            out[k] = k === 'qty' ? Math.round(n * 1e6) / 1e6 : roundMoney(n); // qty: solo quita el ruido de coma flotante
+                            if (k === 'qty' && out[k] < 0) negatives.push(id);
+                        }
+                    }
+                    return out;
+                };
+
+                fields.filter(f => !USER_SKIP_FIELDS.includes(f)).forEach(f => {
+                    if (!PRINT_LISTS.includes(f)) {
+                        const b = (prints.other || {})[f], l = lp.other[f], c = cp.other[f];
+                        let v;
+                        if (l === c || l === b) v = cloud[f];
+                        else if (c === b) v = local[f];
+                        else if (f === 'fiscalConfig' && local[f] && cloud[f] && canonText(without(local[f], FISCAL_COUNTERS)) === canonText(without(cloud[f], FISCAL_COUNTERS))) {
+                            v = { ...cloud[f] };
+                            FISCAL_COUNTERS.forEach(k => { const m = Math.max(Number(local[f][k]) || 0, Number(cloud[f][k]) || 0); if (m) v[k] = m; });
+                        } else { conflicts.push(f); return; }
+                        if (v !== undefined) data[f] = v; // sin la clave, finishLoadingData conserva lo local (nube de una versión vieja)
+                        return;
+                    }
+                    const L = local[f], C = cloud[f], B = prints[f], LP = lp[f], CP = cp[f];
+                    // Sin huellas de la lista, con una nube sin la lista (versión vieja) o con un id repetido no se une
+                    if (!B || !Array.isArray(L) || !Array.isArray(C) || Object.keys(LP).length !== L.length || Object.keys(CP).length !== C.length) { conflicts.push(f); return; }
+                    const lById = new Map(L.map(x => [String(x.id), x]));
+                    const out = [];
+                    let clash = false;
+                    const fail = (id) => { clash = true; conflicts.push(f + ':' + id); };
+                    C.forEach(c => {
+                        const id = String(c.id), inB = hasKey(B, id);
+                        if (!hasKey(LP, id)) { // local no lo tiene: lo borró, o es nuevo de la nube
+                            if (!inB || h(B[id]) === h(CP[id])) { if (!inB) out.push(c); }
+                            else fail(id); // borrado en local y editado en la nube
+                            return;
+                        }
+                        const l = lById.get(id);
+                        if (h(LP[id]) === h(CP[id]) || (inB && h(B[id]) === h(LP[id]))) return out.push(c); // iguales, o local no lo tocó
+                        if (!inB) return fail(id); // añadido en los dos lados con distinto contenido
+                        if (h(B[id]) === h(CP[id])) return out.push(l); // solo lo editó local
+                        const m = mergeNums(f, id, B[id], l, c);
+                        if (m) out.push(m); else fail(id);
+                    });
+                    L.forEach(l => {
+                        const id = String(l.id);
+                        if (hasKey(CP, id)) return;
+                        if (!hasKey(B, id)) out.push(l); // nuevo de local
+                        else if (h(B[id]) !== h(LP[id])) fail(id); // borrado en la nube y editado en local
+                    });
+                    if (clash) return;
+                    if (f === 'sales') out.sort((a, b) => (new Date(b.date) - new Date(a.date)) || 0); // state.sales[0] es «la última venta»
+                    // Comprobación: nada añadido falta, nada falta sin que un lado lo borrara y no hay ids repetidos
+                    const ids = new Set(out.map(x => String(x.id)));
+                    const kept = (id) => !hasKey(B, id) || (hasKey(LP, id) && hasKey(CP, id));
+                    if (ids.size !== out.length || [...Object.keys(LP), ...Object.keys(CP)].some(id => kept(id) && !ids.has(id))) { conflicts.push('comprobación:' + f); return; }
+                    data[f] = out;
+                });
+                if (conflicts.length) return { ok: false, conflicts };
+                return { ok: true, data, summary: { local: changeSummary(printChanges(prints, lp)), cloud: changeSummary(printChanges(prints, cp)) }, negatives };
+            } catch (e) {
+                return { ok: false, conflicts: ['error'] };
+            }
         }
 
         // Fase 34: ¿los productos solo difieren en fotos que este dispositivo ya subió a Storage y la nube aún tiene en base64?
@@ -382,6 +486,73 @@
             console.assert(metricDue(null, nowT) && metricDue('basura', nowT) && metricDue(String(nowT - 25 * H), nowT) && metricDue(String(nowT + H), nowT)
                 && !metricDue(String(nowT - 23 * H), nowT) && !metricDue(String(nowT), nowT), 'selfTestSync: metricDue');
             console.assert(docKB({ a: 'x'.repeat(2048) }) === 2 && docKB({ a: 'ñ'.repeat(1024) }) === 2, 'selfTestSync: docKB mide bytes');
+            // Fase 37: unión de tres vías (datos ficticios, montos con decimales)
+            const MF = ['products', 'sales', 'credits', 'clients', 'fiscalConfig', 'lastUpdated', 'bcvUsd'];
+            const m0 = {
+                products: [{ id: 1, name: 'A', price: 1.5, qty: 10 }, { id: 2, name: 'B', price: 2.25, qty: 1 }],
+                sales: [{ id: 's1', date: '2026-01-01T10:00:00.000Z', total: 5.55 }],
+                credits: [{ id: 'c1', customer: 'X', paid: 3.3, totalDebt: 20.5 }],
+                clients: [{ id: 'k1', name: 'X', balance: 1.1 }],
+                fiscalConfig: { rif: 'J-0', currentNumber: 5 }, lastUpdated: 'x', bcvUsd: 1
+            };
+            const m0Text = JSON.stringify(m0);
+            const mp = JSON.parse(JSON.stringify(basePrints(m0, MF)));
+            const mw = (l, c, p = mp) => mergeThreeWay(p, { ...m0, ...l }, { ...m0, ...c }, MF);
+            const prods = (a, b) => [{ ...m0.products[0], ...a }, { ...m0.products[1], ...b }];
+            const cred = (o) => [{ ...m0.credits[0], ...o }];
+            const cli = (o) => [{ ...m0.clients[0], ...o }];
+            const mt = (cond, name) => console.assert(cond, 'selfTestSync: unión: ' + name);
+            mt(Array.isArray(mp.clients.k1) && mp.clients.k1[1] === 1.1, 'la huella de clientes lleva el saldo');
+            let r = mw({ sales: [{ id: 's2', date: '2026-01-02T10:00:00.000Z', total: 1.1 }, ...m0.sales] },
+                { sales: [...m0.sales, { id: 's3', date: '2026-01-03T10:00:00.000Z', total: 2.2 }], credits: [...m0.credits, { id: 'c2', paid: 0, totalDebt: 2.2 }] });
+            mt(r.ok && r.data.sales.map(s => s.id).join() === 's3,s2,s1' && r.data.credits.map(c => c.id).join() === 'c1,c2', '1 venta local y fiado en la nube, ventas por fecha');
+            mt(r.summary.local === '1 venta nueva' && r.summary.cloud === '1 venta nueva, 1 fiado nuevo' && !r.negatives.length, '1 resúmenes');
+            r = mw({ products: prods({ qty: 8 }) }, { products: prods({ qty: 7 }) });
+            mt(r.ok && r.data.products[0].qty === 5 && r.data.products[1].qty === 1 && !r.negatives.length, '2 existencias 10→8 y 10→7 = 5');
+            r = mw({ products: prods({ qty: 7.9 }) }, { products: prods({ qty: 9.7 }) });
+            mt(r.ok && r.data.products[0].qty === 7.6, '2 existencias con decimales sin ruido');
+            r = mw({ credits: cred({ paid: 4.4 }) }, { credits: cred({ paid: 5.5 }) });
+            mt(r.ok && r.data.credits[0].paid === 6.6 && r.data.credits[0].totalDebt === 20.5, '3 abonos de 1,10 y 2,20 sobre 3,30 = 6,60');
+            r = mw({ credits: cred({ paid: 4.4, totalDebt: 22 }) }, { credits: cred({ paid: 5.5, totalDebt: 22 }) });
+            mt(r.ok && r.data.credits[0].paid === 6.6 && r.data.credits[0].totalDebt === 22, '3 la misma deuda total en los dos lados no se suma');
+            r = mw({ credits: cred({ paid: 4.4, totalDebt: 22 }) }, { credits: cred({ paid: 5.5 }) });
+            mt(r.ok && r.data.credits[0].paid === 6.6 && r.data.credits[0].totalDebt === 22, '3 deuda total cambiada en un solo lado');
+            mt(!mw({ credits: cred({ paid: 4.4, totalDebt: 22 }) }, { credits: cred({ paid: 5.5, totalDebt: 22.5 }) }).ok, '3 deuda total distinta en los dos lados es choque');
+            mt(!mw({ credits: cred({ paid: 4.4 }) }, { credits: cred({ paid: 20.5, paidDate: 'd' }) }).ok, '3 abono en un lado y saldado en el otro es choque');
+            r = mw({ products: prods({ price: 1.6 }) }, { products: prods({ price: 1.7 }) });
+            mt(!r.ok && r.conflicts.join() === 'products:1', '4 otro precio en cada lado es choque');
+            mt(!mw({ products: prods({ price: 1.6, qty: 8 }) }, { products: prods({ qty: 7 }) }).ok, '4 precio en un lado y venta en el otro es choque');
+            mt(!mw({ credits: [] }, { credits: cred({ paid: 5.5 }) }).ok && !mw({ credits: cred({ paid: 5.5 }) }, { credits: [] }).ok, '5 fiado borrado y abonado es choque');
+            r = mw({ credits: [] }, {});
+            mt(r.ok && r.data.credits.length === 0 && mw({ credits: [] }, { credits: [] }).ok, '5 fiado borrado en un lado (o en los dos) queda borrado');
+            mt(!mw({ sales: [{ id: 's9', total: 1.1 }, ...m0.sales] }, { sales: [{ id: 's9', total: 2.2 }, ...m0.sales] }).ok, '6 mismo id nuevo con distinto contenido es choque');
+            r = mw({ sales: [{ id: 's9', total: 1.1 }, ...m0.sales] }, { sales: [{ total: 1.1, id: 's9' }, ...m0.sales] });
+            mt(r.ok && r.data.sales.filter(s => s.id === 's9').length === 1 && r.data.sales.length === 2, '6 mismo id nuevo con el mismo contenido queda una vez');
+            mt(!mw({ sales: [{ id: 's1', total: 6 }] }, { sales: [{ id: 's1', total: 7 }] }).ok, '6 dos ediciones distintas de una venta son choque');
+            r = mw({ fiscalConfig: { rif: 'J-0', currentNumber: 7 } }, { fiscalConfig: { rif: 'J-0', currentNumber: 6, currentPayment: 3 } });
+            mt(r.ok && r.data.fiscalConfig.currentNumber === 7 && r.data.fiscalConfig.currentPayment === 3 && r.data.fiscalConfig.rif === 'J-0', '7 contadores fiscales: el mayor');
+            mt(!mw({ fiscalConfig: { rif: 'J-0', currentNumber: 7 } }, { fiscalConfig: { rif: 'J-1', currentNumber: 6 } }).ok, '7 otro RIF es choque');
+            r = mw({ fiscalConfig: { rif: 'J-2', currentNumber: 5 } }, {});
+            mt(r.ok && r.data.fiscalConfig.rif === 'J-2', '7 campo cambiado en un solo lado');
+            r = mw({ products: prods({}, { qty: 0 }) }, { products: prods({}, { qty: 0 }) }); // misma huella: es el mismo cambio
+            mt(r.ok && r.data.products[1].qty === 0, '8 el mismo cambio en los dos lados no se suma');
+            r = mw({ products: prods({ qty: 9 }, { qty: 0 }) }, { products: prods({}, { qty: 0 }) });
+            mt(r.ok && r.data.products[1].qty === 0 && r.data.products[0].qty === 9, '8 producto igual en los dos y otro solo en local');
+            r = mw({ products: prods({}, { qty: 0, name: 'B' }) }, { products: prods({}, { qty: -0.5 }) });
+            mt(r.ok && r.data.products[1].qty === -1.5 && r.negatives.join() === '2', '8 existencias en negativo se avisan');
+            const mpOld = { ...mp, clients: { k1: mp.clients.k1[0] } }; // huella de antes de la v71.0
+            mt(!mw({ clients: cli({ balance: 2.2 }) }, { clients: cli({ balance: 3.3 }) }, mpOld).ok, '9 huella vieja y saldo en los dos lados es choque');
+            r = mw({ clients: cli({ balance: 2.2 }) }, {}, mpOld);
+            mt(r.ok && r.data.clients[0].balance === 2.2, '9 huella vieja y saldo en un solo lado');
+            r = mw({ clients: cli({ balance: 2.2 }) }, { clients: cli({ balance: 3.3 }) });
+            mt(r.ok && r.data.clients[0].balance === 4.4, '9 saldo a favor por diferencia');
+            mt(!mw({ clients: cli({ balance: 2.2, moves: [{ amount: 1.1 }] }) }, { clients: cli({ balance: 3.3, moves: [{ amount: 2.2 }] }) }).ok, '9 movimientos distintos son choque');
+            r = mw({ lastUpdated: 'y' }, { bcvUsd: 9 });
+            mt(r.ok && !userDataDiff(r.data, m0, MF).length && r.summary.local === 'Sin cambios' && r.summary.cloud === 'Sin cambios', '10 sin cambios es igual a la nube');
+            mt(!mw({}, { clients: undefined }).ok, 'nube sin la lista de clientes no se une');
+            mt(!mw({ sales: [...m0.sales, ...m0.sales] }, {}).ok && !mw({}, { sales: [{ total: 1 }] }).ok && !mw({}, {}, { ...mp, noId: 1 }).ok, 'id repetido o sin id no se une');
+            mt(!mw({}, {}, {}).ok && !mw({}, {}, { ...mp, sales: undefined }).ok, 'sin huellas de una lista no se une');
+            mt(JSON.stringify(m0) === m0Text, 'no modifica lo que recibe');
             console.log('selfTestSync terminado');
         }
 

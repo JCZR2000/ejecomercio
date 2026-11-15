@@ -414,6 +414,8 @@
                 console.log("🛡️ Ignorando chequeo de conflicto (Cooldown activo)...");
                 return;
             }
+            // Fase 37: hay una unión en curso; si la nube cambió otra vez, la subida de la unión lo detecta y vuelve a decidir
+            if (mergeInProgress) return;
 
             // 2. FILTRO DE ECO: Si es mi propia escritura pendiente, ignorar.
             if (!isFirstSyncCheck && doc.metadata.hasPendingWrites) return;
@@ -461,9 +463,18 @@
                     } else if (photos) {
                         console.log('☁️ Conflicto solo por fotos ya subidas: se usa la nube y se suben los enlaces');
                         finishLoadingData({ ...cloudData, products: photos }, doc);
+                        setPrintsFromCloud(cloudData, doc);
                         saveData();
                     } else {
-                        showConflictModal(cloudData, doc, diff);
+                        // Fase 37: si los cambios de los dos lados no chocan, se unen solos; si no, el cuadro de siempre
+                        const prints = canAuto && !doc.metadata.hasPendingWrites ? getBasePrints() : null;
+                        const merge = prints ? mergeThreeWay(prints, state, cloudData) : null;
+                        if (merge && merge.ok) {
+                            applyMerge(cloudData, doc);
+                        } else {
+                            if (merge) console.warn('☁️ Los cambios no se pueden unir solos. Choques:', merge.conflicts);
+                            showConflictModal(cloudData, doc, diff);
+                        }
                     }
                 }
                 return;
@@ -546,6 +557,66 @@
             }
 
             isFirstSyncCheck = false;
+        }
+
+        // Fase 37: tras cargar un resultado unido, las huellas de la base son las de la nube, no las del resultado.
+        // Si la subida siguiente no llega, la próxima unión compara contra lo que la nube tiene de verdad;
+        // con las huellas del resultado, lo añadido en local parecería «borrado en la nube» y se quitaría.
+        function setPrintsFromCloud(cloudData, doc, prints) {
+            try { setBasePrints(cloudTokenOf(doc.data()), prints || basePrints(cloudData)); }
+            catch (e) { console.warn('Huellas de la base:', e); dropBasePrints(); }
+        }
+        // Sin huellas no hay unión automática: se pregunta como siempre hasta la próxima carga o subida completa.
+        function dropBasePrints() {
+            try { localStorage.removeItem('inv_cloud_base_prints'); } catch (e) { /* sin almacenamiento */ }
+        }
+
+        // Fase 37: une los cambios de este dispositivo y de la nube (mergeThreeWay), con copia de la nube antes.
+        // Si no hay copia (sin red) o la unión ya no es posible, sale el cuadro de siempre y no cambia nada.
+        async function applyMerge(cloudData, doc) {
+            mergeInProgress = true;
+            let applied = false;
+            try {
+                const base0 = getCloudBase();
+                let backup = null;
+                try { backup = await createCloudBackup('Antes de unir cambios de dos dispositivos'); }
+                catch (e) { console.warn('☁️ Sin copia de la nube no se unen los cambios:', e && e.message || e); }
+                if (getCloudBase() !== base0) return; // durante la espera el usuario ya decidió en el cuadro
+                // Durante la espera pudo haber otra venta: la unión se calcula con lo que hay ahora
+                const prints = backup && !isLocalPartial() ? getBasePrints() : null;
+                const merge = prints ? mergeThreeWay(prints, state, cloudData) : null;
+                if (!merge || !merge.ok) {
+                    if (merge) console.warn('☁️ Los cambios no se pueden unir solos. Choques:', merge.conflicts);
+                    showConflictModal(cloudData, doc);
+                    return;
+                }
+                const cloudPrints = basePrints(cloudData); // antes de tocar nada: si falla, no se une
+                applied = true;
+                finishLoadingData({ ...cloudData, ...merge.data }, doc);
+                // La base es la nube también en los conteos: así la subida compara el resultado contra la nube (pérdidas grandes)
+                setCloudBase(cloudTokenOf(doc.data()), cloudCounts(cloudData), cloudUserVer(doc.data()));
+                setPrintsFromCloud(cloudData, doc, cloudPrints);
+                saveData(); // marca los cambios y sube el resultado; la capa de pérdidas grandes sigue actuando
+                // Un cuadro de conflicto que estuviera abierto ya no vale
+                pendingCloudSnapshot = null;
+                $('conflictModal').classList.add('hidden');
+                const neg = merge.negatives.length;
+                safeSetItem('inv_last_merge', JSON.stringify({ at: new Date().toISOString(), local: merge.summary.local, cloud: merge.summary.cloud, negatives: neg }));
+                console.log('☁️ Cambios unidos · este dispositivo:', merge.summary.local, '· nube:', merge.summary.cloud, '· en negativo:', neg);
+                customAlert('Cambios unidos', `Se unieron los cambios de este dispositivo y de la nube.\nEn este dispositivo: ${merge.summary.local}.\nEn la nube: ${merge.summary.cloud}.\nSe guardó una copia de la nube antes.`
+                    + (neg ? `\nRevisa las existencias: ${neg} ${pluralEs(neg, 'producto')} ${neg === 1 ? 'quedó' : 'quedaron'} en negativo.` : ''), 'success', null, 'cloud');
+            } catch (e) {
+                console.error('Unión de cambios:', e);
+                if (applied) {
+                    // Quedó a medias: sin huellas (no se vuelve a unir sobre una base dudosa) y con la marca de cambios (la nube no pisa lo local sin preguntar)
+                    dropBasePrints();
+                    safeSetItem('inv_cloud_dirty', '1');
+                } else {
+                    showConflictModal(cloudData, doc);
+                }
+            } finally {
+                mergeInProgress = false;
+            }
         }
 
         // Cuadro de conflicto: fecha, productos, ventas y fiados de cada lado. Recomienda solo por más ventas.
