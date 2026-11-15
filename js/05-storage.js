@@ -46,6 +46,21 @@
             safeSetItem('inv_cloud_base_counts', JSON.stringify(counts || {}));
         }
 
+        // Fase 36: huellas por elemento de la base (inv_cloud_base_prints). Son ayuda para el cuadro de conflicto, no datos:
+        // si no caben se borran (que no quede una huella vieja) y no se marca inv_local_partial. Nunca lanzan.
+        function setBasePrints(token, prints) {
+            try {
+                if (!safeSetItem('inv_cloud_base_prints', JSON.stringify({ token, prints }))) localStorage.removeItem('inv_cloud_base_prints');
+            } catch (e) { console.warn('Huellas de la base:', e); }
+        }
+        // Solo valen si son de la base actual; si no, null y el cuadro de conflicto funciona sin ellas.
+        function getBasePrints() {
+            try {
+                const o = JSON.parse(localStorage.getItem('inv_cloud_base_prints'));
+                return o && o.prints && o.token === getCloudBase() ? o.prints : null;
+            } catch (e) { return null; }
+        }
+
         // Fase 15: devuelve false si el almacenamiento está lleno (o no disponible); nunca lanza.
         function safeSetItem(key, value) {
             try { localStorage.setItem(key, value); return true; }
@@ -223,6 +238,9 @@
             const chunksRef = userRef.collection('chunks');
             const userChange = isCloudDirty() || isLocalPartial(); // Fase 27: sin await hasta buildCloudParts
             const { main, chunks, kept } = buildCloudParts();
+            // Fase 36: huellas de lo que se sube, sin await en medio. Si fallan, la subida sigue sin ellas.
+            let upPrints = null;
+            try { upPrints = basePrints(state); } catch (e) { console.warn('Huellas de la base:', e); }
             const fp = keyFingerprint();
             const old = state.cloudManifest || {};
             const oldChunks = old.chunks || {};
@@ -287,6 +305,7 @@
             kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
             setCloudManifest(manifest);
             setCloudBase(newToken, upCounts, newUserVer);
+            if (upPrints) setBasePrints(newToken, upPrints); // sin huellas queda la vieja, con otra ficha, y se ignora
             if (seq === saveSeq) clearCloudDirty(); // si hubo otro cambio durante la subida, sigue pendiente
 
             // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)

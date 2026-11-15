@@ -148,14 +148,91 @@
             fiscalConfig: 'Datos fiscales', catalogConfig: 'Vitrina', customRate: 'Tasa propia', rateMode: 'Modo de tasa',
             fiadosRateMode: 'Tasa de fiados', error: 'No se pudo comparar'
         };
+        const USER_SKIP_FIELDS = ['lastUpdated', 'bcvUsd', 'bcvEur'];
+        // Un campo listo para comparar: en productos la foto pasa a su huella (photoRef).
+        function userPart(d, f) {
+            return f !== 'products' ? d[f]
+                : (d.products || []).map(({ img, imgRef, ...p }) => ({ ...p, photoRef: img ? hashText(JSON.stringify(img)) : imgRef }));
+        }
         function userDataDiff(local, cloud, fields = Object.keys(buildCloudPayload())) {
             try {
-                const part = (d, f) => f !== 'products' ? d[f]
-                    : (d.products || []).map(({ img, imgRef, ...p }) => ({ ...p, photoRef: img ? hashText(JSON.stringify(img)) : imgRef }));
-                return fields.filter(f => !['lastUpdated', 'bcvUsd', 'bcvEur'].includes(f) && canonText(part(local, f)) !== canonText(part(cloud, f)));
+                return fields.filter(f => !USER_SKIP_FIELDS.includes(f) && canonText(userPart(local, f)) !== canonText(userPart(cloud, f)));
             } catch (e) {
                 return ['error'];
             }
+        }
+
+        // ==========================================
+        // Fase 36: huellas por elemento de la base (paso 1 de la unión de tres vías). Solo informan: no deciden nada.
+        // ==========================================
+        const PRINT_LISTS = ['sales', 'products', 'credits', 'clients']; // en el orden en que se nombran en los resúmenes
+        const hasKey = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+        // { products: { id: [huella, qty] }, sales: { id: huella }, credits: { id: [huella, paid, totalDebt] }, clients: { id: huella },
+        //   other: { campo: huella }, noId: cuántos elementos venían sin id (se guardan como '#' + índice) }.
+        // Los números van aparte porque el paso 2 los unirá por diferencia.
+        function basePrints(data, fields = Object.keys(buildCloudPayload())) {
+            const print = (x) => hashText(canonText(x));
+            const out = { other: {}, noId: 0 };
+            fields.filter(f => !USER_SKIP_FIELDS.includes(f)).forEach(f => {
+                const part = userPart(data, f);
+                if (!PRINT_LISTS.includes(f)) { out.other[f] = print(part); return; }
+                out[f] = {};
+                (part || []).forEach((x, i) => {
+                    const noId = !x || x.id == null;
+                    if (noId) out.noId++;
+                    const h = print(x);
+                    out[f][noId ? '#' + i : x.id] = f === 'products' ? [h, x.qty] : f === 'credits' ? [h, x.paid, x.totalDebt] : h;
+                });
+            });
+            return out;
+        }
+
+        // Qué cambió en data respecto a las huellas de la base: por tipo { added, removed, edited } (ids) y other: [campos].
+        function sideChanges(prints, data, fields) {
+            const now = basePrints(data, fields);
+            const h = (v) => Array.isArray(v) ? v[0] : v;
+            const out = { other: Object.keys(now.other).filter(f => now.other[f] !== (prints.other || {})[f]) };
+            PRINT_LISTS.forEach(t => {
+                const a = prints[t] || {}, b = now[t] || {};
+                out[t] = {
+                    added: Object.keys(b).filter(id => !hasKey(a, id)),
+                    removed: Object.keys(a).filter(id => !hasKey(b, id)),
+                    edited: Object.keys(b).filter(id => hasKey(a, id) && h(a[id]) !== h(b[id]))
+                };
+            });
+            return out;
+        }
+
+        const CHANGE_NOUNS = { sales: ['venta', 'a'], products: ['producto', 'o'], credits: ['fiado', 'o'], clients: ['cliente', 'o'] };
+        const pluralEs = (n, word) => word + (n === 1 ? '' : 's');
+
+        // «2 ventas nuevas, 1 producto editado, Datos fiscales». Solo etiquetas fijas y números: nunca texto del usuario.
+        function changeSummary(ch) {
+            const out = [];
+            PRINT_LISTS.forEach(t => {
+                const [noun, g] = CHANGE_NOUNS[t];
+                [['added', 'nuev'], ['edited', 'editad'], ['removed', 'borrad']].forEach(([k, adj]) => {
+                    const n = ch[t][k].length;
+                    if (n) out.push(`${n} ${pluralEs(n, noun)} ${pluralEs(n, adj + g)}`);
+                });
+            });
+            return out.concat(ch.other.map(f => USER_DIFF_LABELS[f] || 'Otros')).join(', ') || 'Sin cambios';
+        }
+
+        // Elementos tocados en los dos lados, por tipo (cantidad), y other: [campos]. Es lo que el paso 3 tendría que preguntar.
+        // shortcut: cuenta también el mismo cambio hecho igual en los dos lados; afinarlo en el paso 2, que ya compara huellas.
+        function bothSides(a, b) {
+            const ids = (c) => [...c.added, ...c.edited, ...c.removed];
+            const out = { other: a.other.filter(f => b.other.includes(f)) };
+            PRINT_LISTS.forEach(t => { const s = new Set(ids(a[t])); out[t] = ids(b[t]).filter(id => s.has(id)).length; });
+            return out;
+        }
+
+        // «1 producto, 2 ventas, Datos fiscales» o «ninguno».
+        function bothSummary(both) {
+            return PRINT_LISTS.filter(t => both[t]).map(t => `${both[t]} ${pluralEs(both[t], CHANGE_NOUNS[t][0])}`)
+                .concat(both.other.map(f => USER_DIFF_LABELS[f] || 'Otros')).join(', ') || 'ninguno';
         }
 
         // Fase 34: ¿los productos solo difieren en fotos que este dispositivo ya subió a Storage y la nube aún tiene en base64?
@@ -267,6 +344,39 @@
             console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'B', img: photo }]) === null, 'selfTestSync: otra diferencia no se une');
             console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'A', img: photo + 'B' }]) === null, 'selfTestSync: otra foto no se une');
             console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'A', img: photo }, { id: 2 }]) === null && mergeUploadedPhotos([up], [{ id: 9, name: 'A', img: photo }]) === null, 'selfTestSync: productos distintos no se unen');
+            // Fase 36: huellas de la base (datos ficticios)
+            const PF = ['products', 'sales', 'credits', 'clients', 'fiscalConfig', 'lastUpdated', 'bcvUsd'];
+            const b0 = {
+                products: [{ id: 1, name: 'A', qty: 5 }, { id: 2, name: 'B', qty: 1 }], sales: [{ id: 's1', total: 5 }],
+                credits: [{ id: 'c1', paid: 1, totalDebt: 3 }], clients: [{ id: 'k1', name: 'X' }], fiscalConfig: { a: 1 }, lastUpdated: 'x', bcvUsd: 1
+            };
+            const bp = JSON.parse(JSON.stringify(basePrints(b0, PF))); // como vuelve de localStorage
+            const sc = (d) => sideChanges(bp, { ...b0, ...d }, PF);
+            const flat = (ch) => PRINT_LISTS.map(t => t + ':' + ['added', 'edited', 'removed'].map(k => ch[t][k].join('+')).join('/')).join(' ') + ' ' + ch.other.join('+');
+            const none = 'sales:// products:// credits:// clients:// ';
+            console.assert(bp.products[1][1] === 5 && bp.credits.c1[1] === 1 && bp.credits.c1[2] === 3 && typeof bp.sales.s1 === 'string' && bp.noId === 0, 'selfTestSync: forma de las huellas');
+            console.assert(flat(sc({})) === none && flat(sc({ lastUpdated: 'y', bcvUsd: 9 })) === none && changeSummary(sc({})) === 'Sin cambios', 'selfTestSync: sin cambios');
+            console.assert(flat(sc({ products: [{ qty: 5, name: 'A', id: 1 }, { name: 'B', id: 2, qty: 1, note: null }] })) === none, 'selfTestSync: otro orden de claves no es cambio');
+            const chL = sc({ sales: [{ id: 's2', total: 1 }, ...b0.sales], products: [{ id: 1, name: 'A', qty: 4 }, b0.products[1]] });
+            console.assert(chL.sales.added.join() === 's2' && chL.products.edited.join() === '1' && flat(chL) === 'sales:s2// products:/1/ credits:// clients:// ', 'selfTestSync: venta añadida y producto con otra qty');
+            console.assert(changeSummary(chL) === '1 venta nueva, 1 producto editado', 'selfTestSync: resumen en singular');
+            const chC = sc({ credits: [], products: [{ id: 1, name: 'A2', qty: 5 }, b0.products[1]], fiscalConfig: { a: 2 } });
+            console.assert(chC.credits.removed.join() === 'c1' && chC.other.join() === 'fiscalConfig', 'selfTestSync: fiado borrado y campo distinto');
+            console.assert(changeSummary(chC) === '1 producto editado, 1 fiado borrado, Datos fiscales', 'selfTestSync: resumen con otros campos');
+            console.assert(changeSummary(sc({ sales: [{ id: 's2' }, { id: 's3' }, ...b0.sales], clients: [] })) === '2 ventas nuevas, 1 cliente borrado', 'selfTestSync: resumen en plural');
+            const both = bothSides(chL, chC);
+            console.assert(both.products === 1 && both.sales === 0 && both.credits === 0 && bothSummary(both) === '1 producto', 'selfTestSync: mismo producto en los dos lados');
+            console.assert(bothSummary(bothSides(chL, sc({ credits: [...b0.credits, { id: 'c2' }] }))) === 'ninguno', 'selfTestSync: lados que no chocan');
+            const noId = basePrints({ sales: [{ total: 1 }] }, ['sales']);
+            console.assert(noId.noId === 1 && hasKey(noId.sales, '#0'), 'selfTestSync: elemento sin id');
+            const ph = 'data:image/jpeg;base64,AAA';
+            console.assert(basePrints({ products: [{ id: 1, img: ph }] }, ['products']).products[1][0] === basePrints({ products: [{ id: 1, imgRef: hashText(JSON.stringify(ph)) }] }, ['products']).products[1][0], 'selfTestSync: huella igual con img o con su imgRef');
+            // setBasePrints: si no cabe, borra la clave y no lanza. La clave real se restaura.
+            const realPrints = localStorage.getItem('inv_cloud_base_prints');
+            Storage.prototype.setItem = () => { throw new DOMException('lleno', 'QuotaExceededError'); };
+            try { setBasePrints('t', bp); } finally { Storage.prototype.setItem = realSet; }
+            console.assert(localStorage.getItem('inv_cloud_base_prints') === null, 'selfTestSync: huella que no cabe se borra');
+            if (realPrints !== null) localStorage.setItem('inv_cloud_base_prints', realPrints);
             console.log('selfTestSync terminado');
         }
 
