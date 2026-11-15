@@ -239,6 +239,12 @@
                 box.textContent = 'No se pudo cargar: ' + (e.message || e.code || 'error');
                 return;
             }
+            // Fase 36: tamaño de los datos de cada cuenta (metricas/{uid}). Si falla, el panel sale igual con «—».
+            try {
+                const kb = {};
+                (await db.collection('metricas').get()).forEach(d => { const k = d.data().mainKB; if (Number.isInteger(k)) kb[d.id] = k; });
+                adminLicenses.forEach(l => { l.kb = l.uid in kb ? kb[l.uid] : null; });
+            } catch (e) { console.warn('Tamaño de las cuentas:', e.code || e); }
             if (adminSelected) adminSelected = adminLicenses.find(l => l.uid === adminSelected.uid) || null;
             renderAdminResults();
             renderAdminForm();
@@ -249,7 +255,10 @@
             return list.filter(l => !t || l.email.toLowerCase().includes(t) || l.uid.toLowerCase().startsWith(t));
         };
 
-        const isValidLicenseEmail = (s) => s.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+        // Fase 36: color del tamaño del documento principal (límite de Firestore: 1 MiB = 1024 KB). Amarillo desde la mitad, rojo desde el 80 %.
+        const sizeClass = (kb) => kb >= 820 ? 'text-red-600 font-bold' : kb >= 512 ? 'text-amber-600 font-bold' : 'text-slate-400';
+
+        const isValidLicenseEmail =(s) => s.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 
         function renderAdminResults() {
             const box = $('adminResults');
@@ -271,7 +280,10 @@
                 const sub = document.createElement('span');
                 sub.className = 'block ' + (l.hasta <= now ? 'text-red-600 font-bold' : 'text-slate-500');
                 sub.textContent = `${l.origen} · ${l.hasta >= LIFETIME_MS ? 'de por vida' : (l.hasta <= now ? 'venció el ' : 'hasta ') + formatLicenseDate(l.hasta)}`;
-                b.append(top, sub);
+                const size = document.createElement('span');
+                size.className = 'block ' + sizeClass(l.kb);
+                size.textContent = 'Datos: ' + (l.kb == null ? '—' : l.kb + ' KB');
+                b.append(top, sub, size);
                 b.onclick = () => { adminSelected = l; $('adminEmail').value = ''; renderAdminResults(); renderAdminForm(); };
                 box.append(b);
             });
@@ -394,6 +406,7 @@
 
             t(isValidLicenseEmail('prueba@example.com') && !isValidLicenseEmail('prueba@') && !isValidLicenseEmail('a b@example.com') && !isValidLicenseEmail('x'.repeat(120) + '@example.com'), 'correo de la licencia');
 
+            t(sizeClass(undefined).includes('slate') && sizeClass(null).includes('slate') && sizeClass(511).includes('slate') && sizeClass(512).includes('amber') && sizeClass(819).includes('amber') && sizeClass(820).includes('red'), 'color del tamaño de los datos');
             console.log(fails ? `selfTestLicense: ${fails} fallas` : 'selfTestLicense: OK');
             return fails;
         }
