@@ -433,7 +433,9 @@
             } else if (filter === 'OK' && isCloudDirty() && !isLocalPartial() && sameUserVersion(doc.data(), getCloudBaseUser())) {
                 // Fase 27: la nube solo cambió por subidas de fondo de otro dispositivo: los cambios locales se suben encima
                 console.log('☁️ La nube solo cambió por tasas o fotos: se suben los cambios locales');
+                const oldPrints = getBasePrints(); // Fase 36: antes de cambiar la base; el contenido de la base es el mismo
                 setCloudBase(token, cloudCounts(cloudData), cloudUserVer(doc.data()));
+                if (oldPrints) setBasePrints(token, oldPrints);
             }
 
             // Fase 6: decisión por versión base. Solo un dispositivo sin base (LEGACY) usa la lógica antigua de abajo.
@@ -554,6 +556,20 @@
             // En la primera carga tras actualizar, el index.html puede ser el viejo (en caché) con el JS nuevo: sin el elemento, el cuadro sale igual
             const sinceEl = $('confDirtySince');
             if (sinceEl) sinceEl.textContent = isNaN(since) ? '' : 'Cambios sin subir desde: ' + since.toLocaleString();
+            // Fase 36: con huellas de la base válidas, qué cambió en cada lado. Solo informa; si falla, el cuadro sale como antes.
+            let sides = null;
+            try {
+                const prints = getBasePrints();
+                if (prints) {
+                    const localCh = sideChanges(prints, state), cloudCh = sideChanges(prints, cloudData);
+                    sides = { local: changeSummary(localCh), cloud: changeSummary(cloudCh), both: bothSummary(bothSides(localCh, cloudCh)) };
+                    console.warn('Cambios desde la base · este dispositivo:', sides.local, '· nube:', sides.cloud, '· en los dos lados:', sides.both);
+                }
+            } catch (e) { console.warn('Huellas de la base:', e); }
+            pendingCloudSnapshot.sides = sides;
+            const sideEl = (id, text) => { const el = $(id); if (el) el.textContent = text; };
+            sideEl('confLocalChanges', sides ? 'En este dispositivo: ' + sides.local : '');
+            sideEl('confCloudChanges', sides ? 'En la nube: ' + sides.cloud : '');
             const side = (d) => ({
                 time: d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : '---',
                 ...cloudCounts(d)
@@ -750,6 +766,13 @@
             const parts = (pendingCloudSnapshot.diff || []).map(f => USER_DIFF_LABELS[f] || 'Otros').join(', ') || 'Ninguna';
             tbody.innerHTML += `<tr><td class="px-4 py-3 font-medium text-slate-700 border-r border-slate-100">Partes distintas</td><td colspan="2" class="px-4 py-3 text-center font-bold">${parts}</td></tr>`;
 
+            // 9. CAMBIOS DESDE LA BASE (Fase 36): solo etiquetas fijas y números
+            const sides = pendingCloudSnapshot.sides;
+            if (sides) {
+                const row = (label, text) => `<tr><td class="px-4 py-3 font-medium text-slate-700 border-r border-slate-100">${label}</td><td colspan="2" class="px-4 py-3 text-center font-bold">${text}</td></tr>`;
+                tbody.innerHTML += row('Cambios en este dispositivo', sides.local) + row('Cambios en la nube', sides.cloud) + row('Cambiados en los dos lados', sides.both);
+            }
+
             // Mostrar el modal
             document.getElementById('diffModal').classList.remove('hidden');
         }
@@ -802,6 +825,8 @@
                     renderEncryptionUI(); // Actualizar UI de candado
                     // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
                     setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state), cloudUserVer(doc.data()));
+                    // Fase 36: huellas de la base. Si fallan, la carga sigue sin ellas.
+                    try { setBasePrints(cloudTokenOf(doc.data()), basePrints(state)); } catch (e) { console.warn('Huellas de la base:', e); }
                     clearCloudDirty();
                     assignPendingNumbers(); // Fase 21: numera lo que quedó «por asignar» sin conexión
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
