@@ -20,7 +20,72 @@ service cloud.firestore {
         && d.items is list && d.items.size() > 0 && d.items.size() <= 50
         && d.at is timestamp
         && d.at > request.time - duration.value(10, 'm')
-        && d.at < request.time + duration.value(10, 'm');
+        && d.at < request.time + duration.value(10, 'm')
+        && proActive(userId); // Fase 30, paso R2: esta línea se publica DESPUÉS de R1 (ver el plan, «Orden de publicación»)
+    }
+
+    // Fase 30: licencias Pro
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/admin/config).data.admins;
+    }
+    function proActive(uid) {
+      let p = /databases/$(database)/documents/licencias/$(uid);
+      return exists(p) && get(p).data.hasta > request.time;
+    }
+    function validLicense(d) {
+      return d.keys().hasOnly(['plan','hasta','origen','email','creado','actualizado','por'])
+        && d.plan == 'pro'
+        && d.hasta is timestamp
+        && d.origen in ['prueba','pago','fundador','socio']
+        && (!('email' in d) || d.email is string)
+        && d.por == request.auth.uid;
+    }
+    function validHist(d) {
+      return d.keys().hasOnly(['tipo','dias','hastaAntes','hastaNueva','monto','moneda','nota','por','at'])
+        && d.keys().hasAll(['tipo','hastaNueva','monto','moneda','por','at'])
+        && d.tipo in ['mensual','anual','fundador','socio']
+        && d.hastaNueva is timestamp
+        && d.monto is number && d.monto >= 0
+        && d.moneda in ['USD','VES']
+        && (!('nota' in d) || (d.nota is string && d.nota.size() <= 120))
+        && d.por == request.auth.uid
+        && d.at == request.time;
+    }
+
+    match /admin/config {
+      // Solo un administrador puede leerlo: a los demás les da permiso denegado (así la app sabe si mostrar el panel)
+      allow get: if request.auth != null && request.auth.uid in resource.data.admins;
+      allow list, write: if false;
+    }
+    match /admin/ventas {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow write: if isAdmin();
+    }
+
+    match /licencias/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      // Prueba gratis: una sola vez (create falla si ya existe), 30 días con 1 día de tolerancia por el reloj del teléfono
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['plan','hasta','origen','email','creado'])
+        && request.resource.data.plan == 'pro'
+        && request.resource.data.origen == 'prueba'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.creado == request.time
+        && request.resource.data.hasta > request.time + duration.value(29, 'd')
+        && request.resource.data.hasta <= request.time + duration.value(31, 'd');
+      allow create: if isAdmin() && validLicense(request.resource.data);
+      allow update: if isAdmin() && validLicense(request.resource.data)
+        && (!('email' in resource.data) || request.resource.data.email == resource.data.email);
+      allow delete: if false;
+
+      match /historial/{id} {
+        allow read: if isAdmin();
+        allow create: if isAdmin() && validHist(request.resource.data);
+        allow update, delete: if false;
+      }
     }
 
     match /users/{userId} {

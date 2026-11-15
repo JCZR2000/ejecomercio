@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v65.4</title>
+    <title>EjeComercio v68.0</title>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -158,7 +158,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v65.4</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v68.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -392,7 +392,8 @@
                 <div id="shareStep3" class="hidden">
                     <textarea id="shareMessageInput" class="w-full h-40 border border-gray-300 rounded-lg p-3 text-xs text-gray-700 bg-gray-50 focus:ring-2 focus:ring-green-500 outline-none resize-none mb-3 font-mono leading-relaxed shadow-inner"></textarea>
                     <label class="flex items-center gap-2 text-xs font-bold text-gray-600 bg-gray-50 p-2 rounded border border-gray-100 mb-2">
-                        <input type="checkbox" id="chkIncludeLink" checked onchange="regenerateShareMessage()"> Incluir enlace de pago
+                        <input type="checkbox" id="chkIncludeLink" checked onchange="regenerateShareMessage()"> <span id="chkIncludeLinkText" class="flex-1">Incluir enlace de pago</span>
+                        <button type="button" id="btnShareSeePro" onclick="openMyPlan('el enlace de cobro')" class="hidden bg-amber-100 text-amber-800 border border-amber-200 px-2 py-1 rounded text-[11px] font-bold">Ver Pro</button>
                     </label>
                     <p class="text-[10px] text-gray-500 mb-2">El enlace corto muestra los datos de cobro de tu tienda, aunque los cambies después.</p>
                     <button id="btnShareClientWa" onclick="sendShareToClientWhatsapp()" class="hidden w-full bg-green-100 text-green-700 border border-green-200 py-2 rounded-lg text-xs font-bold mb-2"></button>
@@ -469,6 +470,51 @@
         <option value="BANCO NACIONAL DE CREDITO (0191)">
     </datalist>
 
+    <!-- PANEL DE ADMINISTRACIÓN DE LICENCIAS (Fase 30) -->
+    <div id="adminModal" class="fixed inset-0 modal-bg z-[70] hidden flex items-end sm:items-center justify-center sm:p-4">
+        <div class="bg-slate-50 rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-800 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md"><i class="fa-solid fa-user-shield"></i></div>
+                    <div class="min-w-0"><h3 class="font-bold text-slate-800 text-lg leading-tight">Licencias</h3><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Panel de administración</p></div>
+                </div>
+                <button onclick="closeAdminPanel()" aria-label="Cerrar" class="w-10 h-10 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition active:scale-90"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-4 space-y-3 max-h-[80vh] overflow-y-auto">
+                <input type="search" id="adminSearch" oninput="renderAdminResults()" aria-label="Buscar por correo o código" placeholder="Correo, código o uid completo" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white">
+                <div id="adminResults" class="space-y-2 text-xs text-slate-500 max-h-56 overflow-y-auto"></div>
+                <div id="adminForm" class="hidden bg-white rounded-2xl border border-slate-100 shadow-sm p-3 space-y-2">
+                    <p id="adminAccount" class="text-xs font-bold text-slate-700 break-all"></p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="col-span-2">
+                            <label for="adminType" class="block text-xs font-bold text-slate-600 mb-1">Tipo</label>
+                            <select id="adminType" onchange="renderAdminForm()" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white">
+                                <option value="mensual">Mensual (30 días)</option>
+                                <option value="anual">Anual (365 días)</option>
+                                <option value="fundador">Fundador (1 año desde hoy)</option>
+                                <option value="socio">Socio (de por vida)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="adminAmount" class="block text-xs font-bold text-slate-600 mb-1">Monto cobrado</label>
+                            <input type="number" id="adminAmount" min="0" step="0.01" value="0" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="adminCurrency" class="block text-xs font-bold text-slate-600 mb-1">Moneda</label>
+                            <select id="adminCurrency" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white"><option value="USD">USD</option><option value="VES">VES</option></select>
+                        </div>
+                        <div class="col-span-2">
+                            <label for="adminNote" class="block text-xs font-bold text-slate-600 mb-1">Nota (opcional)</label>
+                            <input type="text" id="adminNote" maxlength="120" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    <p id="adminNewDate" class="text-sm font-bold text-emerald-700"></p>
+                    <button type="button" onclick="activateLicense()" class="w-full bg-indigo-600 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm active:scale-95 transition">Activar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="configModal" class="fixed inset-0 modal-bg z-[60] hidden flex items-end sm:items-center justify-center sm:p-4">
         <div class="bg-slate-50 rounded-t-3xl sm:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
             <div class="bg-white border-b border-slate-100 p-4 flex justify-between items-center">
@@ -480,6 +526,27 @@
             </div>
 
             <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
+
+                <!-- MI PLAN (Fase 30) -->
+                <section id="myPlanSection" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-amber-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-crown"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Mi plan</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Tu suscripción</p></div>
+                    </div>
+                    <p id="myPlanFeature" class="hidden text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-2"></p>
+                    <p id="myPlanStatus" class="font-bold text-slate-800"></p>
+                    <p class="text-xs text-slate-500 break-all mt-0.5"><span id="myPlanEmail"></span> · Código: <span id="myPlanCode" class="font-mono font-bold text-slate-700"></span></p>
+                    <p class="text-xs font-bold text-slate-600 mt-3 mb-1">Pro incluye</p>
+                    <ul class="text-xs text-slate-600 space-y-1">
+                        <li><i class="fa-solid fa-check text-emerald-600 mr-2"></i>Vitrina en línea con pedidos</li>
+                        <li><i class="fa-solid fa-check text-emerald-600 mr-2"></i>Enlace de cobro en el recordatorio</li>
+                        <li><i class="fa-solid fa-check text-emerald-600 mr-2"></i>Logo en recibos y facturas</li>
+                        <li><i class="fa-solid fa-check text-emerald-600 mr-2"></i>Panel de Ganancias y costos</li>
+                    </ul>
+                    <p id="myPlanInfo" class="hidden text-xs text-slate-600 bg-slate-50 rounded-xl p-3 mt-3 break-words" style="white-space: pre-line"></p>
+                    <button type="button" id="myPlanBuyBtn" onclick="openProWhatsapp()" class="hidden w-full bg-green-600 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm mt-3 active:scale-95 transition"><i class="fa-brands fa-whatsapp mr-2"></i><span id="myPlanBuyLabel">Hazte Pro</span></button>
+                    <button type="button" id="myPlanAdminBtn" onclick="openAdminPanel()" class="hidden w-full bg-slate-800 text-white py-2.5 rounded-xl text-sm font-bold shadow-sm mt-2 active:scale-95 transition"><i class="fa-solid fa-user-shield mr-2"></i>Panel de administración</button>
+                </section>
 
                 <!-- TASA DE CAMBIO -->
                 <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
@@ -656,9 +723,10 @@
                 <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-pink-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-store"></i></div>
-                        <div class="min-w-0 flex-1"><h4 class="font-bold text-slate-800 leading-tight">Vitrina</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Catálogo público con pedidos por WhatsApp</p></div>
+                        <div class="min-w-0 flex-1"><h4 class="font-bold text-slate-800 leading-tight">Vitrina <span id="catalogProTag" class="hidden align-middle text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">Pro</span></h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Catálogo público con pedidos por WhatsApp</p></div>
                         <button type="button" id="catalogToggleBtn" role="switch" aria-checked="false" aria-label="Activar vitrina" onclick="toggleCatalog(!state.catalogConfig.enabled)" class="relative shrink-0 w-11 h-6 rounded-full transition bg-slate-300"></button>
                     </div>
+                    <button type="button" id="catalogProNote" onclick="openMyPlan('la vitrina')" class="hidden w-full text-left text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">Disponible con Pro <i class="fa-solid fa-chevron-right ml-1"></i></button>
                     <div class="space-y-3">
                         <div>
                             <label for="catalogTitle" class="block text-xs font-bold text-slate-600 mb-1">Nombre de la tienda</label>
@@ -2147,6 +2215,7 @@
                                     class="w-full bg-red-50 text-red-600 text-xs font-bold py-2 rounded-xl hover:bg-red-100 transition">Quitar</button>
                             </div>
                         </div>
+                        <p id="receiptLogoProNote" class="hidden text-[10px] text-amber-700 font-bold mt-1">El logo sale en el recibo con Pro</p>
                     </div>
         
                     <div>
@@ -2224,5 +2293,6 @@
     <script src="js/26-clients.js"></script>
     <script src="js/27-profit.js"></script>
     <script src="js/28-orders.js"></script>
+    <script src="js/29-license.js"></script>
 </body>
 </html>

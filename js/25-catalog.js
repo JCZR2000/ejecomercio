@@ -120,7 +120,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         function scheduleCatalogPublish() {
             const c = normalizeCatalogConfig();
             const user = auth.currentUser;
-            if (!c.enabled || !user) return;
+            if (!c.enabled || !user || !hasPro()) return; // sin Pro no se encola (Fase 30)
             const hash = catalogHash(buildCatalogNow());
             const q = getCatalogQueue();
             if (q && q.action === 'publish' && q.uid === user.uid && q.qhash === hash) return; // nada nuevo desde el último cambio
@@ -137,6 +137,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             if (!q || isPublishingCatalog) return;
             const c = normalizeCatalogConfig();
             if ((q.action === 'publish') !== c.enabled) { setCatalogQueue(null); return; } // la vitrina cambió de estado
+            // Sin Pro no se sube, pero la cola se conserva: al activar Pro se publica sola. Borrar siempre se ejecuta.
+            if (q.action === 'publish' && !hasPro()) { catalogError = ''; renderCatalogBadge(); return; }
             const user = auth.currentUser;
             if (!user || user.uid !== q.uid || !navigator.onLine || !state.isCloudSynced) { renderCatalogBadge(); return; }
             if (q.action === 'publish' && !force && q.due > Date.now()) { armCatalogTimer(); return; }
@@ -225,6 +227,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
 
         function catalogStatusInfo() {
             const q = getCatalogQueue();
+            if (state.catalogConfig && state.catalogConfig.enabled && !hasPro()) return { text: 'Pausada (Pro)', color: 'text-amber-300' };
             if (isPublishingCatalog) return { text: 'Publicando…', color: 'text-blue-300' };
             if (catalogError) return { text: 'Error', color: 'text-red-400' };
             if (q) return { text: `Pendiente (${Math.max(1, Math.ceil((q.due - Date.now()) / 60000))} min)`, color: 'text-yellow-300' };
@@ -234,6 +237,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
 
         // Al tocar el indicador: detalle del estado y, si hay algo pendiente, opción de publicar ya
         function showCatalogDetail() {
+            if (state.catalogConfig && state.catalogConfig.enabled && !hasPro()) return openMyPlan('la vitrina');
             const { text } = catalogStatusInfo();
             const at = Number(localStorage.getItem('inv_catalog_published_at'));
             const last = at ? 'Última publicación: ' + new Date(at).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Aún no se ha publicado.';
@@ -269,6 +273,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         async function claimCatalogSlug() {
             const user = auth.currentUser;
             const slug = normalizeSlug($('catalogSlug').value);
+            if (!hasPro()) return openMyPlan('el nombre corto');
             if (!user || !navigator.onLine) { customAlert('Sin conexión', 'Necesitas sesión y conexión para reservar el nombre.', 'error'); return; }
             if (!CATALOG_SLUG_RE.test(slug)) { customAlert('Nombre no válido', 'Usa de 3 a 30 letras, números o guiones.', 'error'); return; }
             const c = normalizeCatalogConfig();
@@ -278,7 +283,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
                 const ref = storage.ref(slugPath(slug));
                 let mine = false;
                 try { const m = await ref.getMetadata(); mine = !!(m.customMetadata && m.customMetadata.owner === user.uid); if (!mine) throw Object.assign(new Error('en uso'), { inUse: true }); }
-                catch (e) { if (e.code !== 'storage/object-not-found') throw e; }
+                // unauthorized (Fase 30: nombre de una cuenta sin Pro) se trata como libre: decide el create, que falla si existe
+                catch (e) { if (e.code !== 'storage/object-not-found' && e.code !== 'storage/unauthorized') throw e; }
                 if (!mine) {
                     try { await ref.putString(JSON.stringify({ u: user.uid }), 'raw', { contentType: 'application/json', customMetadata: { owner: user.uid } }); }
                     catch (e) { if (e.code === 'storage/unauthorized') throw Object.assign(new Error('en uso'), { inUse: true }); throw e; }
@@ -334,6 +340,8 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
             $('catalogLinkInput').value = catalogPublicUrl();
             $('catalogDirectLinkInput').value = catalogPublicUrl('direct');
             $('catalogError').textContent = catalogError;
+            $('catalogProTag').classList.toggle('hidden', hasPro());
+            $('catalogProNote').classList.toggle('hidden', hasPro());
             renderSlugUI();
             renderCatalogBadge();
         }
@@ -359,6 +367,7 @@ const CATALOG_COLORS = { indigo: '#312e81', verde: '#166534', rojo: '#991b1b', a
         function toggleCatalog(enabled) {
             const c = normalizeCatalogConfig();
             if (enabled) {
+                if (!hasPro()) return openMyPlan('la vitrina');
                 const whatsapp = normalizeCatalogWhatsapp($('catalogWhatsapp').value);
                 if (!isValidCatalogWhatsapp(whatsapp)) {
                     customAlert('WhatsApp obligatorio', 'Para activar la vitrina escribe el WhatsApp del negocio con código de país, solo dígitos (10 a 15). Ejemplo: 584120000000.', 'error');

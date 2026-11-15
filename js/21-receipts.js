@@ -21,6 +21,7 @@
                 qrBox.checked = qrOk && state.receiptConfig.showShopQr === true;
                 qrNote.textContent = !qrOk ? 'Activa la vitrina en Ajustes para usarlo' : (!cat.slug ? 'Ponle nombre a tu vitrina para un enlace más corto' : '');
                 qrNote.classList.toggle('hidden', !qrNote.textContent);
+                $('receiptLogoProNote').classList.toggle('hidden', hasPro());
                 if (state.receiptConfig.logo) {
                     $('receiptLogoPreview').src = state.receiptConfig.logo;
                     $('receiptLogoPreview').classList.remove('hidden');
@@ -365,7 +366,7 @@
 
         // Bloque del QR de la tienda; '' si no corresponde. Solo codifica el enlace público de la vitrina.
         function shopQrHtml(conf) {
-            if (conf.showShopQr !== true || !normalizeCatalogConfig().enabled || typeof qrcode === 'undefined') return '';
+            if (conf.showShopQr !== true || !hasPro() || !normalizeCatalogConfig().enabled || typeof qrcode === 'undefined') return '';
             const url = catalogPublicUrl();
             if (!url) return '';
             let svg;
@@ -476,7 +477,7 @@
             const refLine = methodText && data.methodRef ? `<p class="text-[9px] text-slate-400">Ref. ${escapeHtml(data.methodRef)}</p>` : '';
 
             $('receiptCanvas').innerHTML = `<div class="bg-white rounded-2xl overflow-hidden" style="color:#1e293b">
-                ${receiptHeaderHtml(conf.companyName || 'Mi Negocio', conf.logo, conf.headerInfo)}
+                ${receiptHeaderHtml(conf.companyName || 'Mi Negocio', hasPro() ? conf.logo : null, conf.headerInfo)}
                 <div class="p-4">
                     <div class="flex items-start justify-between gap-2">
                         <div class="min-w-0"><div class="text-sm font-extrabold leading-tight">${title}</div>${number ? `<div class="text-[10px] text-slate-400 font-bold mt-0.5">N° ${escapeHtml(number)}</div>` : ''}</div>
