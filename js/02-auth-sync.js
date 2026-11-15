@@ -72,6 +72,7 @@
                 loginOverlay.classList.add('hidden');
                 loginStatus.classList.add('hidden');
                 initDataSync(user); // Arrancar sincronización
+                startLicense(user); // Fase 30: licencia Pro
             } else {
                 console.log("💤 Auth: Desconectado");
                 updateCloudStatus('OFFLINE');
@@ -90,6 +91,7 @@
                     loginStatus.classList.add('hidden');
                 }
                 if (unsubscribe) unsubscribe();
+                stopLicense();
             }
         }));
 

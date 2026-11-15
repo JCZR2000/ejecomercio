@@ -127,7 +127,7 @@
 
         async function publishPayProfile() {
             const user = auth.currentUser;
-            if (!user || !navigator.onLine || payProfilePublishing) return;
+            if (!user || !navigator.onLine || payProfilePublishing || !hasPro()) return;
             const profile = buildPayProfile();
             if (!Object.keys(profile.methods).length) return; // seguro: un estado vacío (p. ej. cifrado sin desbloquear) nunca reemplaza el perfil
             payProfilePublishing = true;
@@ -148,7 +148,7 @@
         function schedulePayProfile() {
             const user = auth.currentUser;
             const c = state.catalogConfig;
-            if (!c || c.payProfile !== true || !user || !navigator.onLine || !state.isCloudSynced) return;
+            if (!c || c.payProfile !== true || !user || !navigator.onLine || !state.isCloudSynced || !hasPro()) return;
             clearTimeout(payProfileTimer);
             if (localStorage.getItem(PAY_PROFILE_KEY) === payProfileStoredKey(user.uid, buildPayProfile())) return;
             payProfileTimer = setTimeout(() => publishPayProfile().catch(e => console.warn('Perfil de cobro no publicado:', e.code || e.message || e)), 3000);
@@ -181,8 +181,8 @@
             for (let i = 0; i < 3; i++) {
                 const code = randomShortCode();
                 const ref = storage.ref(`cobro/${code}.json`);
-                // No depende de las reglas: si el código ya existe (get es público) se prueba con otro
-                try { await ref.getMetadata(); continue; } catch (e) { if (!e || e.code !== 'storage/object-not-found') throw e; }
+                // Si el código ya existe se prueba con otro. unauthorized (Fase 30: código de una cuenta sin Pro) se trata como libre: decide el create
+                try { await ref.getMetadata(); continue; } catch (e) { if (!e || (e.code !== 'storage/object-not-found' && e.code !== 'storage/unauthorized')) throw e; }
                 try {
                     await ref.putString(JSON.stringify({ v: 1, q }), 'raw',
                         { contentType: 'application/json', cacheControl: 'public, max-age=86400', customMetadata: { owner: user.uid } });
@@ -413,6 +413,13 @@
                 $('shareWaBox').classList.toggle('hidden', !!wa);
                 if (!wa) $('shareWhatsapp').value = '';
                 try { localStorage.setItem(SHARE_LAST_METHODS_KEY, JSON.stringify(getSelectedShareMethods())); } catch (e) { /* sin almacenamiento */ }
+                // Fase 30: el enlace de cobro es de Pro; al recuperar Pro la casilla vuelve a quedar marcada
+                const pro = hasPro(), chk = $('chkIncludeLink');
+                chk.disabled = !pro;
+                if (!pro) { chk.checked = false; chk.dataset.locked = '1'; }
+                else if (chk.dataset.locked) { chk.checked = true; delete chk.dataset.locked; }
+                $('chkIncludeLinkText').textContent = pro ? 'Incluir enlace de pago' : 'Incluir enlace de pago · Pro';
+                $('btnShareSeePro').classList.toggle('hidden', pro);
                 regenerateShareMessage();
                 updateShareClientWa();
             }
@@ -425,7 +432,7 @@
             const methods = buildShareMethodList(getSelectedShareMethods());
             const now = new Date();
             const opts = { debt: shareDraft.debt, rate: shareDraft.rate, rateName: shareDraft.rateName, date: now, link: '' };
-            if ($('chkIncludeLink').checked) {
+            if ($('chkIncludeLink').checked && hasPro()) {
                 const cfg = state.catalogConfig || {};
                 const user = auth.currentUser;
                 const canCloud = !!user && navigator.onLine;

@@ -1,6 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    // Fase 30: Pro vigente según licencias/{uid} en Firestore (cuesta 1-2 lecturas de Firestore por consulta)
+    function proActive(uid) {
+      return firestore.exists(/databases/(default)/documents/licencias/$(uid))
+          && firestore.get(/databases/(default)/documents/licencias/$(uid)).data.hasta > request.time;
+    }
+    function isOwnFile(fileName) {
+      return request.auth != null && fileName == request.auth.uid + '.json';
+    }
+    function isOwner() {
+      return request.auth != null && resource.metadata.owner == request.auth.uid;
+    }
+
     match /users/{userId}/{allPaths=**} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
@@ -9,35 +21,48 @@ service firebase.storage {
                             && request.resource.contentType.matches('image/.*');
     }
 
+    // El dueño siempre lee el suyo (la app lo consulta antes de subir); el público, solo con Pro vigente
     match /catalogo/{fileName} {
-      allow get: if true;
-      allow create, update: if request.auth != null
-                            && fileName == request.auth.uid + '.json'
+      allow get: if isOwnFile(fileName) || proActive(fileName.split('[.]')[0]);
+      allow create, update: if isOwnFile(fileName) && proActive(request.auth.uid)
                             && request.resource.size < 1024 * 1024
                             && request.resource.contentType == 'application/json';
-      allow delete: if request.auth != null && fileName == request.auth.uid + '.json';
+      allow delete: if isOwnFile(fileName);
     }
 
-    // Fase 17: perfil de cobro público de la tienda (nombre, color, logo, WhatsApp y métodos de pago)
+    // Fase 17: perfil de cobro público de la tienda
     match /perfil/{fileName} {
-      allow get: if true;
-      allow create, update: if request.auth != null
-                            && fileName == request.auth.uid + '.json'
+      allow get: if isOwnFile(fileName) || proActive(fileName.split('[.]')[0]);
+      allow create, update: if isOwnFile(fileName) && proActive(request.auth.uid)
                             && request.resource.size < 64 * 1024
                             && request.resource.contentType == 'application/json';
-      allow delete: if request.auth != null && fileName == request.auth.uid + '.json';
+      allow delete: if isOwnFile(fileName);
     }
 
-    // Fase 17: nombre corto de la vitrina. create solo si no existe: el primero que lo pide se lo queda.
+    // Fase 17: nombre corto de la vitrina. create solo si no existe.
     match /tienda/{fileName} {
-      allow get: if true;
+      allow get: if resource == null || isOwner() || proActive(resource.metadata.owner);
       allow create: if request.auth != null
                     && fileName.matches('^[a-z0-9][a-z0-9-]{1,28}[a-z0-9][.]json$')
                     && request.resource.metadata.owner == request.auth.uid
                     && request.resource.size < 1024
-                    && request.resource.contentType == 'application/json';
+                    && request.resource.contentType == 'application/json'
+                    && proActive(request.auth.uid);
       allow update: if false;
-      allow delete: if request.auth != null && resource.metadata.owner == request.auth.uid;
+      allow delete: if isOwner();
+    }
+
+    // Fase 31a: código corto del enlace de cobro (90 días por la regla de ciclo de vida del bucket)
+    match /cobro/{fileName} {
+      allow get: if resource == null || isOwner() || proActive(resource.metadata.owner);
+      allow create: if request.auth != null
+                    && fileName.matches('^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{6}[.]json$')
+                    && request.resource.metadata.owner == request.auth.uid
+                    && request.resource.size < 1024
+                    && request.resource.contentType == 'application/json'
+                    && proActive(request.auth.uid);
+      allow update: if false;
+      allow delete: if isOwner();
     }
   }
 }

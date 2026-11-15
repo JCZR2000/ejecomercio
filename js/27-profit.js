@@ -86,7 +86,10 @@
             $('tabDashProfit').className = `flex-1 py-2 text-xs font-bold rounded transition ${isProfit ? 'shadow bg-white text-indigo-600' : 'text-gray-500 hover:bg-gray-200'}`;
             if (isProfit) renderProfit();
         }
-        function openProfitTab() { checkAuth('profit', () => showDashTab('profit')); }
+        function openProfitTab() {
+            if (!hasPro()) return openMyPlan('el panel de Ganancias');
+            checkAuth('profit', () => showDashTab('profit'));
+        }
 
         function setProfitPeriod(p) { profitPeriod = p; renderProfit(); }
 
