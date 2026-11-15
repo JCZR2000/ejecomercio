@@ -790,6 +790,9 @@
                     put('inv_bcv_eur', state.bcvEur);
                     put('inv_receipt_config', JSON.stringify(state.receiptConfig));
                     put('inv_catalog_config', JSON.stringify(normalizeCatalogConfig()));
+                    // Fase 35: también los datos fiscales (antes solo quedaban en memoria)
+                    if (state.receiptType) put('inv_receipt_type', state.receiptType);
+                    if (state.fiscalConfig && typeof state.fiscalConfig === 'object') put('inv_fiscal_config', JSON.stringify(state.fiscalConfig));
 
                     if(encryptionKey) put('inv_enc_key', encryptionKey);
                     if (localOk) { try { localStorage.removeItem('inv_local_partial'); } catch (e) { /* sin almacenamiento */ } }
