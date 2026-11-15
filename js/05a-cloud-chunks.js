@@ -125,6 +125,60 @@
             return { sales: miss(local.sales, cloud.sales), credits: miss(local.credits, cloud.credits) };
         }
 
+        // Fase 34: texto para comparar contenido. Claves ordenadas; una clave vacía (null, [], {}) cuenta como ausente.
+        function canonText(value) {
+            const isEmpty = (x) => x == null || (typeof x === 'object' && Object.keys(x).length === 0);
+            const norm = (x) => {
+                if (Array.isArray(x)) return x.map(norm);
+                if (!x || typeof x !== 'object') return x;
+                const o = {};
+                Object.keys(x).sort().forEach(k => { const n = norm(x[k]); if (!isEmpty(n)) o[k] = n; });
+                return o;
+            };
+            const n = norm(value);
+            return JSON.stringify(isEmpty(n) ? null : n);
+        }
+
+        // Fase 34: partes de los datos del usuario que son distintas entre local y nube ([] = mismo contenido).
+        // No cuentan lastUpdated ni las tasas BCV (subidas de fondo). La foto se compara por su huella:
+        // base64 en un lado y su imgRef en el otro son la misma foto. Si algo falla: ['error'] (en la duda se pregunta).
+        const USER_DIFF_LABELS = {
+            products: 'Productos', sales: 'Ventas', credits: 'Fiados', clients: 'Clientes', profitArchive: 'Ganancias',
+            paymentMethods: 'Métodos de pago', security: 'PIN', receiptConfig: 'Recibo', receiptType: 'Tipo de recibo',
+            fiscalConfig: 'Datos fiscales', catalogConfig: 'Vitrina', customRate: 'Tasa propia', rateMode: 'Modo de tasa',
+            fiadosRateMode: 'Tasa de fiados', error: 'No se pudo comparar'
+        };
+        function userDataDiff(local, cloud, fields = Object.keys(buildCloudPayload())) {
+            try {
+                const part = (d, f) => f !== 'products' ? d[f]
+                    : (d.products || []).map(({ img, imgRef, ...p }) => ({ ...p, photoRef: img ? hashText(JSON.stringify(img)) : imgRef }));
+                return fields.filter(f => !['lastUpdated', 'bcvUsd', 'bcvEur'].includes(f) && canonText(part(local, f)) !== canonText(part(cloud, f)));
+            } catch (e) {
+                return ['error'];
+            }
+        }
+
+        // Fase 34: ¿los productos solo difieren en fotos que este dispositivo ya subió a Storage y la nube aún tiene en base64?
+        // Devuelve los productos de la nube con el enlace local (imgUrl/imgHash), o null si hay cualquier otra diferencia.
+        function mergeUploadedPhotos(localProducts, cloudProducts) {
+            try {
+                const byId = new Map(localProducts.map(p => [String(p.id), p]));
+                if (byId.size !== cloudProducts.length || new Set(cloudProducts.map(c => String(c.id))).size !== byId.size) return null;
+                const same = (a, b) => !userDataDiff({ products: [a] }, { products: [b] }, ['products']).length;
+                return cloudProducts.map(c => {
+                    const l = byId.get(String(c.id));
+                    if (same(l, c)) return c;
+                    const { img, imgRef, imgUrl, imgHash, ...rest } = c;
+                    const merged = { ...rest, imgUrl: l.imgUrl, imgHash: l.imgHash };
+                    // misma foto: imgHash local es la huella del base64 que la nube todavía guarda
+                    if (l.img || !l.imgUrl || typeof img !== 'string' || hashText(img) !== l.imgHash || !same(l, merged)) throw new Error('otra diferencia');
+                    return merged;
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
         // Tipos que bajan a 0 desde más de 0, o a menos de la mitad desde 5 o más.
         function bigLoss(baseCounts, nowCounts) {
             if (!baseCounts) return [];
@@ -191,6 +245,28 @@
             const text = 'ñ'.repeat(2500) + 'abc';
             const parts = splitText(text, 900);
             console.assert(parts.length === 3 && parts.join('') === text && splitText('') .length === 0, 'selfTestSync: partir y unir texto');
+            // Fase 34: userDataDiff y mergeUploadedPhotos (datos ficticios)
+            const F = ['products', 'sales', 'credits', 'lastUpdated', 'bcvUsd'];
+            const dA = { products: [{ id: 1, name: 'A', price: 2, imgUrl: 'u', imgHash: 'h' }], sales: [{ id: 's1', total: 5 }], credits: [], lastUpdated: 'x', bcvUsd: 1 };
+            const dd = (cloud) => userDataDiff(dA, { ...dA, ...cloud }, F).join();
+            console.assert(dd({ lastUpdated: 'y', bcvUsd: 2 }) === '', 'selfTestSync: otra fecha y otra tasa es igual');
+            console.assert(dd({ sales: [{ id: 's1', total: 6 }] }) === 'sales', 'selfTestSync: venta distinta');
+            console.assert(dd({ sales: [...dA.sales, { id: 's2', total: 1 }] }) === 'sales', 'selfTestSync: venta de más');
+            console.assert(dd({ products: [{ imgHash: 'h', imgUrl: 'u', price: 2, name: 'A', id: 1 }] }) === '', 'selfTestSync: otro orden de claves es igual');
+            console.assert(dd({ credits: undefined }) === '' && dd({ credits: null }) === '' && dd({ products: [{ ...dA.products[0], note: null }] }) === '', 'selfTestSync: vacío y ausente son iguales');
+            console.assert(dd({ products: [{ ...dA.products[0], imgHash: 'otro' }] }) === 'products', 'selfTestSync: imgHash distinto');
+            console.assert(dd({ products: [{ ...dA.products[0], price: 3 }], credits: [{ id: 'c' }] }) === 'products,credits', 'selfTestSync: dos partes distintas');
+            const photo = 'data:image/jpeg;base64,AAA';
+            const dp = (l, c) => userDataDiff({ products: [l] }, { products: [c] }, ['products']).join();
+            console.assert(dp({ id: 1, img: photo }, { id: 1, imgRef: hashText(JSON.stringify(photo)) }) === '', 'selfTestSync: img y su imgRef son la misma foto');
+            console.assert(dp({ id: 1, img: photo }, { id: 1, img: photo + 'B' }) === 'products' && dp({ id: 1, img: photo }, { id: 1 }) === 'products', 'selfTestSync: foto distinta o nueva');
+            console.assert(userDataDiff({ products: 5 }, { products: [] }, ['products']).join() === 'error', 'selfTestSync: en la duda, error');
+            const up = { id: 1, name: 'A', imgUrl: 'u', imgHash: hashText(photo) };
+            const mg = mergeUploadedPhotos([up, { id: 2 }], [{ name: 'A', id: 1, img: photo }, { id: 2 }]);
+            console.assert(mg && mg[0].imgUrl === 'u' && mg[0].imgHash === up.imgHash && !('img' in mg[0]) && mg.length === 2, 'selfTestSync: foto ya subida conserva el enlace local');
+            console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'B', img: photo }]) === null, 'selfTestSync: otra diferencia no se une');
+            console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'A', img: photo + 'B' }]) === null, 'selfTestSync: otra foto no se une');
+            console.assert(mergeUploadedPhotos([up], [{ id: 1, name: 'A', img: photo }, { id: 2 }]) === null && mergeUploadedPhotos([up], [{ id: 9, name: 'A', img: photo }]) === null, 'selfTestSync: productos distintos no se unen');
             console.log('selfTestSync terminado');
         }
 
