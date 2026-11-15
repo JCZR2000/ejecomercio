@@ -5,6 +5,9 @@
         // Las fotos no se copian (solo sus enlaces de Storage); las de trozos img_ viejos tampoco.
         // ==========================================
         const BACKUPS_KEEP = 5;
+        // Las copias de cada unión automática (Fase 37) se recortan aparte para no desplazar las importantes (Fase 38)
+        const MERGE_BACKUP_REASON = 'Antes de unir cambios de dos dispositivos';
+        const MERGE_BACKUPS_KEEP = 3;
 
         const cloudUserRef = () => db.collection('users').doc(auth.currentUser.uid);
 
@@ -99,9 +102,15 @@
             return snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
         }
 
+        // Pura: ids a borrar. list va de la más nueva a la más vieja; las de unión y las demás se cuentan por separado.
+        function backupsToTrim(list) {
+            const merge = list.filter(b => b.reason === MERGE_BACKUP_REASON), other = list.filter(b => b.reason !== MERGE_BACKUP_REASON);
+            return [...merge.slice(MERGE_BACKUPS_KEEP), ...other.slice(BACKUPS_KEEP)].map(b => b.id);
+        }
+
         async function trimCloudBackups() {
             const list = await listCloudBackups();
-            for (const b of list.slice(BACKUPS_KEEP)) await deleteBackupDoc(cloudUserRef().collection('backups').doc(b.id));
+            for (const id of backupsToTrim(list)) await deleteBackupDoc(cloudUserRef().collection('backups').doc(id));
         }
 
         async function deleteAllCloudBackups(userRef) {
@@ -146,8 +155,9 @@
         // Barra azul de Ajustes: copias guardadas frente al máximo que se conservan (n = null: sin datos)
         function setBackupsBar(n) {
             if (!$('backupsBar')) return;
-            $('backupsBar').style.width = n === null ? '0%' : `${Math.min(n / BACKUPS_KEEP, 1) * 100}%`;
-            $('backupsText').textContent = n === null ? 'Sin datos' : `${n} / ${BACKUPS_KEEP} copias en la nube`;
+            const max = BACKUPS_KEEP + MERGE_BACKUPS_KEEP;
+            $('backupsBar').style.width = n === null ? '0%' : `${Math.min(n / max, 1) * 100}%`;
+            $('backupsText').textContent = n === null ? 'Sin datos' : `${n} / ${max} copias en la nube`;
         }
 
         async function renderCloudBackupsUI() {

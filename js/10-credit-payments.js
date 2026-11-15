@@ -74,8 +74,8 @@
                 if (settled) setTimeout(autoPruneCredits, 500);
 
                 rememberPayMethod(state.sales[0].method);
+                assignPendingNumbers(); // antes de saveData: la subida espera a la asignación en curso (Fase 38)
                 saveData();
-                assignPendingNumbers();
                 renderAll();
 
                 // Ventana de éxito con «Generar Recibo» en cualquier modo: el recibo del abono es el personalizado (Fase 21)
@@ -160,8 +160,8 @@
 
             rememberPayMethod(payMethodKey(pay.method));
             closeMultiPayModal();
+            assignPendingNumbers(); // antes de saveData: la subida espera a la asignación en curso (Fase 38)
             saveData();
-            assignPendingNumbers();
             renderAll();
             setTimeout(() => customAlert('Abonos registrados', `${rows.length} abonos registrados por ${formatMoney(roundMoney(total))}.` +
                 (settledNames.length ? ` Saldados: ${settledNames.join(', ')}` : '') +

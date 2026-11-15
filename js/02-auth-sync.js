@@ -449,6 +449,7 @@
                 } else if (decision === 'UPLOAD') {
                     console.log("⬆️ Cambios locales sin subir sobre la misma versión de la nube: subiendo...");
                     state.isCloudSynced = true;
+                    assignPendingNumbers(); // Fase 38: ventas hechas sin conexión suben ya numeradas
                     saveData();
                     afterCloudSyncImages();
                     if (!hasInitialRatesUpdate) { hasInitialRatesUpdate = true; setTimeout(() => fetchAllRates(), 500); }
@@ -579,7 +580,7 @@
             try {
                 const base0 = getCloudBase();
                 let backup = null;
-                try { backup = await createCloudBackup('Antes de unir cambios de dos dispositivos'); }
+                try { backup = await createCloudBackup(MERGE_BACKUP_REASON); }
                 catch (e) { console.warn('☁️ Sin copia de la nube no se unen los cambios:', e && e.message || e); }
                 if (getCloudBase() !== base0) return; // durante la espera el usuario ya decidió en el cuadro
                 // Durante la espera pudo haber otra venta: la unión se calcula con lo que hay ahora

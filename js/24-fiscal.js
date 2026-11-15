@@ -186,10 +186,37 @@
         // Pura: operaciones esperando número, de la más antigua a la más nueva. st = { sales, credits }
         function pendingDocs(st) {
             const byDate = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+            // shortcut: la clave es tipo + id; si dos dispositivos crean el mismo id, comparten número. Cambiar cuando los ids lleven dispositivo.
+            const keys = new Map();
             const sales = (st.credits || []).filter(c => c.numPending);
+            sales.forEach(c => keys.set(c, 'c' + c.id));
             const payments = [];
-            (st.sales || []).forEach(s => { if (s.numPending) (s.type === 'payment' ? payments : sales).push(s); });
-            return { sales: sales.sort(byDate), payments: payments.sort(byDate) };
+            (st.sales || []).forEach(s => {
+                if (!s.numPending) return;
+                const pay = s.type === 'payment';
+                (pay ? payments : sales).push(s);
+                keys.set(s, (pay ? 'p' : 's') + s.id);
+            });
+            return { sales: sales.sort(byDate), payments: payments.sort(byDate), keys };
+        }
+
+        // Pura: reparte números a las claves. Una clave que ya tiene número en `given` lo conserva (mismo n y at).
+        function allotNumbers(keys, given, start, stamp) {
+            const out = { ...(given || {}) };
+            let next = start;
+            const list = keys.map(k => {
+                const g = out[k];
+                if (g && Number.isInteger(g.n) && g.n > 0) return g;
+                return (out[k] = { n: next++, at: stamp });
+            });
+            return { list, next, given: out };
+        }
+
+        // Pura: deja las `cap` entradas más recientes
+        function trimGiven(given, cap = 100) {
+            const e = Object.entries(given || {});
+            if (e.length <= cap) return given;
+            return Object.fromEntries(e.sort((a, b) => (a[1].at < b[1].at ? 1 : a[1].at > b[1].at ? -1 : 0)).slice(0, cap));
         }
 
         // Pura: [{ ref, num }] consecutivos desde start
@@ -217,6 +244,12 @@
             return assignPromise;
         }
 
+        // Fase 38: espera (hasta ms) a la asignación en curso; nunca rechaza
+        function numbersSettled(ms = 4000) {
+            if (!assignPromise) return Promise.resolve();
+            return Promise.race([assignPromise.catch(() => {}), new Promise(r => setTimeout(r, ms))]);
+        }
+
         async function runAssign() {
             const p = pendingDocs(state);
             const N = p.sales.length, M = p.payments.length;
@@ -224,33 +257,48 @@
             const cfg = state.fiscalConfig;
             const user = auth.currentUser;
             const wasPending = !!(tempReceiptData && tempReceiptData.numPending);
+            const saleKeys = p.sales.map(x => p.keys.get(x)), payKeys = p.payments.map(x => p.keys.get(x));
+            const stamp = new Date().toISOString();
             try {
-                let s, a, recovered = false;
+                let S, P, s0, recovered = false;
                 if (!user) { // Modo sin sesión: un solo dispositivo
-                    s = cfg.currentNumber || 1;
-                    a = cfg.currentPayment || maxPayNum(state) + 1;
+                    s0 = cfg.currentNumber || 1;
+                    const a0 = cfg.currentPayment || maxPayNum(state) + 1;
+                    S = allotNumbers(saleKeys, {}, s0, stamp);
+                    P = allotNumbers(payKeys, {}, a0, stamp);
                 } else {
                     if (!navigator.onLine) return;
                     let block = null;
                     try { block = N ? JSON.parse(localStorage.getItem('inv_fiscal_block')) : null; } catch (e) { /* sin bloque */ }
                     const ref = db.collection('users').doc(user.uid).collection('counters').doc('fiscal');
-                    ({ s, a } = await db.runTransaction(async tx => {
+                    ({ S, P, s0 } = await db.runTransaction(async tx => {
                         const d = (await tx.get(ref)).data() || {};
-                        const s = fiscalStart(d.next || 1, block, cfg.currentNumber);
-                        const a = Math.max(d.nextPayment || 1, maxPayNum(state) + 1);
-                        tx.set(ref, { ...(N ? { next: s + N } : {}), ...(M ? { nextPayment: a + M } : {}) }, { merge: true });
-                        return { s, a };
+                        const s0 = fiscalStart(d.next || 1, block, cfg.currentNumber);
+                        const a0 = Math.max(d.nextPayment || 1, maxPayNum(state) + 1);
+                        const S = allotNumbers(saleKeys, d.given || {}, s0, stamp);
+                        const P = allotNumbers(payKeys, S.given, a0, stamp);
+                        // Sin merge: así se quitan las entradas viejas de given
+                        tx.set(ref, { ...d, ...(S.next > s0 ? { next: S.next } : {}), ...(P.next > a0 ? { nextPayment: P.next } : {}), given: trimGiven(P.given) });
+                        return { S, P, s0 };
                     }));
-                    recovered = !!block && s === block.next;
+                    recovered = !!block && s0 === block.next && S.next > s0;
                 }
-                // El estado pudo cambiar mientras esperaba la nube: se vuelve a leer y solo se numeran los N y M reservados
+                // El estado pudo cambiar mientras esperaba la nube: se vuelve a leer y se numera por clave solo lo pedido
                 const now = pendingDocs(state);
-                const stamp = new Date().toISOString();
-                numberPlan(now.sales.slice(0, N), s).forEach(({ ref, num }) => { ref.fiscalNum = String(num).padStart(6, '0'); ref.numAt = stamp; delete ref.numPending; });
-                numberPlan(now.payments.slice(0, M), a).forEach(({ ref, num }) => { ref.payNum = String(num).padStart(6, '0'); ref.numAt = stamp; delete ref.numPending; });
-                if (N) cfg.currentNumber = recovered ? s + N : Math.max(cfg.currentNumber || 1, s + N);
-                if (M) cfg.currentPayment = Math.max(cfg.currentPayment || 1, a + M);
-                if (N && user) { try { localStorage.removeItem('inv_fiscal_block'); } catch (e) { /* sin almacenamiento */ } }
+                const put = (docs, keys, res, field) => {
+                    let top = 0;
+                    docs.forEach(doc => {
+                        const i = keys.indexOf(now.keys.get(doc));
+                        if (i < 0) return;
+                        doc[field] = String(res.list[i].n).padStart(6, '0'); doc.numAt = res.list[i].at; delete doc.numPending;
+                        top = Math.max(top, res.list[i].n);
+                    });
+                    return top;
+                };
+                const topS = put(now.sales, saleKeys, S, 'fiscalNum'), topP = put(now.payments, payKeys, P, 'payNum');
+                if (topS) cfg.currentNumber = recovered ? S.next : Math.max(cfg.currentNumber || 1, topS + 1);
+                if (topP) cfg.currentPayment = Math.max(cfg.currentPayment || 1, topP + 1);
+                if (N && user && S.next > s0) { try { localStorage.removeItem('inv_fiscal_block'); } catch (e) { /* sin almacenamiento */ } }
                 saveData();
                 renderAll();
                 // Si había un recibo abierto esperando su número, se repinta
@@ -600,6 +648,24 @@
             console.assert(fiscalStart(76, { next: 51, end: 75 }, 76) === 51, 'selfTestFiscal: recupera el bloque');
             console.assert(fiscalStart(101, { next: 51, end: 75 }, 76) === 101, 'selfTestFiscal: otro reservó después');
             console.assert(fiscalStart(30, null, 40) === 40 && fiscalStart(50, null, 40) === 50, 'selfTestFiscal: sin bloque');
+
+            // Registro de números (Fase 38)
+            console.assert([...p.keys.values()].sort().join() === 'c5,p2,s1,s3', 'selfTestFiscal: claves de las operaciones');
+            const T = '2026-11-15T10:00:00.000Z', T0 = '2026-11-15T09:00:00.000Z';
+            const al = allotNumbers(['s1', 'c5'], {}, 10, T);
+            console.assert(al.list.map(x => x.n).join() === '10,11' && al.next === 12 && al.given.s1.at === T && al.given.c5.at === T, 'selfTestFiscal: allotNumbers reparte consecutivos');
+            const g0 = { s1: { n: 7, at: T0 } };
+            const re = allotNumbers(['s1', 's9'], g0, 10, T);
+            console.assert(re.list[0].n === 7 && re.list[0].at === T0 && re.list[1].n === 10 && re.list[1].at === T && re.next === 11 && Object.keys(g0).join() === 's1', 'selfTestFiscal: allotNumbers reutiliza y no toca lo recibido');
+            const second = allotNumbers(['s1', 'c5'], al.given, al.next, '2026-11-15T10:00:05.000Z');
+            console.assert(second.list.map(x => x.n + x.at).join() === al.list.map(x => x.n + x.at).join() && second.next === al.next, 'selfTestFiscal: segundo dispositivo recibe lo mismo');
+            const bad = allotNumbers(['a', 'b', 'c'], { a: { n: 0 }, b: {}, c: null }, 20, T);
+            console.assert(bad.list.map(x => x.n).join() === '20,21,22', 'selfTestFiscal: entrada dañada recibe número nuevo');
+            const sp = allotNumbers(['p5'], allotNumbers(['s5'], {}, 5, T).given, 5, T);
+            console.assert(sp.list[0].n === 5 && sp.given.s5.n === 5, 'selfTestFiscal: series separadas');
+            const big = {}; for (let i = 0; i < 105; i++) big['s' + i] = { n: i + 1, at: new Date(2026, 0, 1, 0, 0, i).toISOString() };
+            const cut = trimGiven(big);
+            console.assert(Object.keys(cut).length === 100 && cut.s104 && !cut.s0 && trimGiven(cut) === cut, 'selfTestFiscal: trimGiven');
 
             // Factura: venta en modo personalizado, copia fija, fiado
             const ctx = { ivaIncluded: true, bcvRate: 50, fallbackRate: 99, method: 'EFECTIVO', note: '' };
