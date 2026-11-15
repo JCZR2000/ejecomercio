@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ejecomercio-v69.0'; // Subirlo en cada publicación: con caché primero, sin esto nadie recibe la versión nueva
+const CACHE_NAME = 'ejecomercio-v69.1'; // Subirlo en cada publicación: con caché primero, sin esto nadie recibe la versión nueva
 const IMG_CACHE = 'ejecomercio-img'; // fotos de Storage; no se borra al cambiar de versión
 const CDN_CACHE = 'ejecomercio-cdn'; // librerías con versión en la URL; no se borra al cambiar de versión
 
@@ -43,6 +43,7 @@ const STATIC_ASSETS = [
   './js/27-profit.js',
   './js/28-orders.js',
   './js/29-license.js',
+  './js/30-reports.js',
   './js/vendor/tailwind-3.4.17.js',
   './icon-192.png',
   './icon-512.png'

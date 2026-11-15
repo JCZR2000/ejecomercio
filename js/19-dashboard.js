@@ -125,9 +125,11 @@
         }
 
         const STATS_LABELS = { '7d': '7 días', '30d': '30 días', '12m': 'Año' };
+        let statsCurrent = '7d'; // rango en pantalla: lo usan los reportes
         function updateChart(range) {
             const pro = hasPro();
             if (range !== '7d' && !pro) return openMyPlan('la estadística de 30 días y del año');
+            statsCurrent = range;
             Object.keys(STATS_LABELS).forEach(r => {
                 const btn = $(`btnChart${r}`);
                 btn.className = 'flex-1 py-1 text-xs font-bold rounded transition ' + (r === range ? 'shadow bg-white text-indigo-600' : 'text-gray-500 hover:bg-gray-200');
