@@ -165,6 +165,7 @@
                     if (!r) { updateCloudStatus('OFFLINE'); return; }
                 } while (pendingCloudSave);
                 console.log("💾☁️ Guardado en la nube (Confirmación)");
+                safeSetItem('inv_cloud_last_ok', String(Date.now())); // solo local: no entra en buildCloudPayload
                 updateCloudStatus('ONLINE');
             } catch (err) {
                 console.error("Error crítico:", err);
@@ -172,6 +173,7 @@
                 customAlert('Error al subir', 'Error al subir datos. Revisa tu conexión.', 'error', null, 'cloud');
             } finally {
                 isUploadingToCloud = false;
+                if (typeof renderSyncState === 'function') renderSyncState();
             }
         }
 
