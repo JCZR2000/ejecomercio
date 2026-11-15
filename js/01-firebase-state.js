@@ -97,6 +97,8 @@
 
         // [NUEVO] Variable para ignorar conflictos temporalmente tras resolver uno
         let conflictCooldown = false;
+        // Fase 37: mientras se unen los cambios de dos dispositivos (applyMerge) no se procesa otra versión de la nube
+        let mergeInProgress = false;
 
         // --- E2EE (ENCRIPTACIÓN) ---
         let encryptionKey = localStorage.getItem('inv_enc_key') || null;
