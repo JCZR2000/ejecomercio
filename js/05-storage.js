@@ -75,6 +75,11 @@
         }
         const getCloudBaseCounts = () => { try { return JSON.parse(localStorage.getItem('inv_cloud_base_counts')); } catch (e) { return null; } };
         const isCloudDirty = () => localStorage.getItem('inv_cloud_dirty') === '1';
+        // Fase 34: inv_cloud_dirty_at = desde cuándo hay cambios sin subir (solo local, no entra en buildCloudPayload)
+        function clearCloudDirty() {
+            safeSetItem('inv_cloud_dirty', '');
+            try { localStorage.removeItem('inv_cloud_dirty_at'); } catch (e) { /* sin almacenamiento */ }
+        }
 
         // background: guardado que no es un cambio del usuario (tasas): no marca cambios pendientes ni pregunta en conflictos.
         // skipLossCheck: el usuario ya confirmó un borrado grande.
@@ -84,7 +89,11 @@
             safeSetItem('inv_local_partial', '1');
             let localOk = true;
             const put = (key, value) => { localOk = safeSetItem(key, value) && localOk; };
-            if (!background) { saveSeq++; put('inv_cloud_dirty', '1'); }
+            if (!background) {
+                saveSeq++;
+                if (!isCloudDirty()) safeSetItem('inv_cloud_dirty_at', new Date().toISOString());
+                put('inv_cloud_dirty', '1');
+            }
             // Esto asegura que la memoria local sepa que acabamos de modificar datos
             state.lastUpdated = new Date().toISOString();
 
@@ -193,7 +202,7 @@
                 try {
                     const full = await readCloudFull({ photos: true });
                     if (full) { setCloudManifest(full.manifest); finishLoadingData(full.data, full.snap); }
-                    else safeSetItem('inv_cloud_dirty', '');
+                    else clearCloudDirty();
                 } catch (e) {
                     console.error('No se pudo recargar la nube:', e);
                     customAlert('Sin conexión', 'No se pudo recargar la nube. Los cambios de este dispositivo siguen sin subir.', 'error', null, 'offline');
@@ -278,7 +287,7 @@
             kept.forEach(id => { if (oldChunks[id]) manifest.chunks[id] = oldChunks[id]; });
             setCloudManifest(manifest);
             setCloudBase(newToken, upCounts, newUserVer);
-            if (seq === saveSeq) safeSetItem('inv_cloud_dirty', ''); // si hubo otro cambio durante la subida, sigue pendiente
+            if (seq === saveSeq) clearCloudDirty(); // si hubo otro cambio durante la subida, sigue pendiente
 
             // 3. Al final, borrar los trozos que ya no existen (si falla antes, el principal viejo sigue válido)
             const stale = Object.keys(oldChunks).filter(id => !chunks[id] && !kept.includes(id));

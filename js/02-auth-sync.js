@@ -449,7 +449,20 @@
                     afterCloudSyncImages();
                     if (!hasInitialRatesUpdate) { hasInitialRatesUpdate = true; setTimeout(() => fetchAllRates(), 500); }
                 } else {
-                    showConflictModal(cloudData, doc);
+                    // Fase 34: antes de preguntar se compara el contenido. Con datos locales incompletos o cifrado distinto, siempre se pregunta.
+                    const diff = userDataDiff(state, cloudData);
+                    const canAuto = !isLocalPartial() && !!doc.data().isEncrypted === !!encryptionKey;
+                    const photos = canAuto && diff.join() === 'products' ? mergeUploadedPhotos(state.products, cloudData.products) : null;
+                    if (canAuto && !diff.length) {
+                        console.log('☁️ Conflicto sin diferencias: se usa la nube');
+                        finishLoadingData(cloudData, doc);
+                    } else if (photos) {
+                        console.log('☁️ Conflicto solo por fotos ya subidas: se usa la nube y se suben los enlaces');
+                        finishLoadingData({ ...cloudData, products: photos }, doc);
+                        saveData();
+                    } else {
+                        showConflictModal(cloudData, doc, diff);
+                    }
                 }
                 return;
             }
@@ -534,9 +547,11 @@
         }
 
         // Cuadro de conflicto: fecha, productos, ventas y fiados de cada lado. Recomienda solo por más ventas.
-        function showConflictModal(cloudData, doc) {
-            console.warn("⚠️ CONFLICTO: hay cambios locales sin subir y la nube cambió.");
-            pendingCloudSnapshot = { data: cloudData, doc: doc };
+        function showConflictModal(cloudData, doc, diff = userDataDiff(state, cloudData)) {
+            const since = new Date(localStorage.getItem('inv_cloud_dirty_at') || NaN); // sin la clave (datos viejos) no se muestra la línea
+            console.warn("⚠️ CONFLICTO: hay cambios locales sin subir y la nube cambió. Partes distintas:", diff, '· sin subir desde:', isNaN(since) ? '(sin dato)' : since.toISOString());
+            pendingCloudSnapshot = { data: cloudData, doc: doc, diff };
+            $('confDirtySince').textContent = isNaN(since) ? '' : 'Cambios sin subir desde: ' + since.toLocaleString();
             const side = (d) => ({
                 time: d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : '---',
                 ...cloudCounts(d)
@@ -729,6 +744,10 @@
             // 7. CLIENTES (Fase 13)
             tbody.innerHTML += createRow("Clientes", (local.clients || []).length, (cloud.clients || []).length);
 
+            // 8. PARTES DISTINTAS (Fase 34): etiquetas fijas, no texto del usuario
+            const parts = (pendingCloudSnapshot.diff || []).map(f => USER_DIFF_LABELS[f] || 'Otros').join(', ') || 'Ninguna';
+            tbody.innerHTML += `<tr><td class="px-4 py-3 font-medium text-slate-700 border-r border-slate-100">Partes distintas</td><td colspan="2" class="px-4 py-3 text-center font-bold">${parts}</td></tr>`;
+
             // Mostrar el modal
             document.getElementById('diffModal').classList.remove('hidden');
         }
@@ -778,7 +797,7 @@
                     renderEncryptionUI(); // Actualizar UI de candado
                     // Fase 6: esta version de la nube ya es la base y no quedan cambios locales sin subir
                     setCloudBase(cloudTokenOf(doc.data()), cloudCounts(state), cloudUserVer(doc.data()));
-                    safeSetItem('inv_cloud_dirty', '');
+                    clearCloudDirty();
                     assignPendingNumbers(); // Fase 21: numera lo que quedó «por asignar» sin conexión
                     afterCloudSyncImages(); // sube a Storage las fotos que siguen en el teléfono
                     console.log("☁️ Sincronizado y listo.");
