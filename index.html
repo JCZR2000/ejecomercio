@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v68.0</title>
+    <title>EjeComercio v68.1</title>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -158,7 +158,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v68.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v68.1</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -485,6 +485,11 @@
                 <div id="adminResults" class="space-y-2 text-xs text-slate-500 max-h-56 overflow-y-auto"></div>
                 <div id="adminForm" class="hidden bg-white rounded-2xl border border-slate-100 shadow-sm p-3 space-y-2">
                     <p id="adminAccount" class="text-xs font-bold text-slate-700 break-all"></p>
+                    <div id="adminEmailBox" class="hidden">
+                        <label for="adminEmail" class="block text-xs font-bold text-slate-600 mb-1">Correo de la cuenta (opcional)</label>
+                        <input type="email" id="adminEmail" maxlength="120" autocomplete="off" placeholder="cliente@gmail.com" class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm">
+                        <p class="text-[10px] text-slate-400 mt-0.5">Sirve para buscarla después. No se puede cambiar una vez guardado.</p>
+                    </div>
                     <div class="grid grid-cols-2 gap-2">
                         <div class="col-span-2">
                             <label for="adminType" class="block text-xs font-bold text-slate-600 mb-1">Tipo</label>

@@ -187,6 +187,8 @@
             return list.filter(l => !t || l.email.toLowerCase().includes(t) || l.uid.toLowerCase().startsWith(t));
         };
 
+        const isValidLicenseEmail = (s) => s.length <= 120 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+
         function renderAdminResults() {
             const box = $('adminResults');
             const raw = $('adminSearch').value.trim();
@@ -208,7 +210,7 @@
                 sub.className = 'block ' + (l.hasta <= now ? 'text-red-600 font-bold' : 'text-slate-500');
                 sub.textContent = `${l.origen} · ${l.hasta >= LIFETIME_MS ? 'de por vida' : (l.hasta <= now ? 'venció el ' : 'hasta ') + formatLicenseDate(l.hasta)}`;
                 b.append(top, sub);
-                b.onclick = () => { adminSelected = l; renderAdminResults(); renderAdminForm(); };
+                b.onclick = () => { adminSelected = l; $('adminEmail').value = ''; renderAdminResults(); renderAdminForm(); };
                 box.append(b);
             });
             // Cuenta que aún no abrió la versión nueva: se crea su licencia pegando el uid completo
@@ -217,7 +219,7 @@
                 b.type = 'button';
                 b.className = 'w-full bg-indigo-50 text-indigo-700 border border-indigo-200 py-2 rounded-xl text-xs font-bold';
                 b.textContent = 'Crear licencia para este uid';
-                b.onclick = () => { adminSelected = { uid: raw, email: '', origen: '', hasta: 0 }; renderAdminForm(); };
+                b.onclick = () => { adminSelected = { uid: raw, email: '', origen: '', hasta: 0 }; $('adminEmail').value = ''; renderAdminForm(); };
                 box.append(b);
             }
         }
@@ -227,6 +229,7 @@
             $('adminForm').classList.toggle('hidden', !l);
             if (!l) return;
             $('adminAccount').textContent = `${l.email || 'uid ' + l.uid} · ${accountCode(l.uid)}`;
+            $('adminEmailBox').classList.toggle('hidden', !!l.email); // solo si la licencia aún no tiene correo
             const hasta = extendLicense(l.hasta, Date.now(), $('adminType').value);
             $('adminNewDate').textContent = hasta >= LIFETIME_MS ? 'Pro de por vida' : 'Pro hasta el ' + formatLicenseDate(hasta);
         }
@@ -240,9 +243,12 @@
             const nota = $('adminNote').value.trim().slice(0, 120);
             if (!['mensual', 'anual', 'fundador', 'socio'].includes(tipo) || !['USD', 'VES'].includes(moneda)) return;
             if (montoText === '' || !isFinite(monto) || monto < 0) { customAlert('Monto no válido', 'Escribe el monto cobrado (0 si no se cobró).', 'error'); return; }
+            // El correo solo se escribe si la licencia no lo tiene (creada por uid); la regla no deja cambiarlo después
+            const email = l.email ? '' : $('adminEmail').value.trim().toLowerCase();
+            if (email && !isValidLicenseEmail(email)) { customAlert('Correo no válido', 'Revisa el correo o déjalo vacío.', 'error'); return; }
             const hastaMs = extendLicense(l.hasta, Date.now(), tipo);
             const when = hastaMs >= LIFETIME_MS ? 'de por vida' : 'hasta el ' + formatLicenseDate(hastaMs);
-            if (!await customConfirm('Activar Pro', `${l.email || 'uid ' + l.uid}\nTipo: ${tipo}\nPro ${when}`, 'warning', null, 'Activar')) return;
+            if (!await customConfirm('Activar Pro', `${l.email || email || 'uid ' + l.uid}\nTipo: ${tipo}\nPro ${when}`, 'warning', null, 'Activar')) return;
             const TS = firebase.firestore.Timestamp, now = firebase.firestore.FieldValue.serverTimestamp();
             const hasta = TS.fromMillis(hastaMs);
             const ref = db.collection('licencias').doc(l.uid);
@@ -251,7 +257,9 @@
             if (nota) hist.nota = nota;
             const batch = db.batch();
             // merge: se conservan email y creado (la regla rechaza cambiar el email)
-            batch.set(ref, { plan: 'pro', hasta, origen: tipo === 'mensual' || tipo === 'anual' ? 'pago' : tipo, actualizado: now, por: admin.uid }, { merge: true });
+            const lic = { plan: 'pro', hasta, origen: tipo === 'mensual' || tipo === 'anual' ? 'pago' : tipo, actualizado: now, por: admin.uid };
+            if (email) lic.email = email;
+            batch.set(ref, lic, { merge: true });
             batch.set(ref.collection('historial').doc(), hist);
             busyStart('Activando...');
             try {
@@ -266,6 +274,7 @@
             customAlert('Pro activado', `Pro activado ${when}.`, 'success');
             $('adminAmount').value = '0';
             $('adminNote').value = '';
+            $('adminEmail').value = '';
             loadAdminLicenses();
         }
 
@@ -312,6 +321,8 @@
 
             const list = [{ uid: 'AbCdEf123', email: 'Uno@Example.com' }, { uid: 'zzz999', email: '' }];
             t(filterLicenses(list, 'uno@').length === 1 && filterLicenses(list, 'abcdef').length === 1 && filterLicenses(list, '').length === 2 && filterLicenses(list, 'nadie').length === 0, 'buscador por correo o código');
+
+            t(isValidLicenseEmail('prueba@example.com') && !isValidLicenseEmail('prueba@') && !isValidLicenseEmail('a b@example.com') && !isValidLicenseEmail('x'.repeat(120) + '@example.com'), 'correo de la licencia');
 
             console.log(fails ? `selfTestLicense: ${fails} fallas` : 'selfTestLicense: OK');
             return fails;
