@@ -551,7 +551,9 @@
             const since = new Date(localStorage.getItem('inv_cloud_dirty_at') || NaN); // sin la clave (datos viejos) no se muestra la línea
             console.warn("⚠️ CONFLICTO: hay cambios locales sin subir y la nube cambió. Partes distintas:", diff, '· sin subir desde:', isNaN(since) ? '(sin dato)' : since.toISOString());
             pendingCloudSnapshot = { data: cloudData, doc: doc, diff };
-            $('confDirtySince').textContent = isNaN(since) ? '' : 'Cambios sin subir desde: ' + since.toLocaleString();
+            // En la primera carga tras actualizar, el index.html puede ser el viejo (en caché) con el JS nuevo: sin el elemento, el cuadro sale igual
+            const sinceEl = $('confDirtySince');
+            if (sinceEl) sinceEl.textContent = isNaN(since) ? '' : 'Cambios sin subir desde: ' + since.toLocaleString();
             const side = (d) => ({
                 time: d.lastUpdated ? new Date(d.lastUpdated).toLocaleString() : '---',
                 ...cloudCounts(d)
