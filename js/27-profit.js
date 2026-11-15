@@ -78,6 +78,16 @@
             return { from: mo(0), to: mo(1) };
         }
 
+        // Período anterior equivalente, para la comparación de la ganancia
+        function profitPrevRange(p) {
+            const n = new Date(), day = (k) => new Date(n.getFullYear(), n.getMonth(), n.getDate() + k);
+            const mo = (k) => new Date(n.getFullYear(), n.getMonth() + k, 1);
+            if (p === 'today') return { from: day(-1), to: day(0), label: 'ayer' };
+            if (p === 'last') return { from: mo(-2), to: mo(-1), label: 'el mes anterior' };
+            if (p === '12m') return { from: mo(-23), to: mo(-11), label: 'los 12 meses anteriores' };
+            return { from: mo(-1), to: mo(0), label: 'el mes pasado' };
+        }
+
         function showDashTab(tab) {
             const isProfit = tab === 'profit';
             $('dashSales').classList.toggle('hidden', isProfit);
@@ -90,6 +100,11 @@
             if (!hasPro()) return openMyPlan('el panel de Ganancias');
             checkAuth('profit', () => showDashTab('profit'));
         }
+        // Entrada «Ganancias» del menú del usuario
+        function openProfitFromMenu() {
+            if (!hasPro()) return openMyPlan('el panel de Ganancias');
+            checkAuth('profit', () => openDashboard('profit'));
+        }
 
         function setProfitPeriod(p) { profitPeriod = p; renderProfit(); }
 
@@ -99,19 +114,33 @@
                 $('profPer_' + p).className = `flex-1 py-1 text-[11px] font-bold rounded transition ${p === profitPeriod ? 'shadow bg-white text-indigo-600' : 'text-gray-500 hover:bg-gray-200'}`;
             });
             const { from, to } = profitRange(profitPeriod);
-            const r = computeProfit({ sales: state.sales, credits: state.credits, archive: state.profitArchive, products: state.products, from, to });
+            const src = { sales: state.sales, credits: state.credits, archive: state.profitArchive, products: state.products };
+            const r = computeProfit({ ...src, from, to });
+            const prev = profitPrevRange(profitPeriod);
+            const prevProfit = computeProfit({ ...src, from: prev.from, to: prev.to }).profit;
             const pending = roundMoney(state.credits.reduce((a, c) => a + Math.max(0, creditPending(c)), 0));
             const pc = r.profit < 0 ? 'text-red-600' : 'text-green-600';
-            const card = (label, value, cls = 'text-gray-800') => `<div class="bg-gray-50 border rounded-lg p-2"><p class="text-[10px] text-gray-500 font-bold uppercase">${label}</p><p class="font-bold text-sm ${cls}">${value}</p></div>`;
-            let h = `<div class="grid grid-cols-2 gap-2">
-                ${card('Vendido', money(r.sold))}
-                ${card('Costo de lo vendido', money(r.cost))}
-                <div class="bg-gray-50 border rounded-lg p-2 col-span-2"><p class="text-[10px] text-gray-500 font-bold uppercase">Ganancia</p><p class="font-bold text-xl ${pc}">${money(r.profit)} <span class="text-xs">(${(r.margin * 100).toFixed(1)} % de margen)</span></p></div>
-                ${card('Cobrado', money(r.collected))}
-                ${card('Por cobrar (hoy, no del periodo)', money(pending), 'text-orange-600')}
+            let h = '';
+            if (r.noCost > 0) {
+                // Productos distintos vendidos sin costo en el período (los meses archivados no tienen detalle)
+                const missing = new Set();
+                profitLines(state.sales, state.credits).forEach(({ item, date }) => { if (date >= from && date < to && profitLine(item, state.products).cost === null) missing.add(String(item.id ?? item.name)); });
+                h += `<div class="flex items-center gap-2 bg-amber-50 border border-amber-300 rounded-lg p-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-600 shrink-0"></i>
+                    <p class="flex-1 text-xs font-bold text-amber-800">${missing.size ? `${missing.size} producto(s) vendidos sin costo` : `${money(r.noCost)} vendido sin costo`}: la ganancia sale incompleta</p>
+                    <button type="button" onclick="openCosts(true)" class="shrink-0 bg-amber-500 text-white text-[11px] font-bold px-2 py-1.5 rounded-lg hover:bg-amber-600">Completar costos</button></div>`;
+            }
+            h += `<div class="bg-gray-50 border rounded-lg p-3"><p class="text-[10px] text-gray-500 font-bold uppercase">Ganancia</p>
+                <p class="font-bold text-2xl ${pc}">${money(r.profit)}</p>
+                <p class="text-xs text-gray-600 font-bold">${(r.margin * 100).toFixed(1)} % de margen</p>
+                ${statsDeltaHtml(r.profit, prevProfit, prev.label)}</div>
+            <div class="grid grid-cols-2 gap-2">
+                ${dashCard('Vendido', money(r.sold))}
+                ${dashCard('Costo de lo vendido', money(r.cost))}
+                ${dashCard('Cobrado', money(r.collected), 'text-green-600')}
+                ${dashCard('Por cobrar (hoy, no del periodo)', money(pending), 'text-orange-600')}
             </div>`;
             if (r.est > 0) h += `<p class="text-[11px] text-gray-500">Incluye ${money(r.est)} estimado con el costo actual.</p>`;
-            if (r.noCost > 0) h += `<p class="text-[11px] text-orange-600 font-bold">${money(r.noCost)} vendido sin costo. <button onclick="openCosts()" class="underline">Completa los costos</button></p>`;
 
             // Dinero en mercancía (no depende del periodo)
             const withCost = state.products.filter(p => !isUnlimited(p) && p.cost > 0 && p.qty > 0);
@@ -123,8 +152,7 @@
                 <p class="text-xs text-gray-600">Ganancia posible: <b>${money(roundMoney(atPrice - atCost))}</b>${noCostN ? ` · ${noCostN} producto(s) sin costo` : ''}</p></div>`;
 
             // Listas cortas
-            const list = (title, rows, empty) => `<div><p class="text-xs font-bold text-gray-700 mb-1">${title}</p>${rows.length ? rows.join('') : `<p class="text-xs text-gray-400">${empty}</p>`}</div>`;
-            const row = (name, val, cls = 'text-gray-700') => `<div class="flex justify-between text-xs py-0.5 border-b"><span class="truncate pr-2">${escapeHtml(name)}</span><span class="font-bold shrink-0 ${cls}">${val}</span></div>`;
+            const list = dashList, row = dashRow; // mismo estilo que Estadísticas
             const prods = Object.values(r.byProduct);
             h += list('Los que más ganancia dejan', prods.filter(b => b.profit > 0).sort((a, b) => b.profit - a.profit).slice(0, 5).map(b => row(b.name, money(b.profit), 'text-green-600')), 'Sin datos en este periodo.');
             h += list('Vendidos por debajo del costo', prods.filter(b => b.profit < 0).sort((a, b) => a.profit - b.profit).slice(0, 5).map(b => row(b.name, money(b.profit), 'text-red-600')), 'Ninguno.');
@@ -137,7 +165,11 @@
         }
 
         // ---------- Lista de Costos ----------
-        function openCosts() { $('costsModal').classList.remove('hidden'); renderCosts(); }
+        function openCosts(onlyMissing) {
+            if (onlyMissing === true) $('costsOnlyMissing').checked = true;
+            $('costsModal').classList.remove('hidden');
+            renderCosts();
+        }
         function closeCosts() { $('costsModal').classList.add('hidden'); }
 
         function renderCosts() {

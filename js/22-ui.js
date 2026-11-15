@@ -273,53 +273,64 @@
 
 
         // ==========================================
-        // 25. REINICIO DE RED (SOLUCIÓN NUCLEAR)
+        // 25. «SINCRONIZAR AHORA» (Ajustes → Almacenamiento, Fase 33)
         // ==========================================
-        function forceNetworkReconnect() {
-            const btn = document.getElementById('cloudSyncBtn');
-            // Guardamos el icono original para restaurarlo luego
-            const originalIcon = '<i class="fa-solid fa-cloud-arrow-up"></i>';
-            
-            console.log("🔌 Reiniciando conexión con Google...");
-            
-            // 1. Feedback Visual: Se pone Rojo y muestra un enchufe
-            // Esto le dice al usuario "Estoy haciendo algo drástico, espera"
-            updateCloudStatus('OFFLINE'); 
-            btn.innerHTML = '<i class="fa-solid fa-plug-circle-xmark fa-fade"></i>';
-            btn.classList.replace('bg-indigo-600', 'bg-red-600');
-            btn.classList.replace('border-indigo-400', 'border-red-400');
-            btn.disabled = true; // Evitar doble clic compulsivo
+        // Estado de la sincronización en palabras. Solo lee.
+        function syncStateInfo() {
+            if (!auth.currentUser) return { text: 'Sin sesión', tone: 'text-slate-500' };
+            if (!navigator.onLine) return { text: 'Sin conexión: tus cambios quedan en este teléfono', tone: 'text-rose-600' };
+            if (!state.isCloudSynced) return { text: 'Leyendo la nube…', tone: 'text-amber-600' };
+            if (isUploadingToCloud) return { text: 'Subiendo…', tone: 'text-amber-600' };
+            if (isCloudDirty() || isLocalPartial()) return { text: 'Hay cambios sin subir', tone: 'text-amber-600' };
+            return { text: 'Todo al día', tone: 'text-emerald-700' };
+        }
 
-            // 2. Apagamos la radio de Firebase (Corte de señal)
-            db.disableNetwork().then(() => {
-                
-                // Esperamos 1.5 segundos para asegurar que el corte limpie la tubería
-                setTimeout(() => {
-                    
-                    // 3. La encendemos de nuevo (Reconexión Limpia)
-                    db.enableNetwork().then(() => {
-                        console.log("⚡ Conexión restablecida. Ejecutando guardado...");
-                        
-                        // 4. Restaurar botón a su estado normal (Azul)
-                        btn.innerHTML = originalIcon;
-                        btn.classList.replace('bg-red-600', 'bg-indigo-600');
-                        btn.classList.replace('border-red-400', 'border-indigo-400');
-                        btn.disabled = false;
-                        
-                        // 5. ¡GOLPE FINAL! Guardamos de inmediato aprovechando la conexión fresca
-                        saveData(); 
-                        
-                    });
-                    
-                }, 1500); 
-                
-            }).catch(err => {
-                console.error("Error reiniciando red:", err);
-                customAlert('Error de red', 'Error al reiniciar la red. Por favor recarga la página.', 'error', null, 'offline');
-                btn.innerHTML = originalIcon;
-                btn.classList.replace('bg-red-600', 'bg-indigo-600');
-                btn.disabled = false;
-            });
+        // La llama updateCloudStatus muy seguido: con Ajustes cerrado no hace nada.
+        function renderSyncState() {
+            const el = $('syncStateText');
+            if (!el || $('configModal').classList.contains('hidden')) return;
+            const info = syncStateInfo();
+            el.textContent = info.text;
+            el.className = 'text-sm font-bold ' + info.tone;
+            const last = Number(localStorage.getItem('inv_cloud_last_ok'));
+            $('syncLastText').textContent = last
+                ? 'Última subida desde este dispositivo: ' + new Date(last).toLocaleString('es-VE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : 'Aún no hay subidas registradas';
+        }
+
+        // No sube a ciegas: usa saveData (con todas sus protecciones) solo si hay cambios; si no, mira si la nube tiene algo más nuevo.
+        async function syncNow() {
+            const user = auth.currentUser;
+            if (!user || !navigator.onLine || !state.isCloudSynced) { customAlert('Sincronizar', syncStateInfo().text, 'warning', null, 'cloud'); return; }
+            let msg = 'Todo al día', type = 'success';
+            busyStart('Sincronizando…');
+            try {
+                await waitForUpload();
+                if (isCloudDirty() || isLocalPartial()) {
+                    saveData();
+                    await waitForUpload();
+                    if (isCloudDirty()) { msg = 'No se pudo subir: revisa tu conexión'; type = 'error'; }
+                    else msg = 'Cambios subidos';
+                } else {
+                    const snap = await db.collection('users').doc(user.uid).get({ source: 'server' });
+                    const token = cloudTokenOf(snap.exists ? snap.data() : null);
+                    const before = getCloudBase();
+                    if (token !== before) {
+                        await pullAndDecide(); // el mismo camino de los conflictos
+                        if (getCloudBase() !== before) msg = 'Se trajeron los cambios de otro dispositivo';
+                        else { msg = 'No se pudo leer la nube: revisa tu conexión'; type = 'error'; }
+                    }
+                }
+            } catch (e) {
+                console.warn('Sincronizar ahora:', e.code || e.message || e);
+                msg = 'Sin conexión'; type = 'error';
+            } finally {
+                busyEnd();
+            }
+            renderSyncState();
+            // Si saveData o pullAndDecide ya abrieron su propio cuadro (conflicto, pérdida grande, error), ese manda
+            if (!$('conflictModal').classList.contains('hidden') || !$('dialogModal').classList.contains('hidden')) return;
+            customAlert('Sincronizar', msg, type, null, type === 'error' ? 'offline' : 'cloud');
         }
 
 

@@ -216,6 +216,7 @@
                     updateSecurityUI(); // Muestra si ya hay PIN
                     renderCatalogConfigUI(); // Vitrina en línea
                     onConfigOpenLicense(); // Mi plan (Fase 30)
+                    renderSyncState(); // «Sincronizar ahora» (Fase 33)
                 }
                 updateConfigUI();
             }

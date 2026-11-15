@@ -175,6 +175,7 @@
 
         function updateCloudStatus(status) {
             currentCloudState = status; // Guardar estado actual
+            if (typeof renderSyncState === 'function') renderSyncState(); // «Sincronizar ahora» en Ajustes
             
             // Buscamos los NUEVOS elementos del HTML
             const dot = document.getElementById('statusDot');

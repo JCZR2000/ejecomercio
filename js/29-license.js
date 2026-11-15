@@ -10,6 +10,7 @@
 
         let licenseUnsub = null;
         let licenseTrialTried = false; // la prueba se intenta crear una vez por sesión
+        let trialError = false;        // el servidor rechazó la prueba (casi siempre, la hora del teléfono)
         let adminPromise = null;       // respuesta de admin/config, una vez por sesión
         let salesInfo = null;          // admin/ventas = { wa, info }
         let adminLicenses = [];
@@ -51,6 +52,8 @@
             if (licenseUnsub) licenseUnsub();
             licenseUnsub = null;
             adminPromise = null;
+            licenseTrialTried = false; // otra cuenta en la misma sesión también intenta su prueba
+            trialError = false;
         }
 
         // La llama onAuthStateChanged al entrar
@@ -67,7 +70,10 @@
                 } else if (!snap.metadata.fromCache && navigator.onLine && !licenseTrialTried) {
                     licenseTrialTried = true;
                     snap.ref.set(buildTrialLicense(user, Date.now()))
-                        .catch(e => console.warn('Licencia: no se pudo crear la prueba (se reintenta al abrir de nuevo)', e.code || e.message || e));
+                        .catch(e => {
+                            console.warn('Licencia: no se pudo crear la prueba (se reintenta al abrir de nuevo)', e.code || e.message || e);
+                            if (e.code === 'permission-denied') { trialError = true; renderMyPlan(); }
+                        });
                 }
             }, e => console.warn('Licencia: se sigue con la caché', e.code || e.message || e));
         }
@@ -75,6 +81,7 @@
         function onLicenseChanged(hadPro) {
             renderMyPlan();
             renderCatalogConfigUI(); // incluye renderCatalogBadge
+            warnLicenseExpiry();
             // De sin Pro a Pro: la vitrina y el perfil de cobro se vuelven a subir solos
             if (!hadPro && hasPro() && state.isCloudSynced) afterCloudSyncCatalog();
         }
@@ -103,12 +110,67 @@
             return `Pro hasta ${formatLicenseDate(c.hasta)}`;
         }
 
+        // Licencia en caché de la cuenta abierta (o null)
+        function currentLicense() {
+            const user = auth.currentUser, cached = getCachedLicense();
+            return cached && (!user || cached.uid === user.uid) ? cached : null;
+        }
+        const isLifetime = (c) => c.origen === 'socio' || c.hasta >= LIFETIME_MS;
+
+        // Días que quedan, hacia arriba (0 o negativo = vencida); null sin licencia o de por vida. Pura.
+        function daysLeft(c, nowMs) {
+            if (!c || isLifetime(c)) return null;
+            return Math.ceil((c.hasta - nowMs) / LICENSE_DAY_MS);
+        }
+        const daysText = (n) => n === 1 ? '1 día' : `${n} días`;
+
+        // Chip del menú del usuario. Pura.
+        function planChipInfo(c, nowMs) {
+            if (!c || c.hasta <= nowMs) return { text: 'Gratis', cls: 'bg-gray-200 text-gray-600' };
+            const d = daysLeft(c, nowMs);
+            if (d === null) return { text: 'Pro', cls: 'bg-emerald-100 text-emerald-700' };
+            if (d <= 7) return { text: `Vence en ${daysText(d)}`, cls: 'bg-amber-100 text-amber-800' };
+            if (c.origen === 'prueba') return { text: `Prueba · ${daysText(d)}`, cls: 'bg-indigo-100 text-indigo-700' };
+            return { text: 'Pro', cls: 'bg-emerald-100 text-emerald-700' };
+        }
+        function renderUserPlanChip() {
+            const chip = $('userPlanChip');
+            if (!chip) return;
+            const info = planChipInfo(currentLicense(), Date.now());
+            chip.textContent = info.text;
+            chip.className = 'mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ' + info.cls;
+        }
+
+        // Aviso: desde 5 días antes de vencer hasta 3 días después; nunca de por vida. Pura.
+        function shouldWarnLicense(c, nowMs) {
+            const d = daysLeft(c, nowMs);
+            return d !== null && d <= 5 && c.hasta - nowMs >= -3 * LICENSE_DAY_MS;
+        }
+        // Una vez al día por dispositivo (inv_license_warned, solo local)
+        function warnLicenseExpiry() {
+            const c = currentLicense(), now = Date.now(), today = new Date().toDateString();
+            if (!auth.currentUser || !shouldWarnLicense(c, now)) return;
+            try {
+                if (localStorage.getItem('inv_license_warned') === today) return;
+                localStorage.setItem('inv_license_warned', today);
+            } catch (e) { return; } // sin almacenamiento no se puede recordar: mejor no repetir el aviso
+            const expired = c.hasta <= now;
+            customConfirm(expired ? 'Tu Pro venció' : 'Tu Pro está por vencer',
+                (expired ? `Venció el ${formatLicenseDate(c.hasta)}.` : `Vence en ${daysText(daysLeft(c, now))} (${formatLicenseDate(c.hasta)}).`) + '\nRenueva para no pausar la vitrina ni el enlace de cobro.',
+                'warning', null, 'Ver mi plan').then(ok => { if (ok) openMyPlan(); });
+        }
+
         function renderMyPlan() {
+            renderUserPlanChip();
             if (!$('myPlanSection')) return;
             const user = auth.currentUser;
-            const cached = getCachedLicense();
-            const c = cached && (!user || cached.uid === user.uid) ? cached : null;
+            const c = currentLicense();
             const pro = hasPro();
+            const left = pro ? daysLeft(c, Date.now()) : null;
+            const note = left !== null && left <= 7 ? `Tu Pro vence en ${daysText(left)}. Renueva para no pausar la vitrina ni el enlace de cobro.`
+                : (!c && trialError ? 'No se pudo activar la prueba gratis. Revisa que la fecha y la hora del teléfono sean automáticas y vuelve a abrir la app.' : '');
+            $('myPlanNote').textContent = note;
+            $('myPlanNote').classList.toggle('hidden', !note);
             $('myPlanStatus').textContent = licenseStatusText(c, Date.now(), navigator.onLine);
             $('myPlanStatus').className = 'font-bold ' + (pro ? 'text-emerald-700' : 'text-slate-800');
             $('myPlanEmail').textContent = user ? (user.email || '') : 'Sin sesión';
@@ -117,7 +179,7 @@
             $('myPlanInfo').textContent = info; // texto de los administradores: nunca innerHTML
             $('myPlanInfo').classList.toggle('hidden', !info);
             const wa = salesInfo ? String(salesInfo.wa || '') : '';
-            const lifetime = pro && c && (c.origen === 'socio' || c.hasta >= LIFETIME_MS);
+            const lifetime = pro && c && isLifetime(c);
             $('myPlanBuyBtn').classList.toggle('hidden', !user || lifetime || !/^\d{10,15}$/.test(wa));
             $('myPlanBuyLabel').textContent = pro && c.origen !== 'prueba' ? 'Renovar' : 'Hazte Pro';
         }
@@ -318,6 +380,14 @@
             t(licenseStatusText({ hasta: now + D, origen: 'prueba' }, now, true).startsWith('Prueba gratis hasta '), 'estado de prueba');
             t(licenseStatusText({ hasta: now + D, origen: 'pago' }, now, true).startsWith('Pro hasta '), 'estado Pro');
             t(licenseStatusText({ hasta: LIFETIME_MS, origen: 'socio' }, now, true) === 'Pro de por vida', 'estado de por vida');
+
+            t(daysLeft(null, now) === null && daysLeft({ hasta: LIFETIME_MS, origen: 'socio' }, now) === null && daysLeft({ hasta: now + 400 * D, origen: 'socio' }, now) === null, 'daysLeft: sin licencia o de por vida');
+            t(daysLeft({ hasta: now + 3 * D, origen: 'pago' }, now) === 3 && daysLeft({ hasta: now + 2.1 * D, origen: 'pago' }, now) === 3 && daysLeft({ hasta: now + 1, origen: 'pago' }, now) === 1 && daysLeft({ hasta: now - 2 * D, origen: 'pago' }, now) === -2, 'daysLeft: días hacia arriba');
+            t(planChipInfo(null, now).text === 'Gratis' && planChipInfo({ hasta: now - 1, origen: 'pago' }, now).text === 'Gratis', 'chip: gratis');
+            t(planChipInfo({ hasta: now + 20 * D, origen: 'prueba' }, now).text === 'Prueba · 20 días' && planChipInfo({ hasta: now + 20 * D, origen: 'pago' }, now).text === 'Pro', 'chip: prueba y Pro');
+            t(planChipInfo({ hasta: now + 3 * D, origen: 'pago' }, now).text === 'Vence en 3 días' && planChipInfo({ hasta: now + D, origen: 'prueba' }, now).text === 'Vence en 1 día' && planChipInfo({ hasta: LIFETIME_MS, origen: 'socio' }, now).text === 'Pro', 'chip: por vencer y de por vida');
+            t(shouldWarnLicense({ hasta: now + 5 * D, origen: 'pago' }, now) && !shouldWarnLicense({ hasta: now + 6 * D, origen: 'pago' }, now) && shouldWarnLicense({ hasta: now - 3 * D, origen: 'pago' }, now) && !shouldWarnLicense({ hasta: now - 4 * D, origen: 'pago' }, now), 'aviso: de 5 días antes a 3 días después');
+            t(!shouldWarnLicense(null, now) && !shouldWarnLicense({ hasta: LIFETIME_MS, origen: 'socio' }, now), 'aviso: nunca sin licencia ni de por vida');
 
             const list = [{ uid: 'AbCdEf123', email: 'Uno@Example.com' }, { uid: 'zzz999', email: '' }];
             t(filterLicenses(list, 'uno@').length === 1 && filterLicenses(list, 'abcdef').length === 1 && filterLicenses(list, '').length === 2 && filterLicenses(list, 'nadie').length === 0, 'buscador por correo o código');
