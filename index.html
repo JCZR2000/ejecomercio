@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v78.2</title>
+    <title>EjeComercio v78.3</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -156,7 +156,7 @@
 
     <!-- Fase 39: armazón del diseño nuevo (mismos id y onclick que el actual) -->
     <aside data-ui="2" class="ec-sidenav ui2-sidenav" aria-label="Menú principal">
-        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.2</span></div>
+        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.3</span></div>
         <nav aria-label="Secciones" class="ec-sidenav__list">
             <button type="button" class="ec-sidenav__item" data-nav-tab="home" aria-current="page" onclick="switchTab('home')"><span data-icon="box"></span><span>Inventario</span></button>
             <button type="button" class="ec-sidenav__item" data-nav-tab="credits" onclick="switchTab('credits')"><span data-icon="users"></span><span>Fiados</span><span class="ec-sidenav__count hidden" data-credit-count>0</span></button>
@@ -172,7 +172,7 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver ui2-ver--bar">v78.2</span>
+        <span class="ui2-ver ui2-ver--bar">v78.3</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.2</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.3</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -681,9 +681,10 @@
             </div>
 
             <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
+                <nav data-ui="2" class="ui2-cfgnav" aria-label="Secciones de Ajustes"></nav>
 
                 <!-- MI PLAN (Fase 30) -->
-                <section id="myPlanSection" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section id="myPlanSection" data-cfg="plan" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-amber-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-crown"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Mi plan</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Tu suscripción</p></div>
@@ -705,7 +706,7 @@
                 </section>
 
                 <!-- TASA DE CAMBIO -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="rate" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-blue-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-coins"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Tasa de cambio</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Con qué tasa se calculan los precios</p></div>
@@ -735,7 +736,7 @@
                 </section>
 
                 <!-- ALMACENAMIENTO -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="storage" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-emerald-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-database"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Almacenamiento</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Nube y copias de seguridad</p></div>
@@ -789,7 +790,7 @@
                 </section>
 
                 <!-- SEGURIDAD -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="security" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-indigo-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-user-shield"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Seguridad</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">PIN y cifrado</p></div>
@@ -829,7 +830,7 @@
                 </section>
 
                 <!-- FIADOS -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="fiados" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-orange-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-file-invoice-dollar"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Fiados</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Cómo se calcula la deuda si los precios cambian</p></div>
@@ -853,7 +854,7 @@
                 </section>
 
                 <!-- FACTURACIÓN -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="billing" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-sky-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-receipt"></i></div>
                         <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Facturación</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Qué se entrega al cliente</p></div>
@@ -884,7 +885,7 @@
                 </section>
 
                 <!-- VITRINA -->
-                <section class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                <section data-cfg="catalog" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
                     <div class="flex items-center gap-3 mb-3">
                         <div class="bg-pink-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-store"></i></div>
                         <div class="min-w-0 flex-1"><h4 class="font-bold text-slate-800 leading-tight">Vitrina <span id="catalogProTag" class="hidden align-middle text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">Pro</span></h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Catálogo público con pedidos por WhatsApp</p></div>
@@ -1005,7 +1006,7 @@
                 </section>
 
                 <!-- ZONA DE LIMPIEZA -->
-                <details class="group bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+                <details data-cfg="danger" class="group bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
                     <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden bg-red-50">
                         <span class="flex items-center gap-3 min-w-0">
                             <span class="bg-red-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-triangle-exclamation"></i></span>

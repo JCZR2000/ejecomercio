@@ -741,6 +741,22 @@ html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: co
   html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(4) { grid-column: 2; }
 }
 
+/* Fase 47: el índice de Ajustes solo existe en horizontal (ver más abajo); en vertical se ven todas las secciones */
+.ui2-cfgnav { display: none; }
+.ui2-cfghead__chev { display: none; }
+/* Fase 47b: en vertical (teléfono) las secciones de Ajustes se pliegan a su cabecera; tocarla las abre */
+@media not all and (min-width: 900px) and (orientation: landscape) {
+  html.ui2 .ui2-cfghead { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  html.ui2 .ui2-cfghead__chev { display: flex; margin-left: auto; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; align-items: center; justify-content: center; background: var(--bg); color: var(--text-muted); transition: transform .25s; }
+  html.ui2 section.is-fold > .ui2-cfghead { margin-bottom: 0; }
+  html.ui2 section.is-fold > .ui2-cfghead .ui2-cfghead__chev { transform: rotate(-90deg); }
+  html.ui2 section.is-fold > :not(.ui2-cfghead) { display: none !important; }
+}
+@media (min-width: 900px) and (max-width: 1099px) and (orientation: landscape) {
+  html.ui2 #configModal > div > div:nth-child(2) { grid-template-columns: 220px minmax(0, 1fr) !important; }
+  html.ui2 .ui2-cfgnav__tx small { display: none; }
+}
+
 /* ===== Fase 45: ventanas en pantallas horizontales (tableta y PC): más anchas, en dos columnas y al alto visible (dvh) ===== */
 @media (min-width: 900px) and (orientation: landscape) {
   /* A. Regla general: la caja cabe en el alto visible y nada se corta */
@@ -755,14 +771,27 @@ html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: co
   /* B. Ventanas altas: la caja en columna (cabecera fija) y el cuerpo en dos columnas que desplaza solo si no cabe */
   html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel) > div { display: flex; flex-direction: column; overflow: hidden; }
   html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel) > div > div:first-child { flex-shrink: 0; }
-  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
-  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) > * { margin: 0; }
-  /* Ajustes: secciones de alto muy distinto; en grid quedan huecos. Columnas equilibradas sin alto fijo (desplaza la caja, la cabecera queda pegada arriba), así no desbordan hacia el lado */
-  html.ui2 #configModal > div { max-width: 960px; display: block; overflow-y: auto; }
-  html.ui2 #configModal > div > div:first-child { position: sticky; top: 0; z-index: 2; }
-  html.ui2 #configModal > div > div:nth-child(2) { display: block; overflow: visible; columns: 2; column-gap: 16px; }
-  html.ui2 #configModal > div > div:nth-child(2) > * { break-inside: avoid; margin: 0 0 16px; }
-  html.ui2 #configModal > div > div:nth-child(2) > details { column-span: all; margin-bottom: 0; }
+  html.ui2 :is(#fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+  html.ui2 :is(#fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) > * { margin: 0; }
+  /* Fase 47: Ajustes en dos paneles (como Android en tableta): categorías a la izquierda, solo la elegida a la derecha. Alto fijo: no salta al cambiar de sección */
+  html.ui2 #configModal > div { max-width: 960px; height: min(calc(100dvh - 32px), 760px); } /* el max-height lo fija la regla A, más fuerte */
+  html.ui2 #configModal > div > div:nth-child(2) { flex: 1 1 auto; min-height: 0; max-height: none; display: grid; grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; overflow: hidden; }
+  html.ui2 #configModal > div > div:nth-child(2) > * { margin: 0; }
+  html.ui2 #configModal [data-cfg]:not(.is-on) { display: none; }
+  html.ui2 #configModal [data-cfg].is-on { grid-column: 2; grid-row: 1; min-height: 0; overflow-y: auto; padding: 20px; border: 0; border-radius: 0; box-shadow: none; }
+  html.ui2 #configModal details[data-cfg].is-on { padding: 0; }
+  html.ui2 #configModal details[data-cfg].is-on > summary { pointer-events: none; } /* en dos paneles queda siempre abierta */
+  html.ui2 #configModal details[data-cfg].is-on > summary > span:last-child { display: none; }
+  html.ui2 .ui2-cfgnav { display: flex; flex-direction: column; gap: 4px; grid-column: 1; grid-row: 1; min-height: 0; overflow-y: auto; padding: 12px; background: var(--surface); border-right: 1px solid var(--border); }
+  html.ui2 .ui2-cfgnav button { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 10px; border-radius: 14px; text-align: left; color: var(--text); }
+  html.ui2 .ui2-cfgnav button:hover { background: var(--bg); }
+  html.ui2 .ui2-cfgnav button[aria-current] { background: var(--primary-soft); color: var(--primary); }
+  html.ui2 .ui2-cfgnav__ic { flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+  html.ui2 .ui2-cfgnav button[aria-current] .ui2-cfgnav__ic { background: var(--surface); }
+  html.ui2 .ui2-cfgnav__tx { min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+  html.ui2 .ui2-cfgnav__tx b { font-size: 14px; }
+  html.ui2 .ui2-cfgnav__tx small { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  html.ui2 .ui2-cfgnav button[data-key="danger"] { color: var(--danger); }
   html.ui2 #fiscalConfigModal > div { max-width: 760px; }
   html.ui2 #fiscalConfigModal > div > div:nth-child(2) > :is(div:first-child, button) { grid-column: 1 / -1; }
   html.ui2 #receiptConfigPanel > div { max-width: 760px; }
