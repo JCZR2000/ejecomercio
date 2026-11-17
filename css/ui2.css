@@ -490,3 +490,49 @@ html.ui2 #fabCart[data-count="0"] { display: none; }
 }
 
 html.ui2 .ec-field__control input:focus-visible, html.ui2 .ui2-qty input:focus-visible, html.ui2 .ui2-possearch input:focus-visible { outline: none; }
+
+/* ===== Fase 41: fiados y cobro ===== */
+/* Con overflow:hidden las tarjetas del cuerpo se encogían y recortaban la lista: que haga scroll el cuerpo, no ellas */
+.ui2-cart__body > * { flex-shrink: 0; }
+
+.ui2-fiados { display: flex; flex-direction: column; gap: 12px; }
+.ui2-fiados__head { display: flex; align-items: center; gap: 8px; }
+html.ui2 #btnFiadosToolbar.ui2-rate-on { background: var(--warning-soft); color: var(--warning); border-color: var(--warning); }
+.ui2-debtcard { display: flex; flex-direction: column; gap: 6px; }
+.ui2-debtcard__total { font: 700 36px/40px var(--font-display); letter-spacing: -0.02em; color: var(--danger); }
+.ui2-debtcard__stats { font: 400 13px/18px var(--font-sans); color: var(--text-muted); }
+.ui2-debtcard__btn { align-self: flex-start; margin-top: 6px; min-height: 40px; }
+.ui2-fitem { border-bottom: 1px solid var(--surface-muted); }
+.ui2-fitem:last-child { border-bottom: 0; }
+.ui2-frow { width: 100%; box-sizing: border-box; border: 0; background: transparent; text-align: left; cursor: pointer; font-family: var(--font-sans); }
+.ui2-frow:hover { background: var(--bg); }
+.ui2-frow .ec-row__body { display: block; }
+
+/* Cobro: hoja a pantalla completa en móvil (z 55: encima de la barra 40 y la cabecera 50, debajo de las ventanas que abre) */
+.ui2-detail { display: none; }
+.ui2-detail.is-open { display: flex; position: fixed; inset: 0; z-index: 55; flex-direction: column; background: var(--bg); }
+html.ui2 body:not([data-tab="credits"]) .ui2-detail { display: none; }
+.ui2-detail__who { flex: 1; min-width: 0; }
+.ui2-detail .ui2-cart__title button { font: inherit; color: inherit; }
+.ui2-detail__sub { font: 400 12px/16px var(--font-sans); color: var(--text-muted); }
+.ui2-owe, .ui2-payc { display: flex; flex-direction: column; gap: 10px; }
+.ui2-lines { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--surface-muted); font: 400 14px/20px var(--font-sans); }
+.ui2-line { display: flex; justify-content: space-between; gap: 12px; }
+.ui2-line b { font-weight: 600; }
+.ui2-line--total { padding-top: 8px; border-top: 1px solid var(--surface-muted); font-weight: 700; }
+.ui2-detail__items { font: 400 13px/18px var(--font-sans); color: var(--text-muted); }
+.ui2-all { flex-shrink: 0; min-height: 36px; border-radius: var(--radius-pill); }
+.ui2-payc .ec-field__hint { text-align: right; }
+.ui2-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
+.ui2-acts button { min-height: 44px; padding: 0 8px; font: 600 14px var(--font-sans); border-radius: var(--radius-md); cursor: pointer; }
+.ui2-acts .ui2-danger { color: var(--danger); }
+.ui2-more { display: none; margin-top: 8px; }
+.ui2-more.is-open { display: grid; }
+
+@media (min-width: 1024px) {
+  .ui2-mob-only, .ui2-more-btn { display: none !important; }
+  .ui2-more { display: grid; }
+  html.ui2 body[data-tab="credits"] main { padding-right: 416px; }
+  html.ui2 body[data-tab="credits"] .ui2-detail { display: flex; position: fixed; top: 64px; right: 0; bottom: 0; width: 400px; z-index: 30; flex-direction: column; background: var(--bg); border-left: 1px solid var(--border); }
+  .ui2-frow[aria-current] { background: var(--primary-soft); }
+}

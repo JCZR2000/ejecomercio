@@ -181,6 +181,7 @@
             if (allPending.length === 0) {
                 $('noCreditsMsg').textContent = "No hay cuentas por cobrar.";
                 $('noCreditsMsg').classList.remove('hidden');
+                if (UI2 && typeof renderCreditsUi2 === 'function') renderCreditsUi2([], allPending); // Fase 41: cierra el cobro si ya no queda ningún fiado
                 return; // No renderizamos nada más
             } else if (filteredList.length === 0) {
                 $('noCreditsMsg').textContent = "No se encontró ningún cliente con ese nombre.";
@@ -214,6 +215,9 @@
                     default: return b.id - a.id;
                 }
             });
+
+            // Fase 41: el diseño nuevo pinta filas y el cobro (31-ui2.js)
+            if (UI2 && typeof renderCreditsUi2 === 'function') return renderCreditsUi2(filteredList, allPending);
 
             // 7. Renderizar tarjetas (Ya ordenadas)
             filteredList.forEach(c => {

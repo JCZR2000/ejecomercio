@@ -203,6 +203,12 @@
             const clients = sec === 'CLIENTS';
             $('creditsDebtsPane').classList.toggle('hidden', clients);
             $('clientsPanel').classList.toggle('hidden', !clients);
+            if (UI2) { // Fase 41: el segmentado nuevo marca con aria-pressed
+                $('btnSectionDebts').setAttribute('aria-pressed', String(!clients));
+                $('btnSectionClients').setAttribute('aria-pressed', String(clients));
+                if (clients) renderClientsList(); else renderCreditsList();
+                return;
+            }
             const on = 'flex-1 py-2 rounded-xl text-sm font-bold border ', off = ' bg-white text-gray-600 border-gray-200';
             $('btnSectionDebts').className = on + (clients ? off.trim() : 'bg-red-600 text-white border-red-600');
             $('btnSectionClients').className = on + (clients ? 'bg-indigo-600 text-white border-indigo-600' : off.trim());

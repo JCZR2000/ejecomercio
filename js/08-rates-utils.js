@@ -81,7 +81,9 @@
 
             // --- CORRECCIÓN AQUÍ (Botón de Tasa en Fiados) ---
             const btnFiados = $('btnFiadosToolbar');
-            if (btnFiados) {
+            if (btnFiados && UI2) { // Fase 41: el botón nuevo no pierde su clase; solo se marca cuando la tasa de fiados es distinta
+                btnFiados.classList.toggle('ui2-rate-on', state.fiadosRateMode !== 'DEFAULT');
+            } else if (btnFiados) {
                 if (state.fiadosRateMode !== 'DEFAULT') {
                     // Estado Activo (Naranja, animado, estilo cuadrado nuevo)
                     btnFiados.className = "h-10 w-10 border rounded-lg bg-orange-100 text-orange-600 border-orange-300 transition flex items-center justify-center shrink-0 animate-pulse font-bold shadow-sm hover:bg-orange-200";

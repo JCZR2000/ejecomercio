@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v73.0</title>
+    <title>EjeComercio v74.0</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -172,7 +172,7 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver">v73.0</span>
+        <span class="ui2-ver">v74.0</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v73.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v74.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -2035,6 +2035,7 @@
         </div>
             
             <div id="view-credits" class="hidden pb-24 space-y-4 animate-fade-in">
+                <div data-ui="1" class="space-y-4">
                 <div class="bg-red-50 border border-red-200 rounded-2xl p-4 shadow-sm">
                     <div class="flex justify-between items-center">
                         <div>
@@ -2147,6 +2148,66 @@
                     <i class="fa-solid fa-clipboard-check text-4xl mb-2"></i>
                     <p class="text-sm font-bold">No hay deudas pendientes</p>
                 </div>
+                </div>
+                </div>
+
+                <!-- Fase 41: Fiados del diseño nuevo (mismos id que el actual) -->
+                <div data-ui="2" class="ui2-fiados">
+                    <div class="ui2-fiados__head">
+                        <div class="ui2-inv__titlebox">
+                            <h1 class="ui2-inv__title ui2-mob-only">Fiados</h1>
+                        </div>
+                        <button type="button" class="ec-iconbtn" onclick="openCreditHistory()" aria-label="Historial de fiados"><span data-icon="clock"></span></button>
+                        <button type="button" id="btnFiadosToolbar" class="ec-iconbtn" onclick="toggleMenu('fiados')" aria-label="Tasa de los fiados"><span data-icon="calc"></span></button>
+                    </div>
+
+                    <section class="ui2-card ui2-debtcard">
+                        <div class="ec-overline">POR COBRAR</div>
+                        <div id="totalPendingDebt" class="ui2-debtcard__total">0.00</div>
+                        <div class="ui2-debtcard__stats"><span id="ui2CreditStats"></span> · a favor <span id="totalClientBalances">0.00</span></div>
+                        <button type="button" class="ec-btn ec-btn--soft ui2-debtcard__btn" onclick="openBulkRemind()">Recordar a los atrasados <span class="ec-chip ec-chip--pro">Pro</span></button>
+                    </section>
+
+                    <div class="ec-seg" role="group" aria-label="Sección de fiados">
+                        <button type="button" id="btnSectionDebts" aria-pressed="true" onclick="setCreditsSection('DEBTS')">Deudas</button>
+                        <button type="button" id="btnSectionClients" aria-pressed="false" onclick="setCreditsSection('CLIENTS')">Clientes</button>
+                    </div>
+
+                    <div id="clientsPanel" class="hidden ui2-stack">
+                        <div class="ui2-inv__bar">
+                            <label class="ec-field__control ec-search ui2-inv__search">
+                                <span data-icon="search" data-size="18"></span>
+                                <input type="search" id="clientSearchInput" autocomplete="off" oninput="renderClientsList()" placeholder="Buscar por nombre, teléfono o cédula" aria-label="Buscar cliente">
+                            </label>
+                            <button type="button" class="ec-btn ec-btn--primary" onclick="openClientForm()"><span data-icon="plus" data-size="18"></span>Nuevo cliente</button>
+                        </div>
+                        <div id="clientsList" class="grid grid-cols-1 md:grid-cols-2 gap-3 pb-24 items-start"></div>
+                    </div>
+
+                    <div id="creditsDebtsPane" class="ui2-stack">
+                        <div class="ui2-inv__bar">
+                            <label class="ec-field__control ec-search ui2-inv__search">
+                                <span data-icon="search" data-size="18"></span>
+                                <input type="search" id="creditSearchInput" autocomplete="off" placeholder="Buscar cliente" aria-label="Buscar cliente con deuda" oninput="renderCreditsList()">
+                            </label>
+                            <label class="ui2-sort"><span>Ordenar</span>
+                                <select id="ui2CreditSort" onchange="setCreditSort(this.value)" aria-label="Ordenar fiados">
+                                    <option value="URGENCY">Urgencia</option>
+                                    <option value="RECENT">Recientes</option>
+                                    <option value="ALPHA_ASC">Nombre (A-Z)</option>
+                                    <option value="ALPHA_DESC">Nombre (Z-A)</option>
+                                    <option value="DEBT_DESC">Mayor deuda</option>
+                                    <option value="DEBT_ASC">Menor deuda</option>
+                                </select>
+                            </label>
+                        </div>
+                        <!-- Lo usan setCreditSort y el oyente de clic de 15-credits.js; en el diseño nuevo queda vacío -->
+                        <div id="sortMenuDropdown" class="hidden"></div>
+                        <div class="ec-list">
+                            <div id="creditsList" role="list"></div>
+                            <div id="noCreditsMsg" class="hidden p-8 text-center text-gray-400 italic bg-white">No hay deudas pendientes</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -2398,6 +2459,9 @@
             </div>
         </div>
 
+        <!-- Fase 41: cobro de un fiado (hoja en móvil con z-[55], columna a la derecha en escritorio). Fuera de #creditsList: ese contenedor se vacía en cada repintado -->
+        <div data-ui="2" id="ui2CreditDetail" class="ui2-detail" role="dialog" aria-label="Cobro del fiado"></div>
+
         <!-- Fase 40: carrito del diseño nuevo (hoja en móvil, panel en escritorio). Mismos id y manejadores que el actual -->
         <div data-ui="2" id="cartModal" class="fixed inset-0 modal-bg z-[75] hidden flex justify-center items-end sm:items-center" role="dialog" aria-modal="true" aria-labelledby="posTitle">
             <div class="ui2-cart">
@@ -2417,11 +2481,7 @@
                     </div>
                     <input type="checkbox" id="isCreditSale" class="sr-only" tabindex="-1" aria-hidden="true" onchange="toggleCreditModeUI()">
 
-                    <section class="ui2-card ui2-cartlist">
-                        <div id="cartTableBody" role="list"></div>
-                        <div id="cartEmptyMsg" class="ui2-cart__empty">Carrito vacío</div>
-                    </section>
-
+                    <!-- Fase 41: el buscador va arriba de la lista (abajo tapaba los productos) -->
                     <section class="ui2-card ui2-possearch">
                         <div class="ui2-possearch__row">
                             <div class="ui2-possearch__box">
@@ -2435,6 +2495,11 @@
                             <input type="number" id="saleQty" value="1" min="1" aria-label="Cantidad">
                             <button type="button" class="ec-icon-btn" onclick="addToCart()" aria-label="Agregar a la venta"><span data-icon="plus"></span></button>
                         </div>
+                    </section>
+
+                    <section class="ui2-card ui2-cartlist">
+                        <div id="cartTableBody" role="list"></div>
+                        <div id="cartEmptyMsg" class="ui2-cart__empty">Carrito vacío</div>
                     </section>
 
                     <section id="creditConfig" class="hidden ui2-card ui2-credit">
