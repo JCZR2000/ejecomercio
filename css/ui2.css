@@ -585,3 +585,36 @@ html.ui2 #clientModalBody { display: flex; flex-direction: column; gap: 12px; }
   html.ui2 .ui2-desk-grid { display: grid; }
   html.ui2 body[data-tab="home"] .ui2-desk-grid { display: grid; }
 }
+
+/* ===== Fase 43: piel común de las ventanas viejas (solo color, borde, radio, fuente y alto mínimo) ===== */
+/* html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) = la caja de la ventana; :not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) = excluye #receiptCanvas y #fiscalCanvas y todo lo de dentro (la imagen/PDF del cliente no cambia) */
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-menu); font-family: var(--font-sans); color: var(--text); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) h2:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)), html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) h3:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { font-family: var(--font-display); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) :is(.text-gray-400,.text-gray-500,.text-gray-600,.text-slate-400,.text-slate-500):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { color: var(--text-muted); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) :is(.text-gray-700,.text-gray-800,.text-gray-900,.text-slate-700,.text-slate-800):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { color: var(--text); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-blue-600,.bg-indigo-600,.bg-slate-800,.bg-slate-900):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--primary); color: #fff; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-blue-600,.bg-indigo-600,.bg-slate-800,.bg-slate-900):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)):hover { background: var(--primary-hover); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button.bg-green-600:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--success); color: #fff; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-red-600,.bg-red-500):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--danger); color: #fff; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-red-50,.bg-red-100):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--danger-soft); color: var(--danger); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-gray-100,.bg-gray-200,.bg-slate-100):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.bg-blue-600,.bg-indigo-600,.bg-slate-800,.bg-slate-900,.bg-green-600,.bg-red-600,.bg-red-500,.bg-red-50,.bg-red-100,.bg-gray-100,.bg-gray-200,.bg-slate-100):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { border-radius: var(--radius-md); font-weight: 600; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) button:is(.w-full,.flex-1):is(.bg-blue-600,.bg-indigo-600,.bg-slate-800,.bg-slate-900,.bg-green-600,.bg-red-600,.bg-red-500,.bg-red-50,.bg-red-100,.bg-gray-100,.bg-gray-200,.bg-slate-100):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { min-height: var(--tap-min); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) :is(input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=color]),select,textarea):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { border: 1px solid var(--border-input); border-radius: var(--radius-md); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) :is(input:not([type=checkbox],[type=radio],[type=range],[type=file],[type=color]),select):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { min-height: 44px; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) :is(input,select,textarea):not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)):focus { outline: 2px solid var(--primary); outline-offset: 1px; box-shadow: none; }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-blue-100:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)), html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-indigo-100:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--primary-soft); color: var(--primary); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-green-100:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--success-soft); color: var(--success); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-red-100:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--danger-soft); color: var(--danger); }
+html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-yellow-100:not(:where(#receiptCanvas,#fiscalCanvas,#receiptCanvas *,#fiscalCanvas *)) { background: var(--warning-soft); color: var(--warning); }
+@media (max-width: 639px) {
+  html.ui2 .modal-bg.items-end:not([data-ui="2"]) > div:not(.ui2-cart) { border-radius: 20px 20px 0 0; }
+}
+
+/* Iconos de trazo (js/31-ui2.js ui2SwapIcon): el <i> se conserva y el SVG hereda tamaño y color */
+html.ui2 i[data-ui2i]::before { content: none; }
+html.ui2 i[data-ui2i] { display: inline-flex; vertical-align: -0.125em; }
+html.ui2 i[data-ui2i] > svg { width: 1em; height: 1em; }
+
+/* Hora del historial: no parte en dos líneas */
+html.ui2 .ui2-hrow__time { white-space: nowrap; width: auto; min-width: 44px; }

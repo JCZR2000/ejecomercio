@@ -34,8 +34,51 @@
             edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
             trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
             // Fase 42
-            receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'
+            receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>',
+            // Fase 43 (trazos para el cambiador de iconos)
+            check: '<path d="m5 12 5 5 9-10"/>',
+            'check-circle': '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+            save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/>',
+            minus: '<path d="M5 12h14"/>',
+            unlock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+            file: '<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+            upload: '<path d="M12 16V4M7 9l5-5 5 5M5 21h14"/>',
+            calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+            'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+            'chevron-up': '<path d="m18 15-6-6-6 6"/>',
+            refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18.5 2v4h-4M5.5 22v-4h4"/>',
+            spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
+            image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/>',
+            cart: '<circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20 7H6"/>',
+            tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
+            share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/>',
+            copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+            link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+            phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+            warning: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+            info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+            ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
+            login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5M15 12H3"/>',
+            'eye-off': '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3 3.6M6.6 6.6A16 16 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4-.9"/>',
+            bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
         };
+
+        // Nombre de Font Awesome (sin «fa-») → clave de UI2_ICONS. Lo que no está aquí se queda como Font Awesome.
+        const UI2_FA_MAP = {};
+        Object.entries({
+            x: 'times xmark', check: 'check', 'check-circle': 'circle-check check-circle clipboard-check', save: 'save floppy-disk',
+            trash: 'trash trash-can', edit: 'pen pen-to-square', plus: 'plus', minus: 'minus', user: 'user', users: 'address-book user-clock',
+            lock: 'lock user-shield shield-halved key', unlock: 'lock-open', receipt: 'receipt file-invoice file-invoice-dollar print',
+            file: 'file-pdf file-excel', download: 'download', upload: 'upload', cloud: 'cloud cloud-bolt', 'cloud-down': 'cloud-arrow-down',
+            sliders: 'gear sliders', clock: 'clock clock-rotate-left history', calendar: 'calendar-days calendar-day',
+            chevron: 'chevron-right arrow-right', 'chevron-down': 'chevron-down', 'chevron-up': 'caret-up', back: 'arrow-left',
+            refresh: 'rotate sync-alt', spinner: 'spinner circle-notch', search: 'search magnifying-glass', camera: 'camera', image: 'image',
+            scan: 'barcode qrcode', calc: 'calculator', cart: 'cart-shopping basket-shopping cart-plus', box: 'box box-open boxes-stacked',
+            store: 'store', inbox: 'inbox', tag: 'tags', share: 'share-nodes', copy: 'copy', link: 'link', phone: 'phone mobile-screen',
+            warning: 'triangle-exclamation circle-exclamation', info: 'circle-info info-circle', ban: 'ban',
+            chart: 'chart-line chart-pie arrow-trend-up', coins: 'coins money-bill money-bill-wave sack-dollar dollar-sign piggy-bank',
+            crown: 'crown trophy', logout: 'right-from-bracket', login: 'right-to-bracket', 'eye-off': 'eye-slash', bolt: 'bolt'
+        }).forEach(([k, names]) => names.split(' ').forEach(n => { UI2_FA_MAP[n] = k; }));
 
         function icon(name, size) {
             const s = Number(size) || 20;
@@ -44,6 +87,40 @@
 
         // Rellena los <span data-icon="nombre" data-size="N"> del armazón nuevo
         document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon, el.dataset.size); });
+
+        // Fase 43: iconos de trazo en lugar de Font Awesome (solo con UI2). Se conserva el <i> para que sigan sirviendo id, className, classList y fa-spin.
+        const UI2_FA_SKIP = new Set(['fa-solid', 'fa-regular', 'fa-brands', 'fa-spin', 'fa-fw', 'fa-lg', 'fa-xl', 'fa-2x', 'fa-3x', 'fa-xs', 'fa-sm', 'fa-beat', 'fa-bounce', 'fa-pulse', 'fa-shake']);
+        function ui2SwapIcon(i) {
+            if (!i || i.closest('#receiptCanvas, #fiscalCanvas') || i.classList.contains('fa-brands')) return; // el recibo y la factura no cambian
+            const cls = [...i.classList].find(c => c.startsWith('fa-') && !UI2_FA_SKIP.has(c));
+            const key = cls && UI2_FA_MAP[cls.slice(3)];
+            if (!key) { if (i.dataset.ui2i) { delete i.dataset.ui2i; i.textContent = ''; } return; }
+            if (i.dataset.ui2i === cls.slice(3)) return;
+            i.dataset.ui2i = cls.slice(3);
+            i.innerHTML = icon(key, 16).replace('width="16" height="16"', 'width="1em" height="1em"');
+        }
+        function ui2SwapIn(root) {
+            if (root.nodeType !== 1) return;
+            if (root.tagName === 'I') ui2SwapIcon(root);
+            else if (root.querySelector) root.querySelectorAll('i[class*="fa-"]').forEach(ui2SwapIcon);
+        }
+        // Consola (solo para probar): nombres de FA que siguen visibles sin traducir, con su cuenta
+        function ui2IconAudit() {
+            const out = {};
+            document.querySelectorAll('i[class*="fa-"]:not([data-ui2i])').forEach(i => {
+                if (i.offsetParent === null) return;
+                const c = [...i.classList].find(x => x.startsWith('fa-') && !UI2_FA_SKIP.has(x)) || '?';
+                out[c] = (out[c] || 0) + 1;
+            });
+            return out;
+        }
+        if (UI2) {
+            ui2SwapIn(document.body);
+            new MutationObserver(muts => muts.forEach(m => {
+                if (m.type === 'attributes') ui2SwapIcon(m.target.tagName === 'I' ? m.target : null);
+                else m.addedNodes.forEach(ui2SwapIn);
+            })).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+        }
 
         // Un solo botón alterna entre los dos diseños. Se guarda y se recarga: no se redibuja en caliente.
         async function toggleDesign() {
@@ -628,7 +705,20 @@
             console.assert(groupsOk, 'ui2HistGroups agrupa mal por día');
             console.assert(noCostOk, 'ui2FilterProducts nocost cuenta mal');
             console.assert(limitOk, 'ui2HistLimit no debe estar en state ni en buildCloudPayload()');
-            const ok = noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
+            // Fase 43: cambiador de iconos (nodos sueltos, nada queda en el DOM)
+            const box = document.createElement('div');
+            box.innerHTML = '<i class="fa-solid fa-trash-can"></i><i class="fa-brands fa-whatsapp"></i><i class="fa-solid fa-ghost"></i><span id="receiptCanvas"><i class="fa-solid fa-check"></i></span>';
+            const [iTr, iWa, iGh] = box.querySelectorAll(':scope > i'), iRc = box.querySelector('span i');
+            [iTr, iWa, iGh, iRc].forEach(ui2SwapIcon);
+            const swapA = iTr.dataset.ui2i === 'trash-can' && !!iTr.querySelector('svg');
+            iTr.className = 'fa-solid fa-pen'; ui2SwapIcon(iTr);
+            const swapB = iTr.dataset.ui2i === 'pen';
+            const swapNo = !iWa.dataset.ui2i && !iGh.dataset.ui2i && !iRc.dataset.ui2i && !iRc.querySelector('svg');
+            const mapOk = Object.values(UI2_FA_MAP).every(k => k in UI2_ICONS);
+            console.assert(swapA && swapB, 'ui2SwapIcon no traduce o no retraduce');
+            console.assert(swapNo, 'ui2SwapIcon cambió marcas, desconocidos o el recibo');
+            console.assert(mapOk, 'UI2_FA_MAP apunta a un icono que no existe');
+            const ok = swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
             console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk, movesOk, groupsOk, noCostOk, limitOk });
             return ok;
         }
