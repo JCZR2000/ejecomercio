@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v76.1</title>
+    <title>EjeComercio v77.0</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -156,7 +156,7 @@
 
     <!-- Fase 39: armazón del diseño nuevo (mismos id y onclick que el actual) -->
     <aside data-ui="2" class="ec-sidenav ui2-sidenav" aria-label="Menú principal">
-        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:40px;height:40px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span></div>
+        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v77.0</span></div>
         <nav aria-label="Secciones" class="ec-sidenav__list">
             <button type="button" class="ec-sidenav__item" data-nav-tab="home" aria-current="page" onclick="switchTab('home')"><span data-icon="box"></span><span>Inventario</span></button>
             <button type="button" class="ec-sidenav__item" data-nav-tab="credits" onclick="switchTab('credits')"><span data-icon="users"></span><span>Fiados</span><span class="ec-sidenav__count hidden" data-credit-count>0</span></button>
@@ -167,12 +167,12 @@
             <button type="button" class="ec-sidenav__item" onclick="toggleMenu('config')"><span data-icon="sliders"></span><span>Ajustes</span></button>
         </nav>
         <div style="flex: 1"></div>
-        <button type="button" class="ec-sidenav__user" onclick="toggleUserMenu()" aria-haspopup="menu"><span class="ec-avatar"><span data-icon="user"></span></span><span style="flex: 1; min-width: 0"><span style="display: block; font-weight: 600; font-size: 14px">Mi cuenta</span><span style="display: block; font-size: 12px; color: var(--on-ink-muted)">Plan, diseño y sesión</span></span><span data-icon="more" data-size="18"></span></button>
+        <button type="button" class="ec-sidenav__user" onclick="toggleUserMenu()" aria-haspopup="menu"><span class="ec-avatar ui2-sideav"><img id="ui2SideImg" class="hidden" src="" alt="" referrerpolicy="no-referrer"><span id="ui2SideIni" data-icon="user"></span></span><span style="flex: 1; min-width: 0"><span id="ui2SideName" class="ui2-side__t">Mi cuenta</span><span id="ui2SideSync" class="ui2-side__s">Sin sesión</span></span><span data-icon="more" data-size="18"></span></button>
     </aside>
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver">v76.1</span>
+        <span class="ui2-ver ui2-ver--bar">v77.0</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v76.1</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v77.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -2005,14 +2005,15 @@
                         <h1 class="ui2-inv__title">Inventario</h1>
                         <div class="ui2-inv__count"><span id="ui2ProdCount">0</span> productos</div>
                     </div>
-                    <button type="button" class="ec-iconbtn ui2-inv__calc" onclick="openCalculator()" aria-label="Calculadora"><span data-icon="calc"></span></button>
+                    <button type="button" class="ec-btn ec-btn--secondary ui2-inv__calc" onclick="openCalculator()" aria-label="Calculadora de precios"><span data-icon="calc" data-size="18"></span><span class="ui2-xl-only">Calculadora de precios</span></button>
+                    <button type="button" class="ec-btn ec-btn--secondary ui2-desk-only" onclick="exportInventoryPDF()"><span data-icon="download" data-size="18"></span>Exportar PDF</button>
                     <button type="button" class="ec-btn ec-btn--primary ui2-inv__new" onclick="ui2NewProduct()"><span data-icon="plus" data-size="18"></span>Nuevo<span class="ui2-desk-only">&nbsp;producto</span></button>
                 </div>
                 <div class="ui2-stats ui2-stats--4 ui2-desk-grid">
                     <div class="ec-stat"><span class="ec-stat__icon ui2-stat-ic" data-icon="box"></span><div><span class="ec-stat__label">PRODUCTOS</span><span id="ui2StatProds" class="ec-stat__value">0</span><span class="ec-stat__sub"><span id="ui2StatOut">0</span> agotados</span></div></div>
                     <div class="ec-stat"><span class="ec-stat__icon ec-stat__icon--success ui2-stat-ic" data-icon="coins"></span><div><span class="ec-stat__label">COBRADO ESTE MES</span><span data-month-total class="ec-stat__value">0.00</span><span class="ec-stat__sub">ventas y abonos</span></div></div>
                     <div class="ec-stat"><span class="ec-stat__icon ec-stat__icon--danger ui2-stat-ic" data-icon="users"></span><div><span class="ec-stat__label">POR COBRAR</span><span data-pending-total class="ec-stat__value ec-stat__value--danger">0.00</span><span class="ec-stat__sub">fiados abiertos</span></div></div>
-                    <button type="button" id="ui2StatNoCost" class="ec-stat ui2-stat-btn" onclick="ui2SetFilter('nocost')"><span class="ec-stat__icon ec-stat__icon--warning ui2-stat-ic" data-icon="sliders"></span><div><span class="ec-stat__label">SIN COSTO</span><span id="ui2StatNoCostN" class="ec-stat__value">0</span><span class="ec-stat__sub">ver cuáles</span></div></button>
+                    <button type="button" id="ui2StatNoCost" class="ec-stat ui2-stat-btn" onclick="ui2OpenMissingCosts()"><span class="ec-stat__icon ec-stat__icon--warning ui2-stat-ic" data-icon="sliders"></span><div><span class="ec-stat__label">SIN COSTO</span><span id="ui2StatNoCostN" class="ec-stat__value">0</span><span class="ec-stat__sub">poner costos</span></div></button>
                 </div>
                 <div class="ui2-inv__bar">
                     <label class="ec-field__control ec-search ui2-inv__search">
@@ -2021,10 +2022,10 @@
                         <button type="button" id="clearSearchBtn" class="hidden ec-iconbtn ec-iconbtn--plain ui2-inv__clear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><span data-icon="x" data-size="18"></span></button>
                     </label>
                     <button type="button" class="ui2-inv__scan" onclick="startScanner('POS')" aria-label="Escanear para vender"><span data-icon="scan"></span></button>
-                    <button type="button" class="ec-btn ec-btn--secondary ui2-desk-only" onclick="exportInventoryPDF()"><span data-icon="download" data-size="18"></span>Exportar PDF</button>
                 </div>
                 <div class="ui2-inv__filters">
-                    <div id="ui2InvFilters" class="ui2-chips" role="group" aria-label="Filtrar productos"></div>
+                    <div id="ui2InvFilters" class="ui2-chips" role="group" aria-label="Filtrar productos por estado"></div>
+                    <button type="button" id="ui2PutCosts" class="ui2-link hidden" onclick="ui2OpenMissingCosts()">Poner costos</button>
                     <label class="ui2-sort"><span>Ordenar</span>
                         <select id="ui2Sort" onchange="ui2SortChange(this.value)" aria-label="Ordenar productos">
                             <option value="name">Nombre</option>
@@ -2033,6 +2034,7 @@
                         </select>
                     </label>
                 </div>
+                <div id="ui2CatsRow" class="ui2-inv__cats hidden"><span class="ui2-inv__catlbl">Categorías</span><div id="ui2InvCats" class="ui2-chips" role="group" aria-label="Filtrar productos por categoría"></div></div>
                 <div class="ec-list ui2-inv__list">
                     <div id="inventoryTableBody" role="list"></div>
                     <div id="emptyInvMsg" class="hidden p-8 text-center text-gray-400 italic bg-white">Inventario vacío o sin resultados</div>
@@ -2172,7 +2174,7 @@
                         <div id="totalPendingDebt" class="ui2-debtcard__total">0.00</div>
                         <div class="ui2-debtcard__stats"><span id="ui2CreditStats"></span> · a favor <span id="totalClientBalances">0.00</span></div>
                         <div class="ui2-debtcard__month"><span class="ec-overline">COBRADO ESTE MES</span><b data-month-total>0.00</b><span class="ui2-debtcard__stats">ventas y abonos</span></div>
-                        <button type="button" class="ec-btn ec-btn--soft ui2-debtcard__btn" onclick="openBulkRemind()">Recordar a los atrasados <span class="ec-chip ec-chip--pro">Pro</span></button>
+                        <button type="button" class="ec-btn ec-btn--soft ui2-debtcard__btn" onclick="openBulkRemind()"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i>Recordar a los atrasados <span class="ec-chip ec-chip--pro">Pro</span></button>
                     </section>
 
                     <div class="ec-seg" role="group" aria-label="Sección de fiados">
@@ -2502,8 +2504,8 @@
 
                 <div id="posContainer" class="ui2-cart__body">
                     <div class="ec-seg" role="group" aria-label="Cómo se paga la venta">
-                        <button type="button" id="ui2SegCash" aria-pressed="true" onclick="ui2SetCredit(false)">Pagó ahora</button>
-                        <button type="button" id="ui2SegCredit" aria-pressed="false" onclick="ui2SetCredit(true)">Fiado</button>
+                        <button type="button" id="ui2SegCash" aria-pressed="true" onclick="ui2SetCredit(false)"><span data-icon="wallet" data-size="18"></span>Pago ahora</button>
+                        <button type="button" id="ui2SegCredit" aria-pressed="false" onclick="ui2SetCredit(true)"><span data-icon="book" data-size="18"></span>Fiado</button>
                     </div>
                     <input type="checkbox" id="isCreditSale" class="sr-only" tabindex="-1" aria-hidden="true" onchange="toggleCreditModeUI()">
 
@@ -2646,6 +2648,17 @@
                             <div class="ec-field__control ec-field__control--amount ui2-pricebox"><span class="ec-field__prefix">$</span><input type="number" id="prodPrice" required step="0.01" inputmode="decimal" placeholder="0.00"></div>
                             <div class="ec-field__hint" id="ui2PriceBs">= Bs 0,00</div>
                             <input type="hidden" id="prodCost">
+                        </div>
+                        <div class="ui2-costrow">
+                            <div class="ui2-row-between">
+                                <div><div class="ec-field__label">Costo</div><div class="ec-field__hint" id="ui2CostHint">Oculto</div></div>
+                                <button type="button" id="ui2CostBtn" class="ec-btn ec-btn--secondary ui2-mini" onclick="ui2RevealCost()">Ver / poner</button>
+                            </div>
+                            <div id="ui2CostEditBox" class="hidden ui2-stack">
+                                <div class="ec-field__control ec-field__control--amount"><span class="ec-field__prefix">$</span><input type="number" id="ui2ProdCostEdit" step="0.01" min="0" inputmode="decimal" placeholder="0.00" aria-label="Costo del producto" oninput="ui2CostInput()"></div>
+                                <div class="ec-field__hint" id="ui2CostMargin"></div>
+                                <div class="ec-field__hint">Vacío no cambia el costo guardado. Para quitarlo, usa la lista de costos.</div>
+                            </div>
                         </div>
                         <div class="ui2-qtyrow" id="prodQtyBox">
                             <div><div class="ec-field__label">Existencia</div><div class="ec-field__hint">Unidades que tienes hoy</div></div>

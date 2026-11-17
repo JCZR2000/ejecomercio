@@ -10,7 +10,7 @@
             clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
             inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5.1 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.5-6.9A2 2 0 0 0 16.8 4H7.2a2 2 0 0 0-1.7 1.1z"/>',
             chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
-            coins: '<circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/><path d="M9 6.5v5M7.5 8h2.2a1 1 0 0 1 0 2H8.3a1 1 0 0 0 0 2h2.2"/>',
+            coins: '<circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/><path d="M10 7.8H8.6a.6.6 0 0 0 0 1.2h.8a.6.6 0 0 1 0 1.2H8M9 6.8v1M9 10.2v1"/>',
             crown: '<path d="m3 8 4 4 5-7 5 7 4-4-2 11H5z"/>',
             sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
             download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
@@ -49,7 +49,7 @@
             refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2M3 12a9 9 0 0 1 15.5-6.2"/><path d="M18.5 2v4h-4M5.5 22v-4h4"/>',
             spinner: '<path d="M12 3a9 9 0 1 0 9 9"/>',
             image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.5"/><path d="m21 16-5-5-8 8"/>',
-            cart: '<circle cx="9" cy="20" r="1"/><circle cx="18" cy="20" r="1"/><path d="M2 3h3l2.7 12.4a1 1 0 0 0 1 .8h8.6a1 1 0 0 0 1-.8L20 7H6"/>',
+            cart: '<circle cx="9.5" cy="19.5" r="1.2"/><circle cx="18" cy="19.5" r="1.2"/><path d="M1 4h3.2l2.4 11.4h12.8a1 1 0 0 0 .98-.8L22.5 8H5.3"/>',
             tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/>',
             share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/>',
             copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
@@ -60,8 +60,18 @@
             ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
             login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5M15 12H3"/>',
             'eye-off': '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3 3.6M6.6 6.6A16 16 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4-.9"/>',
-            bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'
+            bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+            // Fase 44: métodos de pago, «Pago ahora» y «Fiado»
+            banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
+            'banknote-usd': '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M13.3 10.4h-2.1a.8.8 0 0 0 0 1.6h1.6a.8.8 0 0 1 0 1.6h-2.1M12 9v1.4M12 13.6V15"/>',
+            bank: '<path d="M3 10 12 4l9 6z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
+            card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h3"/>',
+            wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',
+            book: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>'
         };
+        // Icono de cada método de pago (aparte de PAY_METHODS: lo usan la factura y el recibo)
+        const UI2_PAY_ICONS = { EFECTIVO: 'banknote', DIVISAS: 'banknote-usd', PAGO_MOVIL: 'phone', TRANSFERENCIA: 'bank', PUNTO: 'card', OTRO: 'more' };
+        const ui2PayIcon = (key, size) => icon(UI2_PAY_ICONS[key] || 'more', size || 18);
 
         // Nombre de Font Awesome (sin «fa-») → clave de UI2_ICONS. Lo que no está aquí se queda como Font Awesome.
         const UI2_FA_MAP = {};
@@ -87,6 +97,8 @@
 
         // Rellena los <span data-icon="nombre" data-size="N"> del armazón nuevo
         document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon, el.dataset.size); });
+        // Fase 44: iconos en los métodos de pago del carrito (los botones los crea 24-fiscal.js una sola vez)
+        if (UI2) document.querySelectorAll('#posPayChips button[data-pay]').forEach(b => b.insertAdjacentHTML('afterbegin', ui2PayIcon(b.dataset.pay)));
 
         // Fase 43: iconos de trazo en lugar de Font Awesome (solo con UI2). Se conserva el <i> para que sigan sirviendo id, className, classList y fa-spin.
         const UI2_FA_SKIP = new Set(['fa-solid', 'fa-regular', 'fa-brands', 'fa-spin', 'fa-fw', 'fa-lg', 'fa-xl', 'fa-2x', 'fa-3x', 'fa-xs', 'fa-sm', 'fa-beat', 'fa-bounce', 'fa-pulse', 'fa-shake']);
@@ -121,6 +133,29 @@
                 else m.addedNodes.forEach(ui2SwapIn);
             })).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
         }
+
+        // Fase 44: «Mi cuenta» de la barra lateral muestra la foto y el nombre de Google y el estado de la sincronización (mismas palabras que Ajustes).
+        // La llaman renderUserUI (al entrar y salir) y updateCloudStatus (al cambiar la red o la subida). Todo texto va por textContent.
+        function ui2RenderSideUser(user) {
+            const nameEl = $('ui2SideName');
+            if (!nameEl) return;
+            const u = user === undefined ? auth.currentUser : user;
+            const img = $('ui2SideImg'), ini = $('ui2SideIni'), sync = $('ui2SideSync');
+            const name = u ? (u.displayName || u.email || 'Usuario') : 'Mi cuenta';
+            nameEl.textContent = name;
+            const st = syncStateInfo().text;
+            sync.textContent = st; sync.title = st;
+            if (u && u.photoURL) {
+                if (img.getAttribute('src') !== u.photoURL) img.src = u.photoURL;
+                img.alt = name; img.classList.remove('hidden'); ini.classList.add('hidden');
+                img.onerror = () => { img.classList.add('hidden'); ini.classList.remove('hidden'); };
+            } else {
+                img.classList.add('hidden'); img.removeAttribute('src'); ini.classList.remove('hidden');
+                if (u) ini.textContent = (name.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '?').toUpperCase();
+                else ini.innerHTML = icon('user', 20);
+            }
+        }
+        if (UI2) ui2RenderSideUser();
 
         // Un solo botón alterna entre los dos diseños. Se guarda y se recarga: no se redibuja en caliente.
         async function toggleDesign() {
@@ -175,18 +210,30 @@
         }
 
         function ui2SetFilter(key) { ui2InvFilter = key; renderAll(); }
+        // Fase 44: tarjeta «Sin costo» y enlace «Poner costos». Mismo PIN que Ganancias (el costo sigue oculto sin él); no exige Pro.
+        function ui2OpenMissingCosts() { checkAuth('profit', () => openCosts(true)); }
         function ui2SortChange(col) { if (state.sortCol !== col) sortInventory(col); }
 
         function renderUi2Filters() {
             const box = $('ui2InvFilters');
             if (!box) return;
-            const focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.f : null;
+            const ae = document.activeElement;
+            const focused = ae && ae.closest && ae.closest('#ui2InvFilters, #ui2InvCats') ? ae.dataset.f : null;
             const cats = [...new Set(state.products.map(ui2Cat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
             const noCost = state.products.filter(ui2NoCost).length;
-            const defs = [['all', 'Todos · ' + state.products.length], ['low', 'Poco stock'], ['out', 'Agotados'], ...(noCost > 0 ? [['nocost', 'Sin costo · ' + noCost]] : []), ...cats.map(c => ['cat:' + c, c])];
-            box.innerHTML = defs.map(([k, label]) => `<button type="button" class="ec-filter" data-f="${escapeHtml(k)}" aria-pressed="${k === ui2InvFilter}">${escapeHtml(label)}</button>`).join('');
-            box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => ui2SetFilter(b.dataset.f)));
-            if (focused) { const b = [...box.querySelectorAll('button')].find(x => x.dataset.f === focused); if (b) b.focus(); }
+            const catBox = $('ui2InvCats');
+            const stateDefs = [['all', 'Todos · ' + state.products.length], ['low', 'Poco stock'], ['out', 'Agotados'], ...(noCost > 0 ? [['nocost', 'Sin costo · ' + noCost]] : [])];
+            const paint = (el, defs) => {
+                el.innerHTML = defs.map(([k, label]) => `<button type="button" class="ec-filter" data-f="${escapeHtml(k)}" aria-pressed="${k === ui2InvFilter}">${escapeHtml(label)}</button>`).join('');
+                el.querySelectorAll('button').forEach(b => b.addEventListener('click', () => ui2SetFilter(b.dataset.f)));
+            };
+            paint(box, stateDefs);
+            if (catBox) paint(catBox, cats.map(c => ['cat:' + c, c]));
+            const row = $('ui2CatsRow');
+            if (row) row.classList.toggle('hidden', cats.length === 0);
+            const pc = $('ui2PutCosts');
+            if (pc) pc.classList.toggle('hidden', ui2InvFilter !== 'nocost');
+            if (focused) { const b = [...document.querySelectorAll('#ui2InvFilters button, #ui2InvCats button')].find(x => x.dataset.f === focused); if (b) b.focus(); }
             const sort = $('ui2Sort');
             if (sort) sort.value = state.sortCol;
         }
@@ -232,13 +279,46 @@
         }
 
         // --- Hoja «Nuevo / Editar producto» ---
+        // Fila «Costo» de la hoja: oculta hasta pasar el PIN. El valor vive en #prodCost (el guardado de siempre); el campo solo lo copia.
+        function ui2CostMarginUpdate() {
+            const v = parseFloat($('ui2ProdCostEdit').value), price = parseFloat($('prodPrice').value);
+            $('ui2CostMargin').textContent = v > 0 && price > 0 ? costMarginText(v, price) : '';
+        }
+        function ui2CostInput() { $('prodCost').value = $('ui2ProdCostEdit').value; ui2CostMarginUpdate(); }
+        function ui2SyncCost() { // copia #prodCost al campo si está a la vista (la calculadora de precios también escribe en #prodCost)
+            const cb = $('ui2CostEditBox');
+            if (!cb || cb.classList.contains('hidden')) return;
+            $('ui2ProdCostEdit').value = $('prodCost').value;
+            ui2CostMarginUpdate();
+        }
+        function ui2HideCost() {
+            const box = $('ui2CostEditBox');
+            if (!box) return;
+            box.classList.add('hidden');
+            $('ui2ProdCostEdit').value = '';
+            $('ui2CostMargin').textContent = '';
+            $('ui2CostHint').textContent = 'Oculto';
+            $('ui2CostBtn').classList.remove('hidden');
+        }
+        function ui2RevealCost() {
+            checkAuth('profit', () => {
+                $('ui2CostEditBox').classList.remove('hidden');
+                $('ui2CostBtn').classList.add('hidden');
+                $('ui2CostHint').textContent = 'Costo por unidad';
+                ui2SyncCost();
+                $('ui2ProdCostEdit').focus();
+            });
+        }
         function ui2UpdatePriceBs() {
             const el = $('ui2PriceBs'), v = parseFloat($('prodPrice').value);
             if (el) el.textContent = '= Bs ' + (v > 0 ? (v * getActiveRate()).toFixed(2) : '0,00');
+            const cb = $('ui2CostEditBox');
+            if (cb && !cb.classList.contains('hidden')) ui2CostMarginUpdate();
         }
         // La llama toggleProductManager(true) con el diseño nuevo
         function ui2OnProductSheet() {
             const editing = state.editingId !== null && state.editingId !== undefined;
+            ui2HideCost(); // el costo de un producto no queda a la vista al abrir el siguiente
             $('ui2ProdTitle').textContent = editing ? 'Editar producto' : 'Nuevo producto';
             $('ui2DeleteProd').classList.toggle('hidden', !editing);
             $('ui2ClearProd').classList.toggle('hidden', editing);
@@ -355,11 +435,19 @@
             if (ui2SheetOpen) { const b = $('ui2CreditDetail').querySelector('.ui2-cart__back'); if (b) b.focus(); }
         }
         function ui2CloseCredit() {
-            const id = ui2CreditId;
-            ui2SheetOpen = false; ui2CreditId = null;
-            renderUi2CreditDetail();
-            const row = id !== null && document.querySelector(`#creditsList [data-credit="${CSS.escape(String(id))}"]`);
-            if (row) row.focus();
+            const el = $('ui2CreditDetail');
+            if (el && el.classList.contains('is-closing')) return; // ya se está cerrando
+            const finish = () => {
+                const id = ui2CreditId;
+                if (el) el.classList.remove('is-closing');
+                ui2SheetOpen = false; ui2CreditId = null;
+                renderUi2CreditDetail();
+                const row = id !== null && document.querySelector(`#creditsList [data-credit="${CSS.escape(String(id))}"]`);
+                if (row) row.focus();
+            };
+            // Fase 44: la hoja del teléfono sale con una animación corta antes de vaciarse
+            if (el && el.classList.contains('is-open') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.classList.add('is-closing'); setTimeout(finish, 180); }
+            else finish();
         }
         function ui2ToggleMore() {
             ui2MoreOpen = !ui2MoreOpen;
@@ -393,12 +481,18 @@
             const method = lastPayMethod();
             const line = (k, v, cls) => `<div class="ui2-line${cls || ''}"><span>${k}</span><b>${v}</b></div>`;
             const signed = n => (n < 0 ? '−' : '+') + formatMoney(Math.abs(n));
-            const act = (label, fn, cls) => `<button type="button" class="ec-btn ec-btn--secondary${cls || ''}" onclick="${fn}('${eid}')">${label}</button>`;
+            // Fase 44: en escritorio cada acción lleva icono y una línea de ayuda (el teléfono las oculta por CSS)
+            const actBtn = (label, call, ic, help, cls) => `<button type="button" class="ec-btn ec-btn--secondary ui2-act${cls || ''}" onclick="${call}"><span class="ui2-act__ic">${icon(ic, 20)}</span><span class="ui2-act__t"><b>${label}</b><small>${help}</small></span></button>`;
+            const act = (label, fn, ic, help, cls) => actBtn(label, `${fn}('${eid}')`, ic, help, cls);
+            const cl = getClient(c.clientId);
+            const useBal = cl && cl.balance > 0.01 ? actBtn('Usar saldo', `requestUseBalance('${safeClientId(cl.id)}', '${safeClientId(c.id)}')`, 'wallet', 'Descontar el saldo a favor') : '';
+            const ini = escapeHtml((String(c.customer).trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '?').toUpperCase());
 
             el.innerHTML = `
                 <header class="ui2-cart__head">
                     <button type="button" class="ui2-cart__back ui2-mob-only" onclick="ui2CloseCredit()" aria-label="Volver a Fiados">${icon('back', 22)}</button>
                     <div class="ui2-cart__titlebox">
+                        <span class="ec-avatar ${late ? 'ec-avatar--danger' : 'ec-avatar--neutral'}" aria-hidden="true">${ini}</span>
                         <div class="ui2-detail__who">
                             <h2 class="ui2-cart__title">${clientNameHtml(c)} ${clientBalanceTagHtml(c)}</h2>
                             <div class="ui2-detail__sub">Venta ${ui2Dd(new Date(c.date))}${c.nextPaymentDate ? ' · vence ' + ui2Dd(new Date(c.nextPaymentDate)) : ''}</div>
@@ -411,7 +505,7 @@
                         <div class="ui2-row-between"><span class="ec-overline">DEBE</span>${adjusted ? '<span class="ec-chip ec-chip--pro">Ajustado</span>' : ''}</div>
                         <div class="ec-amount ec-amount--debt ec-amount--xl ec-amount--start"><span class="ec-amount__usd">${formatMoney(b.debt)}</span><span class="ec-amount__bs">Bs ${(b.debt * rate).toFixed(2)}</span></div>
                         <div class="ui2-lines">
-                            ${items ? `<div class="ui2-detail__items">${items}</div>` : ''}
+                            ${items ? `<div class="ui2-took"><div class="ui2-took__lbl">${icon('cart', 16)}Lo que se llevó</div><div class="ui2-detail__items">${items}</div></div>` : ''}
                             ${line('Original', formatMoney(b.orig))}
                             ${b.surcharge ? line('Recargo', '+' + formatMoney(b.surcharge)) : ''}
                             ${Math.abs(b.adj) > 0.01 ? line('Ajuste por precios de hoy', signed(b.adj)) : ''}
@@ -431,18 +525,15 @@
                             <span id="ui2PayHint" class="ec-field__hint" aria-live="polite"></span>
                         </div>
                         <div class="ec-field__label" id="ui2PayMLabel">¿Cómo pagó?</div>
-                        <div class="ec-choices" role="group" aria-labelledby="ui2PayMLabel">${PAY_METHODS.map(m => `<button type="button" class="ec-choice" data-m="${m.key}" aria-pressed="${m.key === method}" onclick="ui2PickPayMethod('${eid}', '${m.key}')">${m.text}</button>`).join('')}</div>
+                        <div class="ec-choices" role="group" aria-labelledby="ui2PayMLabel">${PAY_METHODS.map(m => `<button type="button" class="ec-choice ui2-choice-ic" data-m="${m.key}" aria-pressed="${m.key === method}" onclick="ui2PickPayMethod('${eid}', '${m.key}')">${ui2PayIcon(m.key)}${m.text}</button>`).join('')}</div>
                         <select id="pay_method_${eid}" class="sr-only" tabindex="-1" aria-hidden="true">${PAY_METHODS.map(m => `<option value="${m.key}"${m.key === method ? ' selected' : ''}>${m.text}</option>`).join('')}</select>
                         <button type="button" id="ui2PayBtn" class="ec-btn ec-btn--primary ec-btn--block" onclick="ui2PayCredit('${eid}')">Registrar pago</button>
                     </section>
 
                     <section class="ui2-card">
                         <div class="ui2-acts">
-                            ${act('Recordar', 'openShareModal')}${act('Agregar', 'editCredit')}${act('Factura', 'openReceiptFromCredit')}
-                            <button type="button" id="ui2MoreBtn" class="ec-btn ec-btn--ghost ui2-more-btn" aria-expanded="${ui2MoreOpen}" aria-controls="ui2MoreActs" onclick="ui2ToggleMore()">Más</button>
-                        </div>
-                        <div id="ui2MoreActs" class="ui2-acts ui2-more${ui2MoreOpen ? ' is-open' : ''}">
-                            ${act('Fecha', 'updatePaymentDate')}${act('Recargo', 'openSurchargeModal')}${act('Editar', 'requestEditCredit')}${clientUseBalanceBtnHtml(c)}${act('Eliminar', 'requestDeleteCredit', ' ui2-danger')}
+                            ${act('Recordar', 'openShareModal', 'share', 'Mandar el recordatorio')}${act('Agregar', 'editCredit', 'plus', 'Sumar productos al fiado')}${act('Factura', 'openReceiptFromCredit', 'receipt', 'Generar la factura')}
+                            ${act('Fecha', 'updatePaymentDate', 'calendar', 'Cambiar la fecha de pago')}${act('Recargo', 'openSurchargeModal', 'tag', 'Sumar un cargo a la deuda')}${act('Editar', 'requestEditCredit', 'edit', 'Cambiar productos o fechas')}${useBal}${act('Eliminar', 'requestDeleteCredit', 'trash', 'Borrar este fiado', ' ui2-danger')}
                         </div>
                     </section>
 
@@ -531,19 +622,25 @@
         function ui2HistRow(s) {
             const id = escapeHtml(String(s.id)), amt = Number(s.total) || 0, isPay = s.type === 'payment';
             let title, sub;
+            const mk = payMethodKey(s.method);
+            const mIc = mk ? `<span class="ui2-hrow__m">${ui2PayIcon(mk, 14)}</span>` : ''; // icono del método junto a su texto
+            const isCr = !isPay && !!(s.isCredit || s.type === 'credit');
             if (isPay) {
                 const m = payMethodLabel(s.method);
                 title = escapeHtml(s.description || 'Abono');
-                sub = 'Pago de fiado' + (m ? ' · ' + escapeHtml(m) : '');
+                sub = 'Pago de fiado' + (m ? ' · ' + mIc + escapeHtml(m) : '');
             } else {
                 const cons = {};
                 (s.items || []).forEach(i => { cons[i.name] = (cons[i.name] || 0) + (Number(i.qty) || 0); });
                 title = Object.entries(cons).map(([n, q]) => escapeHtml(n) + (q > 1 ? ' ×' + q : '')).join(', ') || 'Venta';
                 const count = (s.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
-                sub = s.items ? 'Venta · ' + count + (count === 1 ? ' producto' : ' productos') : '';
+                const m = !isCr && payMethodLabel(s.method);
+                sub = s.items ? (isCr ? 'Fiado' : 'Venta') + ' · ' + count + (count === 1 ? ' producto' : ' productos') + (m ? ' · ' + mIc + escapeHtml(m) : '') : '';
             }
+            const kind = isPay ? ['coins', 'success'] : isCr ? ['book', 'warning'] : ['cart', 'primary']; // abono / fiado / venta
             return `<div role="listitem" class="ui2-hrow">
                 <span class="ui2-hrow__time">${escapeHtml(ui2Hm(new Date(s.date)))}</span>
+                <span class="ui2-hrow__ic ui2-hrow__ic--${kind[1]}">${icon(kind[0], 16)}</span>
                 <span class="ec-row__body"><span class="ec-row__title" style="display:block">${title}</span>${sub ? `<span class="ec-row__sub" style="display:block">${sub}</span>` : ''}</span>
                 <span class="ec-amount${isPay ? ' ec-amount--paid' : ''}"><span class="ec-amount__usd">${isPay ? '+' : ''}${formatMoney(amt)}</span></span>
                 <button type="button" class="ec-iconbtn ec-iconbtn--plain" onclick="openReceiptFromHistory('${id}')" aria-label="Ver recibo">${icon('receipt', 20)}</button>
@@ -718,7 +815,18 @@
             console.assert(swapA && swapB, 'ui2SwapIcon no traduce o no retraduce');
             console.assert(swapNo, 'ui2SwapIcon cambió marcas, desconocidos o el recibo');
             console.assert(mapOk, 'UI2_FA_MAP apunta a un icono que no existe');
-            const ok = swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
+            // Fase 44: fila «Costo» oculta al limpiar, el campo escribe en #prodCost, y cada método de pago tiene su icono
+            const prevCost = $('prodCost').value;
+            ui2HideCost();
+            const costHidden = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '';
+            $('ui2CostEditBox').classList.remove('hidden'); $('ui2ProdCostEdit').value = '2.5'; ui2CostInput();
+            const costCopies = $('prodCost').value === '2.5';
+            ui2HideCost(); $('prodCost').value = prevCost;
+            const costBack = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '' && $('prodCost').value === prevCost;
+            const payIconsOk = PAY_METHODS.every(m => UI2_PAY_ICONS[m.key] in UI2_ICONS) && new Set(PAY_METHODS.map(m => UI2_PAY_ICONS[m.key])).size === PAY_METHODS.length;
+            console.assert(costHidden && costCopies && costBack, 'La fila Costo no se oculta o no copia a #prodCost', { costHidden, costCopies, costBack });
+            console.assert(payIconsOk, 'Cada método de pago necesita un icono distinto en UI2_PAY_ICONS');
+            const ok = costHidden && costCopies && costBack && payIconsOk && swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
             console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk, movesOk, groupsOk, noCostOk, limitOk });
             return ok;
         }
