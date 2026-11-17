@@ -378,7 +378,6 @@
         // Estado de pantalla: vive aquí, NO en state (no se guarda ni se sube)
         let ui2CreditId = null;   // fiado abierto en el cobro
         let ui2SheetOpen = false; // móvil: la hoja del cobro está abierta
-        let ui2MoreOpen = false;  // «Más» abierto en el cobro
         let ui2JustPaid = false;  // tras un abono guardado el campo de monto queda vacío
         const ui2IsDesk = () => window.matchMedia('(min-width: 1024px)').matches;
         const ui2Dd = d => String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
@@ -423,14 +422,14 @@
             $('ui2CreditStats').textContent = n + (n === 1 ? ' fiado' : ' fiados') + ' · ' + late + (late === 1 ? ' atrasado' : ' atrasados');
             // ¿Sigue pendiente el fiado abierto? Si no (saldado o borrado): se cierra la hoja o se elige el primero
             if (ui2CreditId === null || !livePending.some(c => String(c.id) === String(ui2CreditId))) {
-                ui2CreditId = null; ui2SheetOpen = false; ui2MoreOpen = false;
+                ui2CreditId = null; ui2SheetOpen = false;
                 if (ui2IsDesk() && live.length) ui2CreditId = live[0].id;
             } else if (!ui2IsDesk() && !ui2SheetOpen) ui2CreditId = null;
             renderUi2CreditDetail();
         }
 
         function ui2OpenCredit(id) {
-            ui2CreditId = id; ui2MoreOpen = false; ui2SheetOpen = !ui2IsDesk();
+            ui2CreditId = id; ui2SheetOpen = !ui2IsDesk();
             renderUi2CreditDetail();
             if (ui2SheetOpen) { const b = $('ui2CreditDetail').querySelector('.ui2-cart__back'); if (b) b.focus(); }
         }
@@ -448,12 +447,6 @@
             // Fase 44: la hoja del teléfono sale con una animación corta antes de vaciarse
             if (el && el.classList.contains('is-open') && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) { el.classList.add('is-closing'); setTimeout(finish, 180); }
             else finish();
-        }
-        function ui2ToggleMore() {
-            ui2MoreOpen = !ui2MoreOpen;
-            const m = $('ui2MoreActs'), b = $('ui2MoreBtn');
-            if (m) m.classList.toggle('is-open', ui2MoreOpen);
-            if (b) b.setAttribute('aria-expanded', String(ui2MoreOpen));
         }
 
         function renderUi2CreditDetail() {
@@ -624,7 +617,6 @@
             let title, sub;
             const mk = payMethodKey(s.method);
             const mIc = mk ? `<span class="ui2-hrow__m">${ui2PayIcon(mk, 14)}</span>` : ''; // icono del método junto a su texto
-            const isCr = !isPay && !!(s.isCredit || s.type === 'credit');
             if (isPay) {
                 const m = payMethodLabel(s.method);
                 title = escapeHtml(s.description || 'Abono');
@@ -634,10 +626,10 @@
                 (s.items || []).forEach(i => { cons[i.name] = (cons[i.name] || 0) + (Number(i.qty) || 0); });
                 title = Object.entries(cons).map(([n, q]) => escapeHtml(n) + (q > 1 ? ' ×' + q : '')).join(', ') || 'Venta';
                 const count = (s.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
-                const m = !isCr && payMethodLabel(s.method);
-                sub = s.items ? (isCr ? 'Fiado' : 'Venta') + ' · ' + count + (count === 1 ? ' producto' : ' productos') + (m ? ' · ' + mIc + escapeHtml(m) : '') : '';
+                const m = payMethodLabel(s.method);
+                sub = s.items ? 'Venta · ' + count + (count === 1 ? ' producto' : ' productos') + (m ? ' · ' + mIc + escapeHtml(m) : '') : '';
             }
-            const kind = isPay ? ['coins', 'success'] : isCr ? ['book', 'warning'] : ['cart', 'primary']; // abono / fiado / venta
+            const kind = isPay ? ['coins', 'success'] : ['cart', 'primary']; // abono / venta (las ventas fiadas no entran en state.sales)
             return `<div role="listitem" class="ui2-hrow">
                 <span class="ui2-hrow__time">${escapeHtml(ui2Hm(new Date(s.date)))}</span>
                 <span class="ui2-hrow__ic ui2-hrow__ic--${kind[1]}">${icon(kind[0], 16)}</span>
