@@ -143,8 +143,8 @@
             const img = $('ui2SideImg'), ini = $('ui2SideIni'), sync = $('ui2SideSync');
             const name = u ? (u.displayName || u.email || 'Usuario') : 'Mi cuenta';
             nameEl.textContent = name;
-            const st = syncStateInfo().text;
-            sync.textContent = st; sync.title = st;
+            const st = syncStateInfo();
+            sync.textContent = st.short; sync.title = st.text; sync.dataset.level = st.level; // leyenda corta con un punto de color (ui2.css)
             if (u && u.photoURL) {
                 if (img.getAttribute('src') !== u.photoURL) img.src = u.photoURL;
                 img.alt = name; img.classList.remove('hidden'); ini.classList.add('hidden');

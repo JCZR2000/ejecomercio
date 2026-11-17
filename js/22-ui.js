@@ -297,12 +297,12 @@
         // ==========================================
         // Estado de la sincronización en palabras. Solo lee.
         function syncStateInfo() {
-            if (!auth.currentUser) return { text: 'Sin sesión', tone: 'text-slate-500' };
-            if (!navigator.onLine) return { text: 'Sin conexión: tus cambios quedan en este teléfono', tone: 'text-rose-600' };
-            if (!state.isCloudSynced) return { text: 'Leyendo la nube…', tone: 'text-amber-600' };
-            if (isUploadingToCloud) return { text: 'Subiendo…', tone: 'text-amber-600' };
-            if (isCloudDirty() || isLocalPartial()) return { text: 'Hay cambios sin subir', tone: 'text-amber-600' };
-            return { text: 'Todo al día', tone: 'text-emerald-700' };
+            if (!auth.currentUser) return { text: 'Sin sesión', short: 'Sin sesión', level: 'off', tone: 'text-slate-500' };
+            if (!navigator.onLine) return { text: 'Sin conexión: tus cambios quedan en este teléfono', short: 'Sin conexión', level: 'err', tone: 'text-rose-600' };
+            if (!state.isCloudSynced) return { text: 'Leyendo la nube…', short: 'Leyendo la nube…', level: 'wait', tone: 'text-amber-600' };
+            if (isUploadingToCloud) return { text: 'Subiendo…', short: 'Subiendo…', level: 'wait', tone: 'text-amber-600' };
+            if (isCloudDirty() || isLocalPartial()) return { text: 'Hay cambios sin subir', short: 'Cambios sin subir', level: 'wait', tone: 'text-amber-600' };
+            return { text: 'Todo al día', short: 'Todo al día', level: 'ok', tone: 'text-emerald-700' };
         }
 
         // La llama updateCloudStatus muy seguido: con Ajustes cerrado no hace nada.
