@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v74.0</title>
+    <title>EjeComercio v75.0</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -172,7 +172,7 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver">v74.0</span>
+        <span class="ui2-ver">v75.0</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v74.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v75.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -2008,6 +2008,12 @@
                     <button type="button" class="ec-iconbtn ui2-inv__calc" onclick="openCalculator()" aria-label="Calculadora"><span data-icon="calc"></span></button>
                     <button type="button" class="ec-btn ec-btn--primary ui2-inv__new" onclick="ui2NewProduct()"><span data-icon="plus" data-size="18"></span>Nuevo<span class="ui2-desk-only">&nbsp;producto</span></button>
                 </div>
+                <div class="ui2-stats ui2-stats--4 ui2-desk-grid">
+                    <div class="ec-stat"><span class="ec-stat__icon ui2-stat-ic" data-icon="box"></span><div><span class="ec-stat__label">PRODUCTOS</span><span id="ui2StatProds" class="ec-stat__value">0</span><span class="ec-stat__sub"><span id="ui2StatOut">0</span> agotados</span></div></div>
+                    <div class="ec-stat"><span class="ec-stat__icon ec-stat__icon--success ui2-stat-ic" data-icon="coins"></span><div><span class="ec-stat__label">COBRADO ESTE MES</span><span data-month-total class="ec-stat__value">0.00</span><span class="ec-stat__sub">ventas y abonos</span></div></div>
+                    <div class="ec-stat"><span class="ec-stat__icon ec-stat__icon--danger ui2-stat-ic" data-icon="users"></span><div><span class="ec-stat__label">POR COBRAR</span><span data-pending-total class="ec-stat__value ec-stat__value--danger">0.00</span><span class="ec-stat__sub">fiados abiertos</span></div></div>
+                    <button type="button" id="ui2StatNoCost" class="ec-stat ui2-stat-btn" onclick="ui2SetFilter('nocost')"><span class="ec-stat__icon ec-stat__icon--warning ui2-stat-ic" data-icon="sliders"></span><div><span class="ec-stat__label">SIN COSTO</span><span id="ui2StatNoCostN" class="ec-stat__value">0</span><span class="ec-stat__sub">ver cuáles</span></div></button>
+                </div>
                 <div class="ui2-inv__bar">
                     <label class="ec-field__control ec-search ui2-inv__search">
                         <span data-icon="search" data-size="18"></span>
@@ -2165,6 +2171,7 @@
                         <div class="ec-overline">POR COBRAR</div>
                         <div id="totalPendingDebt" class="ui2-debtcard__total">0.00</div>
                         <div class="ui2-debtcard__stats"><span id="ui2CreditStats"></span> · a favor <span id="totalClientBalances">0.00</span></div>
+                        <div class="ui2-debtcard__month"><span class="ec-overline">COBRADO ESTE MES</span><b data-month-total>0.00</b><span class="ui2-debtcard__stats">ventas y abonos</span></div>
                         <button type="button" class="ec-btn ec-btn--soft ui2-debtcard__btn" onclick="openBulkRemind()">Recordar a los atrasados <span class="ec-chip ec-chip--pro">Pro</span></button>
                     </section>
 
@@ -2181,7 +2188,7 @@
                             </label>
                             <button type="button" class="ec-btn ec-btn--primary" onclick="openClientForm()"><span data-icon="plus" data-size="18"></span>Nuevo cliente</button>
                         </div>
-                        <div id="clientsList" class="grid grid-cols-1 md:grid-cols-2 gap-3 pb-24 items-start"></div>
+                        <div class="ec-list"><div id="clientsList" role="list"></div></div>
                     </div>
 
                     <div id="creditsDebtsPane" class="ui2-stack">
@@ -2213,6 +2220,7 @@
             
             
             <div id="view-history" class="hidden pb-24 space-y-4 animate-fade-in">
+                <div data-ui="1" class="space-y-4">
                 <div class="bg-slate-800 text-white rounded-2xl p-4 shadow-lg mb-4">
                     <div class="flex justify-between items-start mb-4">
                         <div>
@@ -2250,6 +2258,24 @@
                             <tbody id="historyBody" class="divide-y divide-gray-100"></tbody>
                         </table>
                     </div>
+                </div>
+                </div>
+
+                <!-- Fase 42: Historial del diseño nuevo (mismos id que el actual) -->
+                <div data-ui="2" class="ui2-fiados">
+                    <div class="ui2-fiados__head">
+                        <div class="ui2-inv__titlebox">
+                            <h1 class="ui2-inv__title ui2-mob-only">Historial</h1>
+                            <div class="ui2-inv__count">Registro de movimientos</div>
+                        </div>
+                        <button type="button" class="ec-btn ec-btn--secondary" onclick="openDashboard()"><span data-icon="chart" data-size="18"></span>Ver estadísticas<span class="ui2-desk-only">&nbsp;y ganancias</span></button>
+                    </div>
+                    <div class="ui2-stats ui2-stats--2">
+                        <div class="ec-stat"><span class="ec-stat__icon ec-stat__icon--success ui2-stat-ic" data-icon="coins"></span><div><span class="ec-stat__label">COBRADO HOY</span><span id="todayTotal" class="ec-stat__value">0.00</span><span class="ec-stat__sub">ventas y abonos</span></div></div>
+                        <div class="ec-stat"><span class="ec-stat__icon ui2-stat-ic" data-icon="chart"></span><div><span class="ec-stat__label">COBRADO ESTE MES</span><span id="monthTotal" class="ec-stat__value">0.00</span><span class="ec-stat__sub">ventas y abonos</span></div></div>
+                    </div>
+                    <div class="ec-list"><div id="historyBody" role="list"></div></div>
+                    <button type="button" id="ui2HistMore" class="ec-btn ec-btn--secondary ec-btn--block hidden" onclick="ui2HistMore()">Mostrar más</button>
                 </div>
             </div>
             

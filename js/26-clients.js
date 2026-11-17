@@ -228,6 +228,11 @@
             const rate = getFiadosActiveRate();
             const list = findClients($('clientSearchInput').value, Infinity);
             const box = $('clientsList');
+            if (UI2 && typeof ui2ClientRow === 'function') { // Fase 42: filas como las de deudas
+                box.innerHTML = list.length ? list.map(c => ui2ClientRow(c, clientSummary(c.id), rate)).join('')
+                    : '<div class="p-8 text-center text-gray-400 italic bg-white">No hay clientes. Crea el primero con «+ Nuevo cliente».</div>';
+                return;
+            }
             if (!list.length) {
                 box.innerHTML = '<div class="col-span-full text-center text-gray-400 text-sm font-bold py-10">No hay clientes. Crea el primero con «+ Nuevo cliente».</div>';
                 return;
@@ -347,6 +352,7 @@
             const s = clientSummary(currentClientId);
             if (!s.client) return closeClientCard();
             const c = s.client, id = safeClientId(c.id), rate = getFiadosActiveRate();
+            if (UI2 && typeof renderClientCardUi2 === 'function') { $('clientModalBody').innerHTML = renderClientCardUi2(s, id, rate); return; } // Fase 42
             const wa = clientWaNumber(c.phone);
             const day = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(); };
             const openRows = s.open.map(cr => `<div class="flex justify-between items-center text-xs border-b py-1.5">

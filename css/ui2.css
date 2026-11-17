@@ -536,3 +536,52 @@ html.ui2 body:not([data-tab="credits"]) .ui2-detail { display: none; }
   html.ui2 body[data-tab="credits"] .ui2-detail { display: flex; position: fixed; top: 64px; right: 0; bottom: 0; width: 400px; z-index: 30; flex-direction: column; background: var(--bg); border-left: 1px solid var(--border); }
   .ui2-frow[aria-current] { background: var(--primary-soft); }
 }
+
+/* ===== Fase 42: historial, clientes, cifras ===== */
+.ui2-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.ui2-stats .ec-stat { padding: 12px; gap: 10px; min-width: 0; }
+.ui2-stat-btn { width: 100%; box-sizing: border-box; text-align: left; font-family: var(--font-sans); color: var(--text); cursor: pointer; }
+.ui2-stat-btn[disabled] { cursor: default; opacity: .6; }
+.ui2-stat-ic { display: none; }
+.ui2-desk-grid { display: none; }
+.ui2-hday { display: flex; justify-content: space-between; gap: 8px; padding: 10px 14px; background: var(--bg); border-bottom: 1px solid var(--surface-muted); font: 600 13px/18px var(--font-sans); color: var(--text-muted); }
+.ui2-hday span:last-child { text-transform: none; font-weight: 400; }
+.ui2-hrow { display: flex; align-items: center; gap: 10px; padding: 10px 8px 10px 14px; border-bottom: 1px solid var(--surface-muted); }
+.ui2-hrow__time { flex-shrink: 0; width: 44px; font: 500 13px var(--font-sans); color: var(--text-muted); }
+.ui2-hrow .ec-row__title { white-space: normal; }
+.ui2-debtcard__month { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid var(--surface-muted); }
+.ui2-debtcard__month b { font: 700 18px var(--font-display); color: var(--success); }
+.ui2-clamt { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+
+/* Movimientos del fiado y ficha del cliente */
+.ui2-mv { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--surface-muted); font: 400 14px/20px var(--font-sans); }
+.ui2-mv:last-child { border-bottom: 0; }
+.ui2-mv__l { flex: 1; min-width: 0; }
+.ui2-mv__r { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.ui2-mv--empty { color: var(--text-muted); }
+.ui2-neg { color: var(--danger); }
+.ui2-pos { color: var(--success); }
+.ui2-muted { color: var(--text-muted); }
+.ui2-cardhead { display: flex; align-items: flex-start; gap: 10px; }
+.ui2-cardhead__who { flex: 1; min-width: 0; }
+.ui2-mini { min-height: 36px; padding: 0 10px; font-size: 13px; }
+.ui2-sec { margin-top: 4px; }
+.ui2-span2 { grid-column: 1 / -1; }
+.ui2-cardacts button { min-height: 44px; }
+html.ui2 #clientModal .ec-list { padding: 0 12px; }
+html.ui2 #clientModal > div { display: flex; flex-direction: column; gap: 12px; max-width: 480px; max-height: 94dvh; padding: 16px; background: var(--bg); border-radius: 20px 20px 0 0; font-family: var(--font-sans); color: var(--text); }
+html.ui2 #clientModal > div > button { min-height: 44px; margin: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: var(--text); font: 600 15px var(--font-sans); }
+html.ui2 #clientModal { align-items: flex-end; padding: 0; }
+html.ui2 #clientModalBody { display: flex; flex-direction: column; gap: 12px; }
+
+@media (min-width: 640px) {
+  html.ui2 #clientModal { align-items: center; padding: 16px; }
+  html.ui2 #clientModal > div { border-radius: var(--radius-lg); }
+}
+@media (min-width: 1024px) {
+  html.ui2 .ui2-stat-ic { display: flex; }
+  .ui2-stats .ec-stat { padding: var(--space-4); gap: 14px; }
+  .ui2-stats--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html.ui2 .ui2-desk-grid { display: grid; }
+  html.ui2 body[data-tab="home"] .ui2-desk-grid { display: grid; }
+}

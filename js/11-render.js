@@ -113,6 +113,7 @@
             
             $('todayTotal').textContent = `${formatMoney(dayT)}`;
             $('monthTotal').textContent = `${formatMoney(monthT)}`;
+            document.querySelectorAll('[data-month-total]').forEach(el => { el.textContent = formatMoney(monthT); }); // Fase 42: mismo número en Fiados e Inventario
         }
 
         function renderHistoryTable() {
@@ -121,6 +122,7 @@
             histBody.innerHTML = '';
             
             state.sales.sort((a, b) => new Date(b.date) - new Date(a.date));
+            if (UI2 && typeof renderHistoryUi2 === 'function') return renderHistoryUi2(state.sales); // Fase 42
             state.sales.slice(0, 25).forEach(s => {
                 const d = new Date(s.date);
                 let detail = '';
@@ -160,6 +162,7 @@
             // 3. Calcular Total Global (Sin importar la búsqueda)
             const totalGlobalDebt = allPending.reduce((sum, c) => sum + (c.totalDebt - c.paid), 0);
             $('totalPendingDebt').textContent = `${formatMoney(totalGlobalDebt)}`;
+            document.querySelectorAll('[data-pending-total]').forEach(el => { el.textContent = formatMoney(totalGlobalDebt); }); // Fase 42: tarjeta del Inventario
             
             // 4. Actualizar Badge del Tab (Número total de deudores)
             const badge = $('creditBadge');
