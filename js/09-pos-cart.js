@@ -62,6 +62,7 @@
                 // 1. Configurar UI del Modal para "Modo Edición"
                 const container = $('posContainer');
                 if(container) container.classList.add('edit-mode'); // Borde naranja
+                if (UI2 && container) container.scrollTop = 0; // Fase 46: el carrito se ve desde arriba
                 
                 $('posTitle').textContent = `Agregando a: ${name}`;
                 $('editModeBadge').classList.remove('hidden'); // Mostrar badge "EDITANDO"

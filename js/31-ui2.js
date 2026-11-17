@@ -54,16 +54,16 @@
             share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/>',
             copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
             link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
-            phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+            phone: '<rect x="5.5" y="2" width="13" height="20" rx="2.5"/><path d="M10.5 18h3"/>',
             warning: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
             info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
             ban: '<circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/>',
             login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5M15 12H3"/>',
             'eye-off': '<path d="M3 3l18 18"/><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c6 0 9.5 6 9.5 6a16 16 0 0 1-3 3.6M6.6 6.6A16 16 0 0 0 2.5 12S6 18 12 18a9 9 0 0 0 4-.9"/>',
             bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
-            // Fase 44: métodos de pago, «Pago ahora» y «Fiado»
+            // Fase 44: métodos de pago, «Venta» y «Fiado»
             banknote: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
-            'banknote-usd': '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M13.3 10.4h-2.1a.8.8 0 0 0 0 1.6h1.6a.8.8 0 0 1 0 1.6h-2.1M12 9v1.4M12 13.6V15"/>',
+            'banknote-usd': '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M12 7.5v9M14.6 9.6c-.4-.7-1.4-1.1-2.6-1.1-1.5 0-2.6.7-2.6 1.7 0 2.4 5.3 1.2 5.3 3.6 0 1-1.1 1.7-2.7 1.7-1.3 0-2.3-.5-2.7-1.2"/>',
             bank: '<path d="M3 10 12 4l9 6z"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8M3 20h18"/>',
             card: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h3"/>',
             wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v11a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/>',
@@ -145,6 +145,11 @@
             nameEl.textContent = name;
             const st = syncStateInfo();
             sync.textContent = st.short; sync.title = st.text; sync.dataset.level = st.level; // leyenda corta con un punto de color (ui2.css)
+            ui2FillAvatar(img, ini, u, name);
+            ui2FillAvatar($('ui2MenuImg'), $('ui2MenuIni'), u, name); // Fase 46: la misma foto en el menú de la cuenta
+        }
+        function ui2FillAvatar(img, ini, u, name) {
+            if (!img || !ini) return;
             if (u && u.photoURL) {
                 if (img.getAttribute('src') !== u.photoURL) img.src = u.photoURL;
                 img.alt = name; img.classList.remove('hidden'); ini.classList.add('hidden');
@@ -239,6 +244,12 @@
         }
 
         function ui2Tile(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return UI2_TILES[h % UI2_TILES.length]; }
+        // Fase 46: miniatura del producto (foto o iniciales); la usan el inventario, Costos y Editar fiado. `extra` va dentro (insignia del carrito).
+        function ui2ProdTile(p, extra = '') {
+            const src = productImageSrc(p);
+            const ini = escapeHtml((String(p.name).trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '?').toUpperCase());
+            return `<div class="ui2-prow__tile" style="background:${ui2Tile(p.id)}">${src ? `<img src="${escapeHtml(src)}" alt="">` : ini}${extra}</div>`;
+        }
 
         function renderInventoryUi2(list) {
             const body = $('inventoryTableBody');
@@ -247,13 +258,11 @@
             body.innerHTML = list.map(p => {
                 const id = escapeHtml(String(p.id)), name = escapeHtml(p.name), q = ui2Qty(p);
                 const unl = isUnlimited(p), out = !unl && q <= 0, low = !unl && !out && q < UI2_LOW_STOCK;
-                const src = productImageSrc(p);
-                const ini = escapeHtml((String(p.name).trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '?').toUpperCase());
                 const stock = unl ? '∞' : out ? 'Agotado' : low ? 'Quedan ' + q : q + ' u.';
                 const stockCls = out ? 'ec-chip ec-chip--neutral' : low ? 'ec-chip ec-chip--warning' : 'ui2-prow__stock';
                 const cat = ui2Cat(p);
                 return `<div class="ui2-prow" role="listitem"${out ? ' style="opacity:.6"' : ''}>
-                    <div class="ui2-prow__tile" style="background:${ui2Tile(p.id)}">${src ? `<img src="${escapeHtml(src)}" alt="">` : ini}<span class="ui2-prow__badge hidden" data-cart-badge="${id}">0</span></div>
+                    ${ui2ProdTile(p, `<span class="ui2-prow__badge hidden" data-cart-badge="${id}">0</span>`)}
                     <div class="ui2-prow__body">
                         <button type="button" class="ui2-prow__name" onclick="editProduct('${id}')" aria-label="Editar ${name}">${name}</button>
                         ${cat ? `<div class="ui2-prow__cat">${escapeHtml(cat)}</div>` : ''}

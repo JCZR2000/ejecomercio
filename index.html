@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v78.0</title>
+    <title>EjeComercio v78.1</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -156,7 +156,7 @@
 
     <!-- Fase 39: armazón del diseño nuevo (mismos id y onclick que el actual) -->
     <aside data-ui="2" class="ec-sidenav ui2-sidenav" aria-label="Menú principal">
-        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.0</span></div>
+        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.1</span></div>
         <nav aria-label="Secciones" class="ec-sidenav__list">
             <button type="button" class="ec-sidenav__item" data-nav-tab="home" aria-current="page" onclick="switchTab('home')"><span data-icon="box"></span><span>Inventario</span></button>
             <button type="button" class="ec-sidenav__item" data-nav-tab="credits" onclick="switchTab('credits')"><span data-icon="users"></span><span>Fiados</span><span class="ec-sidenav__count hidden" data-credit-count>0</span></button>
@@ -172,7 +172,7 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver ui2-ver--bar">v78.0</span>
+        <span class="ui2-ver ui2-ver--bar">v78.1</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -195,7 +195,7 @@
             <div id="userMenuDropdown" class="ec-menu hidden" role="menu" aria-label="Menú de la cuenta">
                 <div class="ec-sheet__grip"></div>
                 <div class="ec-menu__head">
-                    <span class="ec-avatar"><span data-icon="user"></span></span>
+                    <span class="ec-avatar ui2-sideav"><img id="ui2MenuImg" class="hidden" alt="" referrerpolicy="no-referrer"><span id="ui2MenuIni" data-icon="user"></span></span>
                     <span style="flex: 1; min-width: 0"><span class="ec-menu__name" id="userNameDisplay">Usuario</span><span class="ec-menu__mail" id="userEmailDisplay">...</span></span>
                     <button type="button" id="userPlanChip" onclick="openMyPlan(); toggleUserMenu()">Gratis</button>
                 </div>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.1</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -1212,13 +1212,30 @@
         </div>
     </div>
 
-    <div id="editCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
+    <div data-ui="1" id="editCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm max-h-[90vh] overflow-y-auto p-4">
             <h3 id="editCreditTitle" class="text-lg font-bold text-gray-800 mb-2"></h3>
             <p id="editCreditFiscal" class="hidden text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 mb-2">Este fiado ya tiene factura emitida. Los productos nuevos no entran en ella.</p>
             <div id="editCreditItems" class="space-y-2 mb-3"></div>
             <div class="flex justify-between items-center text-sm font-bold mb-3"><span>Deuda actual</span><span id="editCreditDebt"></span></div>
             <button onclick="closeEditCreditModal()" class="w-full bg-gray-200 text-gray-700 py-2 rounded font-bold">Cerrar</button>
+        </div>
+    </div>
+    <!-- Fase 46: Editar fiado del diseño Mostrador (mismos id; la lista la pinta renderEditCreditModal) -->
+    <div data-ui="2" id="editCreditModal" class="fixed inset-0 modal-bg z-[90] hidden flex justify-center items-end sm:items-center" role="dialog" aria-modal="true" aria-labelledby="editCreditTitle">
+        <div class="ui2-cart ui2-editcredit">
+            <header class="ui2-cart__head">
+                <div class="ui2-editcredit__titles"><h2 id="editCreditTitle" class="ui2-cart__title">Editar fiado</h2><span id="editCreditClient" class="ui2-editcredit__client"></span></div>
+                <button type="button" class="ec-iconbtn ec-iconbtn--plain" onclick="closeEditCreditModal()" aria-label="Cerrar"><span data-icon="x"></span></button>
+            </header>
+            <div class="ui2-cart__body">
+                <p id="editCreditFiscal" class="hidden ec-chip ec-chip--warning ui2-editcredit__fiscal">Este fiado ya tiene factura emitida. Los productos nuevos no entran en ella.</p>
+                <section class="ui2-card ui2-cartlist"><div id="editCreditItems"></div></section>
+            </div>
+            <footer class="ui2-cart__foot">
+                <div class="ui2-cart__totals"><span class="ec-overline">DEUDA ACTUAL</span><b id="editCreditDebt" class="ui2-editcredit__debt"></b></div>
+                <button type="button" class="ec-btn ec-btn--primary ec-btn--block" onclick="closeEditCreditModal()">Listo</button>
+            </footer>
         </div>
     </div>
 
@@ -2161,16 +2178,21 @@
 
                 <!-- Fase 41: Fiados del diseño nuevo (mismos id que el actual) -->
                 <div data-ui="2" class="ui2-fiados">
-                    <div class="ui2-fiados__head">
+                    <div class="ui2-fiados__head ui2-mob-only">
                         <div class="ui2-inv__titlebox">
-                            <h1 class="ui2-inv__title ui2-mob-only">Fiados</h1>
+                            <h1 class="ui2-inv__title">Fiados</h1>
                         </div>
-                        <button type="button" class="ec-iconbtn" onclick="openCreditHistory()" aria-label="Historial de fiados"><span data-icon="clock"></span></button>
-                        <button type="button" id="btnFiadosToolbar" class="ec-iconbtn" onclick="toggleMenu('fiados')" aria-label="Tasa de los fiados"><span data-icon="calc"></span></button>
                     </div>
 
                     <section class="ui2-card ui2-debtcard">
-                        <div class="ec-overline">POR COBRAR</div>
+                        <!-- Fase 46: historial y tasa dentro de la tarjeta (con texto desde 1024 px) -->
+                        <div class="ui2-debtcard__top">
+                            <div class="ec-overline">POR COBRAR</div>
+                            <div class="ui2-debtcard__tools">
+                                <button type="button" class="ec-iconbtn" onclick="openCreditHistory()" aria-label="Historial de fiados"><span data-icon="clock"></span><span class="ui2-desk-only">Historial</span></button>
+                                <button type="button" id="btnFiadosToolbar" class="ec-iconbtn" onclick="toggleMenu('fiados')" aria-label="Tasa de los fiados"><span data-icon="calc"></span><span class="ui2-desk-only">Tasa de fiados</span></button>
+                            </div>
+                        </div>
                         <div id="totalPendingDebt" class="ui2-debtcard__total">0.00</div>
                         <div class="ui2-debtcard__stats"><span id="ui2CreditStats"></span> · a favor <span id="totalClientBalances">0.00</span></div>
                         <div class="ui2-debtcard__month"><span class="ec-overline">COBRADO ESTE MES</span><b data-month-total>0.00</b><span class="ui2-debtcard__stats">ventas y abonos</span></div>
@@ -2496,15 +2518,17 @@
                 <header class="ui2-cart__head">
                     <button type="button" class="ui2-cart__back" onclick="toggleCartModal(false)" aria-label="Volver al inventario"><span data-icon="back" data-size="22"></span></button>
                     <div class="ui2-cart__titlebox">
-                        <h2 id="posTitle" class="ui2-cart__title">Venta</h2>
+                        <h2 id="posTitle" class="ui2-cart__title">Carrito</h2>
                         <span id="editModeBadge" class="hidden ec-chip ec-chip--warning">Editando fiado</span>
                     </div>
                     <button type="button" class="ui2-cart__clear" onclick="clearCart()">Vaciar</button>
                 </header>
 
                 <div id="posContainer" class="ui2-cart__body">
+                    <!-- Fase 46: dos cajas neutras (display: contents) que en horizontal son las dos columnas -->
+                    <div class="ui2-cart__main">
                     <div class="ec-seg" role="group" aria-label="Cómo se paga la venta">
-                        <button type="button" id="ui2SegCash" aria-pressed="true" onclick="ui2SetCredit(false)"><span data-icon="wallet" data-size="18"></span>Pago ahora</button>
+                        <button type="button" id="ui2SegCash" aria-pressed="true" onclick="ui2SetCredit(false)"><span data-icon="wallet" data-size="18"></span>Venta</button>
                         <button type="button" id="ui2SegCredit" aria-pressed="false" onclick="ui2SetCredit(true)"><span data-icon="book" data-size="18"></span>Fiado</button>
                     </div>
                     <input type="checkbox" id="isCreditSale" class="sr-only" tabindex="-1" aria-hidden="true" onchange="toggleCreditModeUI()">
@@ -2529,7 +2553,9 @@
                         <div id="cartTableBody" role="list"></div>
                         <div id="cartEmptyMsg" class="ui2-cart__empty">Carrito vacío</div>
                     </section>
+                    </div>
 
+                    <div class="ui2-cart__side">
                     <section id="creditConfig" class="hidden ui2-card ui2-credit">
                         <div class="ui2-credit__head">
                             <span class="ec-overline">DATOS DEL FIADO</span>
@@ -2589,6 +2615,7 @@
                         <div id="posPayChips" class="ec-choices"></div>
                         <input type="text" id="posPayRef" maxlength="20" autocomplete="off" placeholder="Referencia (opcional)" aria-label="Referencia del pago" class="hidden ui2-input">
                     </section>
+                    </div>
                 </div>
 
                 <footer class="ui2-cart__foot">

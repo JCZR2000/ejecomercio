@@ -175,6 +175,14 @@
         function renderCosts() {
             const q = norm($('costsSearch').value || ''), onlyMissing = $('costsOnlyMissing').checked;
             const rows = state.products.filter(p => (!onlyMissing || !(p.cost > 0)) && (!q || norm(p.name).includes(q) || norm(p.barcode || '').includes(q)));
+            // Fase 46: con el diseño Mostrador, fila con miniatura y campo «$»; mismos data-cost y data-margin (los leen saveCostInput e initCostsUI)
+            if (UI2) {
+                $('costsList').innerHTML = rows.map(p => { const id = escapeHtml(String(p.id)), name = escapeHtml(p.name); return `<div class="ui2-costitem">
+                ${ui2ProdTile(p)}
+                <div class="ui2-costitem__body"><p class="ui2-costitem__name">${name}</p><p class="ui2-costitem__sub">Precio ${formatMoney(p.price)} · <span data-margin="${id}">${costMarginText(p.cost, p.price)}</span></p></div>
+                <label class="ec-field__control ui2-costitem__field"><span class="ec-field__prefix">$</span><input type="number" step="0.01" min="0" inputmode="decimal" placeholder="Costo" value="${p.cost > 0 ? p.cost : ''}" data-cost="${id}" aria-label="Costo de ${name}"></label></div>`; }).join('') || '<p class="ui2-costitem__empty">Sin productos.</p>';
+                return;
+            }
             $('costsList').innerHTML = rows.map(p => `<div class="flex items-center gap-2 py-2 border-b">
                 <div class="flex-1 min-w-0"><p class="text-sm font-bold truncate">${escapeHtml(p.name)}</p><p class="text-[11px] text-gray-500">Precio ${formatMoney(p.price)} · <span data-margin="${escapeHtml(String(p.id))}">${costMarginText(p.cost, p.price)}</span></p></div>
                 <input type="number" step="0.01" min="0" inputmode="decimal" placeholder="Costo" value="${p.cost > 0 ? p.cost : ''}" data-cost="${escapeHtml(String(p.id))}" class="w-24 h-10 rounded-lg border border-gray-300 px-2 text-sm text-right"></div>`).join('') || '<p class="text-sm text-gray-400 py-4 text-center">Sin productos.</p>';

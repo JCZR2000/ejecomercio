@@ -930,7 +930,7 @@
             if (shouldOpen) {
                 // ABRIR
                 modal.classList.remove('hidden');
-                
+                if (UI2 && $('posContainer')) $('posContainer').scrollTop = 0; // Fase 46: al volver, el carrito se ve desde arriba
             } else {
                 // CERRAR
                 modal.classList.add('hidden');

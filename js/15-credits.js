@@ -1093,6 +1093,31 @@
             if (!c) return closeEditCreditModal();
             $('editCreditTitle').innerText = `Editar fiado — ${c.customer}`;
             $('editCreditFiscal').classList.toggle('hidden', !c.fiscalNum);
+            // Fase 46: diseño Mostrador. editQty_${i} sigue siendo la cantidad a quitar (empieza en todo); − y + solo la mueven entre 1 y it.qty.
+            if (UI2) {
+                $('editCreditTitle').textContent = 'Editar fiado';
+                $('editCreditClient').textContent = c.customer;
+                $('editCreditItems').innerHTML = c.items.map((it, i) => {
+                    const prod = it.isStub ? null : state.products.find(p => p.id == it.id);
+                    return `<div class="ui2-ecrow">
+                    ${ui2ProdTile(prod || { id: it.id ?? it.name, name: it.name })}
+                    <div class="ui2-ecrow__body">
+                        <p class="ui2-ecrow__name">${escapeHtml(it.name)}</p>
+                        <p class="ui2-ecrow__sub">${it.qty} × ${formatMoney(it.price)} = <b>${formatMoney(it.subtotal)}</b></p>
+                        ${it.isStub ? '<span class="ec-chip ec-chip--warning">Deuda anterior</span>' : ''}
+                    </div>
+                    <div class="ui2-ecrow__act">
+                        <div class="ec-stepper" role="group" aria-label="Cantidad a quitar de ${escapeHtml(it.name)}">
+                            <button type="button" onclick="ui2EditQtyStep(${i}, -1)" aria-label="Menos">−</button>
+                            <input type="number" id="editQty_${i}" min="1" max="${it.qty}" value="${it.qty}" inputmode="numeric" oninput="ui2EditQtyLabel(${i})" aria-label="Cantidad a quitar">
+                            <button type="button" onclick="ui2EditQtyStep(${i}, 1)" aria-label="Más">+</button>
+                        </div>
+                        <button type="button" class="ec-btn ec-btn--danger ui2-ecrow__del" onclick="removeCreditItem(${i})">${icon('trash', 16)}Quitar <span id="editQtyLbl_${i}">${it.qty}</span></button>
+                    </div>
+                </div>`; }).join('');
+                $('editCreditDebt').textContent = formatMoney(roundMoney(calculateRealDebt(c) - c.paid));
+                return;
+            }
             $('editCreditItems').innerHTML = c.items.map((it, i) => `
                 <div class="border rounded p-2 text-xs">
                     <div class="font-bold text-gray-800">${escapeHtml(it.name)}</div>
@@ -1104,6 +1129,17 @@
                     </div>
                 </div>`).join('');
             $('editCreditDebt').innerText = `${formatMoney(roundMoney(calculateRealDebt(c) - c.paid))}`;
+        }
+
+        // Solo pantalla: mueven el número del campo; quitar lo sigue haciendo removeCreditItem con lo que diga el campo
+        function ui2EditQtyStep(i, d) {
+            const el = $(`editQty_${i}`);
+            el.value = Math.min(Number(el.max), Math.max(1, (parseInt(el.value, 10) || 0) + d));
+            ui2EditQtyLabel(i);
+        }
+        function ui2EditQtyLabel(i) {
+            const n = parseInt($(`editQty_${i}`).value, 10);
+            $(`editQtyLbl_${i}`).textContent = n > 0 ? n : '';
         }
 
         function closeEditCreditModal() {
