@@ -11,6 +11,7 @@
                 const open = forceOpen !== null ? forceOpen : sheet.classList.contains('hidden');
                 sheet.classList.toggle('hidden', !open);
                 if (open && typeof ui2OnProductSheet === 'function') ui2OnProductSheet();
+                else if (!open && typeof ui2HideCost === 'function') ui2HideCost();
                 return;
             }
             const panel = $('productFormPanel');

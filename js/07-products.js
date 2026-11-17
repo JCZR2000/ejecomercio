@@ -168,6 +168,7 @@
             toggleUnlimitedField();
             $('prodPrice').value = '';
             $('prodCost').value = '';
+            if (typeof ui2HideCost === 'function') ui2HideCost(); // Fase 44: la fila «Costo» vuelve a quedar oculta
             $('prodCategory').value = '';
             $('prodHideCatalog').checked = false;
             $('prodHideBox').classList.toggle('hidden', !normalizeCatalogConfig().allowHide);

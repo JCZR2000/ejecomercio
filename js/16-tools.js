@@ -145,6 +145,7 @@
                 // El costo unitario de la calculadora se guarda con el producto (aviso corto junto al precio)
                 const unitCost = parseFloat(document.getElementById('displayUnitCost').dataset.value);
                 $('prodCost').value = unitCost > 0 ? unitCost : '';
+                if (UI2 && typeof ui2SyncCost === 'function') ui2SyncCost();
                 if (unitCost > 0) {
                     let note = $('prodCostNote');
                     if (!note) {

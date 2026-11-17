@@ -253,7 +253,7 @@ html.ui2 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px
 
 /* Barra superior (ink). Las funciones reescriben className de #rateBox, #catalogBadge…: se ajustan por id */
 html.ui2 .ui2-appbar { position: sticky; top: 0; z-index: 50; padding-top: calc(12px + env(safe-area-inset-top)); }
-.ui2-ver { font: 600 11px var(--font-sans); color: var(--on-ink-muted); }
+.ui2-ver { flex-shrink: 0; padding: 1px 7px; border-radius: var(--radius-pill); background: var(--on-ink-subtle); font: 600 11px/16px var(--font-sans); color: var(--on-ink-muted); }
 .ui2-status { min-width: 0; overflow: hidden; }
 html.ui2 #catalogBadge, html.ui2 #ordersBadge { height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--on-ink-line); background: transparent; gap: 6px; font: 600 12px var(--font-sans); cursor: pointer; }
 html.ui2 #ordersBadge { color: var(--brand-yellow); }
@@ -469,7 +469,7 @@ html.ui2 #fabCart[data-count="0"] { display: none; }
 
   /* Barra superior clara con el título de la página */
   html.ui2 .ui2-appbar { min-height: 64px; box-sizing: border-box; background: var(--surface); color: var(--text); border-bottom: 1px solid var(--border); }
-  html.ui2 .ui2-ver { color: var(--text-muted); }
+  html.ui2 .ui2-ver--bar { display: none; }
   html.ui2 .ui2-pagetitle { display: block; margin-right: auto; font: 600 22px/28px var(--font-display); color: var(--text); }
   html.ui2 .ui2-status { flex: 0 1 auto; }
   html.ui2 .ui2-rate__label { color: var(--text-muted); }
@@ -581,7 +581,7 @@ html.ui2 #clientModalBody { display: flex; flex-direction: column; gap: 12px; }
 @media (min-width: 1024px) {
   html.ui2 .ui2-stat-ic { display: flex; }
   .ui2-stats .ec-stat { padding: var(--space-4); gap: 14px; }
-  .ui2-stats--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .ui2-stats--4 { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
   html.ui2 .ui2-desk-grid { display: grid; }
   html.ui2 body[data-tab="home"] .ui2-desk-grid { display: grid; }
 }
@@ -618,3 +618,83 @@ html.ui2 i[data-ui2i] > svg { width: 1em; height: 1em; }
 
 /* Hora del historial: no parte en dos líneas */
 html.ui2 .ui2-hrow__time { white-space: nowrap; width: auto; min-width: 44px; }
+
+/* ===== Fase 44: ajustes tras revisar en escritorio y tableta ===== */
+html.ui2 :is(#ui2CostEditBox, #ui2CostBtn, #ui2CatsRow, #ui2PutCosts).hidden { display: none; }
+
+/* Barra lateral: versión junto al logo y cuenta de Google */
+.ui2-sidenav .ec-sidenav__brand { gap: 8px; font-size: 19px; }
+.ui2-side__t { display: block; font: 600 14px/20px var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui2-side__s { display: block; font: 400 12px/16px var(--font-sans); color: var(--on-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui2-sideav { position: relative; overflow: hidden; }
+.ui2-sideav img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ui2-sideav .hidden { display: none !important; }
+
+/* Cabecera de inventario: botones a la derecha, ninguno se estira */
+.ui2-inv__head { flex-wrap: wrap; }
+.ui2-inv__head .ui2-inv__titlebox { flex: 1 1 140px; }
+.ui2-xl-only { display: none; }
+.ui2-inv__head > .ec-btn { flex-shrink: 0; }
+.ui2-inv__calc { width: 44px; padding: 0; }
+@media (min-width: 1280px) { .ui2-inv__calc { width: auto; padding: 0 14px; } .ui2-xl-only { display: inline; } }
+
+/* Filtros en dos filas: estado y categorías */
+.ui2-inv__cats { display: flex; align-items: center; gap: 8px; }
+.ui2-inv__catlbl { flex-shrink: 0; font: 600 12px/16px var(--font-sans); letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+.ui2-inv__cats .ui2-chips { flex: 1 1 0; }
+.ui2-inv__filters .ui2-link { margin-left: auto; }
+
+/* Tarjetas de cifras: caben en una tableta */
+.ui2-stats .ec-stat > div { min-width: 0; }
+.ui2-stats .ec-stat__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Fila «Costo» de la hoja del producto */
+.ui2-costrow { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--surface-muted); }
+
+/* «Pago ahora» / «Fiado» y métodos de pago con icono */
+.ec-seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 54px; font-size: 12px; }
+
+/* Fiados: encabezado, «Lo que se llevó» y acciones con ayuda */
+.ui2-detail .ui2-cart__head { padding: 16px 20px; }
+.ui2-detail .ui2-cart__body { padding: 16px 20px; }
+.ui2-detail .ui2-cart__titlebox { gap: 12px; }
+.ui2-took { padding-bottom: 10px; }
+.ui2-took__lbl { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font: 600 12px/16px var(--font-sans); letter-spacing: 0.06em; color: var(--text-muted); text-transform: uppercase; }
+.ui2-act__t small { display: none; }
+.ui2-acts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ui2-acts .ui2-act { justify-content: flex-start; gap: 10px; min-height: 48px; padding: 8px 12px; text-align: left; }
+.ui2-acts .ui2-danger { grid-column: 1 / -1; justify-content: center; }
+.ui2-act__ic { display: inline-flex; flex-shrink: 0; color: var(--primary); }
+.ui2-acts .ui2-danger .ui2-act__ic { color: var(--danger); }
+.ui2-act__t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ui2-act__t b { font-weight: 600; }
+.ui2-debtcard__btn svg, .ui2-debtcard__btn i { flex-shrink: 0; }
+@media (min-width: 1024px) {
+  .ui2-acts .ui2-act { min-height: 56px; }
+  .ui2-act__t small { display: block; font: 400 12px/16px var(--font-sans); color: var(--text-muted); white-space: normal; }
+  .ui2-hrow { padding: 12px 20px; }
+  .ui2-hday { padding: 10px 20px; }
+}
+
+/* Historial: icono del tipo de movimiento y del método de pago */
+.ui2-hrow__ic { width: 28px; height: 28px; flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
+.ui2-hrow__ic--success { background: var(--success-soft); color: var(--success); }
+.ui2-hrow__ic--warning { background: var(--warning-soft); color: var(--warning); }
+.ui2-hrow__ic--primary { background: var(--primary-soft); color: var(--primary); }
+.ui2-hrow__m { display: inline-flex; vertical-align: -2px; margin-right: 4px; }
+
+/* Fase 44: hoja del cobro en el teléfono entra y sale con una animación corta; «Recordar a los atrasados» centrado con una insignia Pro pequeña */
+@keyframes ui2SheetIn { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ui2SheetOut { from { transform: none; opacity: 1; } to { transform: translateY(24px); opacity: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .ui2-detail.is-open { animation: ui2SheetIn .22s ease-out; }
+  .ui2-detail.is-open.is-closing { animation: ui2SheetOut .18s ease-in forwards; }
+}
+.ui2-debtcard__btn .ec-chip { padding: 2px 8px; border-radius: 6px; background: var(--primary); color: #ffffff; font-size: 11px; line-height: 14px; }
+@media (max-width: 1023px) {
+  .ui2-debtcard__btn { align-self: center; }
+}
+@media (min-width: 1024px) {
+  .ui2-detail.is-open, .ui2-detail.is-open.is-closing { animation: none; }
+}

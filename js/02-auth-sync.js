@@ -44,6 +44,7 @@
                 iconAuth.className = "fa-solid fa-right-to-bracket";
                 btnAuth.className = "w-full text-left px-4 py-3 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 transition";
             }
+            if (typeof ui2RenderSideUser === 'function') ui2RenderSideUser(user); // Fase 44: cuenta de la barra lateral
         }
 
         // 3. Ejecutar renderizado inicial (Para evitar parpadeos)
@@ -178,6 +179,7 @@
         function updateCloudStatus(status) {
             currentCloudState = status; // Guardar estado actual
             if (typeof renderSyncState === 'function') renderSyncState(); // «Sincronizar ahora» en Ajustes
+            if (typeof ui2RenderSideUser === 'function') ui2RenderSideUser(); // Fase 44: estado en la barra lateral
             
             // Buscamos los NUEVOS elementos del HTML
             const dot = document.getElementById('statusDot');
