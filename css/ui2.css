@@ -613,7 +613,7 @@ html.ui2 .modal-bg:not([data-ui="2"]) > div:not(.ui2-cart) .rounded-full.bg-yell
 
 /* Iconos de trazo (js/31-ui2.js ui2SwapIcon): el <i> se conserva y el SVG hereda tamaño y color */
 html.ui2 i[data-ui2i]::before { content: none; }
-html.ui2 i[data-ui2i] { display: inline-flex; vertical-align: -0.125em; }
+html.ui2 i[data-ui2i]:not(.hidden) { display: inline-flex; vertical-align: -0.125em; }
 html.ui2 i[data-ui2i] > svg { width: 1em; height: 1em; }
 
 /* Hora del historial: no parte en dos líneas */
