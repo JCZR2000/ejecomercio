@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v78.1</title>
+    <title>EjeComercio v78.2</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -156,7 +156,7 @@
 
     <!-- Fase 39: armazón del diseño nuevo (mismos id y onclick que el actual) -->
     <aside data-ui="2" class="ec-sidenav ui2-sidenav" aria-label="Menú principal">
-        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.1</span></div>
+        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.2</span></div>
         <nav aria-label="Secciones" class="ec-sidenav__list">
             <button type="button" class="ec-sidenav__item" data-nav-tab="home" aria-current="page" onclick="switchTab('home')"><span data-icon="box"></span><span>Inventario</span></button>
             <button type="button" class="ec-sidenav__item" data-nav-tab="credits" onclick="switchTab('credits')"><span data-icon="users"></span><span>Fiados</span><span class="ec-sidenav__count hidden" data-credit-count>0</span></button>
@@ -172,7 +172,7 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver ui2-ver--bar">v78.1</span>
+        <span class="ui2-ver ui2-ver--bar">v78.2</span>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.1</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.2</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -2518,10 +2518,11 @@
                 <header class="ui2-cart__head">
                     <button type="button" class="ui2-cart__back" onclick="toggleCartModal(false)" aria-label="Volver al inventario"><span data-icon="back" data-size="22"></span></button>
                     <div class="ui2-cart__titlebox">
+                        <span class="ui2-cart__ic" data-icon="cart" data-size="20"></span>
                         <h2 id="posTitle" class="ui2-cart__title">Carrito</h2>
                         <span id="editModeBadge" class="hidden ec-chip ec-chip--warning">Editando fiado</span>
                     </div>
-                    <button type="button" class="ui2-cart__clear" onclick="clearCart()">Vaciar</button>
+                    <button type="button" class="ui2-cart__clear" onclick="clearCart()"><span data-icon="trash" data-size="18"></span>Vaciar</button>
                 </header>
 
                 <div id="posContainer" class="ui2-cart__body">
