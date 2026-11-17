@@ -858,3 +858,17 @@ html.ui2 .modal-bg > .ui2-cart.ui2-editcredit { height: auto; max-height: 90dvh;
   html.ui2 body:not([data-tab="home"]) #posContainer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
   html.ui2 body:not([data-tab="home"]) #posContainer > :is(.ui2-cart__main, .ui2-cart__side) { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 }
+
+/* ===== v78.2: ajustes tras probar la v78.1 en la tableta ===== */
+/* App instalada (standalone/fullscreen): no hay barra del navegador que suba y baje, así que se usa el alto real (con svh sobraba una franja abajo) */
+@media (min-width: 1024px) and (display-mode: standalone), (min-width: 1024px) and (display-mode: fullscreen) {
+  html.ui2 .ui2-sidenav { height: 100dvh; }
+  html.ui2 body[data-tab="home"] #cartModal, html.ui2 body[data-tab="home"] #cartModal.hidden { height: calc(100dvh - 64px); }
+}
+/* Carrito: icono junto al título y papelera en «Vaciar» */
+.ui2-cart__ic { display: inline-flex; flex-shrink: 0; color: var(--text-muted); }
+.ui2-cart__clear { display: inline-flex; align-items: center; gap: 6px; }
+/* Tableta en vertical: el carrito como ventana aprovecha la pantalla (en Inventario de escritorio sigue siendo el panel) */
+@media (min-width: 640px) and (orientation: portrait) {
+  html.ui2 #cartModal > .ui2-cart { max-width: 640px; height: 86dvh; max-height: 86dvh; }
+}
