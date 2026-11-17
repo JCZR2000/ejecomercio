@@ -526,12 +526,9 @@ html.ui2 body:not([data-tab="credits"]) .ui2-detail { display: none; }
 .ui2-acts { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
 .ui2-acts button { min-height: 44px; padding: 0 8px; font: 600 14px var(--font-sans); border-radius: var(--radius-md); cursor: pointer; }
 .ui2-acts .ui2-danger { color: var(--danger); }
-.ui2-more { display: none; margin-top: 8px; }
-.ui2-more.is-open { display: grid; }
 
 @media (min-width: 1024px) {
-  .ui2-mob-only, .ui2-more-btn { display: none !important; }
-  .ui2-more { display: grid; }
+  .ui2-mob-only { display: none !important; }
   html.ui2 body[data-tab="credits"] main { padding-right: 416px; }
   html.ui2 body[data-tab="credits"] .ui2-detail { display: flex; position: fixed; top: 64px; right: 0; bottom: 0; width: 400px; z-index: 30; flex-direction: column; background: var(--bg); border-left: 1px solid var(--border); }
   .ui2-frow[aria-current] { background: var(--primary-soft); }
@@ -680,7 +677,6 @@ html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: co
 /* Historial: icono del tipo de movimiento y del método de pago */
 .ui2-hrow__ic { width: 28px; height: 28px; flex-shrink: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center; }
 .ui2-hrow__ic--success { background: var(--success-soft); color: var(--success); }
-.ui2-hrow__ic--warning { background: var(--warning-soft); color: var(--warning); }
 .ui2-hrow__ic--primary { background: var(--primary-soft); color: var(--primary); }
 .ui2-hrow__m { display: inline-flex; vertical-align: -2px; margin-right: 4px; }
 
@@ -697,4 +693,104 @@ html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: co
 }
 @media (min-width: 1024px) {
   .ui2-detail.is-open, .ui2-detail.is-open.is-closing { animation: none; }
+}
+
+/* ===== Ajuste de tableta (2026-11-17): inventario sin título repetido, botones en una fila, cifras legibles, buscador blanco ===== */
+.ec-search { background: var(--surface); border-color: #d8cfc0; box-shadow: 0 1px 2px rgba(120, 90, 40, 0.08); }
+@media (min-width: 1024px) {
+  .ui2-inv__head { flex-wrap: nowrap; }
+  .ui2-inv__head .ui2-inv__titlebox { flex: 1 1 auto; }
+  .ui2-inv__head > .ec-btn { padding: 0 14px; font-size: 14px; }
+  .ui2-inv__head > .ui2-inv__calc { padding: 0; }
+  /* Con el carrito al lado queda poco ancho: 2×2 hasta pantallas muy anchas */
+  .ui2-stats--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1024px) and (max-width: 1279px) {
+  html.ui2 .ui2-stats .ui2-stat-ic { display: none; }
+  .ui2-stats .ec-stat__label { white-space: normal; letter-spacing: 0.03em; }
+  .ui2-inv__head > .ui2-inv__pdf { width: 44px; padding: 0; }
+  .ui2-prow__add { width: 44px; padding: 0; }
+  html.ui2 .ui2-prow__add span.ui2-desk-only { display: none !important; }
+}
+@media (min-width: 1280px) { .ui2-inv__head > .ui2-inv__calc { padding: 0 14px; } }
+@media (min-width: 1680px) { .ui2-stats--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ui2-inv__head .ui2-inv__count { white-space: nowrap; }
+
+/* Estado de la nube bajo el nombre (barra lateral): punto de color + palabra corta (syncStateInfo().short) */
+.ui2-side__s[data-level]::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; vertical-align: 0; background: #94a3b8; }
+.ui2-side__s[data-level="ok"]::before { background: #22c55e; }
+.ui2-side__s[data-level="wait"]::before { background: #f59e0b; }
+.ui2-side__s[data-level="err"]::before { background: #f87171; }
+
+/* Tableta: al esconderse la barra del navegador, la barra lateral y el carrito siguen al alto visible (dvh) y pintan su fondo por debajo */
+@supports (height: 100dvh) {
+  @media (min-width: 1024px) {
+    html.ui2 .ui2-sidenav { bottom: auto; height: 100dvh; box-shadow: 0 240px 0 0 var(--ink); }
+    html.ui2 body[data-tab="home"] #cartModal, html.ui2 body[data-tab="home"] #cartModal.hidden { bottom: auto; height: calc(100dvh - 64px); }
+  }
+}
+
+/* Hoja de producto en pantallas horizontales: dos columnas para que todo quepa sin desplazarse */
+@media (min-width: 900px) and (orientation: landscape) {
+  html.ui2 #inventoryContainer > .ui2-prodsheet { max-width: 860px; max-height: 94dvh; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; align-items: start; gap: 12px; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(1) { grid-column: 1; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(2) { grid-column: 1; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(3) { grid-column: 2; grid-row: 1 / span 2; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(4) { grid-column: 2; }
+}
+
+/* ===== Fase 45: ventanas en pantallas horizontales (tableta y PC): más anchas, en dos columnas y al alto visible (dvh) ===== */
+@media (min-width: 900px) and (orientation: landscape) {
+  /* A. Regla general: la caja cabe en el alto visible y nada se corta */
+  html.ui2 .modal-bg:not([data-ui="2"]):not(#cartModal):not(#inventoryContainer), html.ui2 #conflictModal { padding: 16px; }
+  html.ui2 .modal-bg:not([data-ui="2"]):not(#cartModal):not(#inventoryContainer) > div:not(.ui2-cart), html.ui2 #conflictModal > div { max-height: calc(100dvh - 32px); }
+  html.ui2 .modal-bg:not([data-ui="2"]):not(#cartModal):not(#inventoryContainer) > div:not(.ui2-cart):not(.flex-col), html.ui2 #conflictModal > div { overflow-y: auto; }
+  html.ui2 .modal-bg .max-h-\[90vh\] { max-height: min(90dvh, calc(100dvh - 32px)); }
+  html.ui2 .modal-bg .max-h-\[85vh\] { max-height: min(85dvh, calc(100dvh - 32px)); }
+  html.ui2 .modal-bg .max-h-\[80vh\] { max-height: 80dvh; }
+  html.ui2 .modal-bg .max-h-\[75vh\] { max-height: 75dvh; }
+
+  /* B. Ventanas altas: la caja en columna (cabecera fija) y el cuerpo en dos columnas que desplaza solo si no cabe */
+  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel) > div { display: flex; flex-direction: column; overflow: hidden; }
+  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel) > div > div:first-child { flex-shrink: 0; }
+  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 16px; }
+  html.ui2 :is(#configModal, #fiscalConfigModal, #receiptConfigPanel, #calculatorModal) > div > div:nth-child(2) > * { margin: 0; }
+  /* Ajustes: secciones de alto muy distinto; en grid quedan huecos. Columnas equilibradas sin alto fijo (desplaza la caja, la cabecera queda pegada arriba), así no desbordan hacia el lado */
+  html.ui2 #configModal > div { max-width: 960px; display: block; overflow-y: auto; }
+  html.ui2 #configModal > div > div:first-child { position: sticky; top: 0; z-index: 2; }
+  html.ui2 #configModal > div > div:nth-child(2) { display: block; overflow: visible; columns: 2; column-gap: 16px; }
+  html.ui2 #configModal > div > div:nth-child(2) > * { break-inside: avoid; margin: 0 0 16px; }
+  html.ui2 #configModal > div > div:nth-child(2) > details { column-span: all; margin-bottom: 0; }
+  html.ui2 #fiscalConfigModal > div { max-width: 760px; }
+  html.ui2 #fiscalConfigModal > div > div:nth-child(2) > :is(div:first-child, button) { grid-column: 1 / -1; }
+  html.ui2 #receiptConfigPanel > div { max-width: 760px; }
+  html.ui2 #receiptConfigPanel > div > div:nth-child(2) > div:first-child { grid-row: span 2; }
+  html.ui2 #receiptConfigPanel > div > div:nth-child(2) > button { grid-column: 1 / -1; }
+  /* Calculadora: datos a la izquierda, resultado a la derecha; el pie abajo */
+  html.ui2 #calculatorModal > div { max-width: 720px; }
+  html.ui2 #calculatorModal > div > div:nth-child(2) > div:not(:last-child) { grid-column: 1; }
+  html.ui2 #calculatorModal > div > div:nth-child(2) > div:last-child { grid-column: 2; grid-row: 1 / span 3; align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
+  /* Estadísticas: más ancha; tarjetas en 4 columnas */
+  html.ui2 #dashboardModal > div { max-width: 960px; }
+  html.ui2 #dashboardModal #statsCards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  /* Ventas: gráfica a la izquierda y «más vendidos» a la derecha; botones debajo de cada uno */
+  html.ui2 #dashSales:not(.hidden) { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); align-items: start; gap: 12px 16px; }
+  html.ui2 #dashSales > * { margin: 0; }
+  html.ui2 #dashSales > :is(:first-child, #statsCards) { grid-column: 1 / -1; }
+  html.ui2 #dashSales > #statsTop { grid-column: 2; grid-row: 3 / span 2; }
+  /* Conflicto: los dos bloques lado a lado */
+  html.ui2 #conflictModal > div { max-width: 900px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html.ui2 #conflictModal > div > div:first-of-type { display: flex; flex-direction: column; justify-content: center; }
+
+  /* C. Recibo y factura: vista previa a la izquierda (sin tocar #receiptCanvas ni #fiscalCanvas), opciones y acciones a la derecha */
+  html.ui2 :is(#receiptModal, #fiscalReceiptModal) > div { max-width: 820px; display: grid; grid-template-columns: auto minmax(320px, 1fr); grid-template-rows: auto 1fr auto; }
+  html.ui2 :is(#receiptModal, #fiscalReceiptModal) > div > div:first-child { grid-column: 1 / -1; }
+  html.ui2 :is(#receiptScrollArea, #fiscalReceiptScrollArea) { grid-column: 1; grid-row: 2 / span 2; margin-top: 0; min-width: 344px; }
+  html.ui2 :is(#receiptModal, #fiscalReceiptModal) > div > div:nth-child(2) { grid-column: 2; grid-row: 2; align-self: start; max-height: 100%; min-height: 0; overflow-y: auto; margin: 12px; }
+  html.ui2 :is(#receiptModal, #fiscalReceiptModal) > div > div:last-child { grid-column: 2; grid-row: 3; }
+
+  /* D. Listas: más anchas, sin dos columnas */
+  html.ui2 :is(#ordersModal, #creditHistoryModal, #clientModal, #clientPickModal, #multiPayModal, #editCreditModal, #guidedReceiptModal) > div { max-width: 640px; }
+  html.ui2 #costsModal > div { max-width: 720px; }
 }

@@ -68,7 +68,10 @@
             });
 
             // Generar filas (el diseño nuevo las arma en js/31-ui2.js; antes de que cargue, no pinta nada)
-            if (UI2) { if (typeof renderInventoryUi2 === 'function') renderInventoryUi2(displayProds); }
+            if (UI2) {
+                if (typeof renderInventoryUi2 === 'function') renderInventoryUi2(displayProds);
+                if (typeof ui2RenderSideUser === 'function') ui2RenderSideUser(); // el estado de la nube cambia al terminar de leerla, sin pasar por updateCloudStatus
+            }
             else displayProds.forEach(p => {
                 const img = productImageSrc(p) ? `<img src="${escapeHtml(productImageSrc(p))}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
                 
