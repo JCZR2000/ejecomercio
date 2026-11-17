@@ -236,7 +236,9 @@
                     // Función interna para borrar local y recargar
                     const wipeLocalAndReload = () => {
                         console.log("🧹 Borrando datos locales...");
+                        const ui = localStorage.getItem('inv_ui'); // Fase 39: el diseño elegido es del dispositivo, no de los datos
                         localStorage.clear();
+                        if (ui) safeSetItem('inv_ui', ui);
                         deleteImageDb().finally(() => window.location.reload()); // también las fotos locales (IndexedDB)
                     };
 
