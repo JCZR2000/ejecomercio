@@ -31,6 +31,9 @@
                 );
             }
 
+            // Diseño nuevo: chip elegida (Todos, Poco stock, Agotados, categoría); no se guarda en state
+            if (UI2 && typeof ui2FilterProducts === 'function') displayProds = ui2FilterProducts(displayProds);
+
             // 5. Lógica de Ordenamiento (CANT, PRECIO, NOMBRE)
             displayProds.sort((a, b) => {
                 let valA = state.sortCol === 'qty' ? availableQty(a) : a[state.sortCol];
@@ -64,8 +67,9 @@
                 }
             });
 
-            // Generar filas
-            displayProds.forEach(p => {
+            // Generar filas (el diseño nuevo las arma en js/31-ui2.js; antes de que cargue, no pinta nada)
+            if (UI2) { if (typeof renderInventoryUi2 === 'function') renderInventoryUi2(displayProds); }
+            else displayProds.forEach(p => {
                 const img = productImageSrc(p) ? `<img src="${escapeHtml(productImageSrc(p))}" class="w-10 h-10 object-cover rounded border">` : `<div class="w-10 h-10 bg-gray-200 rounded flex items-center justify-center text-gray-400"><i class="fa-solid fa-image"></i></div>`;
                 
                 invBody.innerHTML += `<tr class="border-b hover:bg-gray-50">

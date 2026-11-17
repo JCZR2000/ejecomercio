@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v72.0</title>
+    <title>EjeComercio v73.0</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
     <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
@@ -172,7 +172,8 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver">v72.0</span>
+        <span class="ui2-ver">v73.0</span>
+        <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
             <span id="customRateBadge" class="hidden ec-chip ec-chip--warning">Personalizada</span>
@@ -246,7 +247,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v72.0</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v73.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -1846,7 +1847,7 @@
     <main class="container mx-auto p-4 relative min-h-screen">
         
         <div id="view-home" class="pb-24 space-y-6">
-            <div class="bg-indigo-50 rounded-[2rem] p-1 mb-6 shadow-sm border border-indigo-100 transition-all duration-300 overflow-hidden"
+            <div data-ui="1" class="bg-indigo-50 rounded-[2rem] p-1 mb-6 shadow-sm border border-indigo-100 transition-all duration-300 overflow-hidden"
                 id="inventoryContainer">
             
                 <div class="flex justify-between items-center p-3 px-5 cursor-pointer select-none" onclick="toggleProductManager()">
@@ -1969,7 +1970,7 @@
                 </div>
             </div>
 
-            <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
+            <div data-ui="1" class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col">
                 <div class="p-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2 sticky top-0 z-20">
                     <i class="fa-solid fa-search text-gray-400"></i>
                     <input type="text" id="searchInput" placeholder="Buscar producto..." class="bg-transparent w-full text-sm outline-none text-gray-700 placeholder-gray-400" oninput="renderAll()">
@@ -1995,6 +1996,41 @@
                     </table>
                 </div>
                 <div id="emptyInvMsg" class="hidden p-8 text-center text-gray-400 italic bg-white">Inventario vacío o sin resultados</div>
+            </div>
+
+            <!-- Fase 40: inventario del diseño nuevo (mismos id que el actual) -->
+            <div data-ui="2" class="ui2-inv">
+                <div class="ui2-inv__head">
+                    <div class="ui2-inv__titlebox">
+                        <h1 class="ui2-inv__title">Inventario</h1>
+                        <div class="ui2-inv__count"><span id="ui2ProdCount">0</span> productos</div>
+                    </div>
+                    <button type="button" class="ec-iconbtn ui2-inv__calc" onclick="openCalculator()" aria-label="Calculadora"><span data-icon="calc"></span></button>
+                    <button type="button" class="ec-btn ec-btn--primary ui2-inv__new" onclick="ui2NewProduct()"><span data-icon="plus" data-size="18"></span>Nuevo<span class="ui2-desk-only">&nbsp;producto</span></button>
+                </div>
+                <div class="ui2-inv__bar">
+                    <label class="ec-field__control ec-search ui2-inv__search">
+                        <span data-icon="search" data-size="18"></span>
+                        <input type="search" id="searchInput" placeholder="Buscar nombre o código" aria-label="Buscar producto" autocomplete="off" oninput="renderAll()">
+                        <button type="button" id="clearSearchBtn" class="hidden ec-iconbtn ec-iconbtn--plain ui2-inv__clear" onclick="clearSearch()" aria-label="Limpiar búsqueda"><span data-icon="x" data-size="18"></span></button>
+                    </label>
+                    <button type="button" class="ui2-inv__scan" onclick="startScanner('POS')" aria-label="Escanear para vender"><span data-icon="scan"></span></button>
+                    <button type="button" class="ec-btn ec-btn--secondary ui2-desk-only" onclick="exportInventoryPDF()"><span data-icon="download" data-size="18"></span>Exportar PDF</button>
+                </div>
+                <div class="ui2-inv__filters">
+                    <div id="ui2InvFilters" class="ui2-chips" role="group" aria-label="Filtrar productos"></div>
+                    <label class="ui2-sort"><span>Ordenar</span>
+                        <select id="ui2Sort" onchange="ui2SortChange(this.value)" aria-label="Ordenar productos">
+                            <option value="name">Nombre</option>
+                            <option value="qty">Cantidad</option>
+                            <option value="price">Precio</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="ec-list ui2-inv__list">
+                    <div id="inventoryTableBody" role="list"></div>
+                    <div id="emptyInvMsg" class="hidden p-8 text-center text-gray-400 italic bg-white">Inventario vacío o sin resultados</div>
+                </div>
             </div>
         </div>
             
@@ -2156,18 +2192,27 @@
                 </div>
             </div>
             
-            <button id="fabCart" onclick="toggleCartModal(true)"
+            <button data-ui="1" id="fabCart" onclick="toggleCartModal(true)"
                 class="fixed bottom-24 right-4 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-300 flex items-center justify-center transition-all hover:scale-110 active:scale-95 z-40 hidden animate-bounce-in hover:bg-indigo-700">
-            
+
                 <i class="fa-solid fa-cart-shopping text-xl"></i>
-            
+
                 <div id="cartBadge"
                     class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full border-2 border-indigo-600 flex items-center justify-center hidden shadow-sm">
                     0</div>
             </button>
+
+            <!-- Fase 40: barra del carrito (móvil) del diseño nuevo -->
+            <button data-ui="2" id="fabCart" type="button" onclick="toggleCartModal(true)" class="ui2-cartbar hidden" data-count="0" aria-label="Ver la venta y cobrar">
+                <span class="ui2-cartbar__txt">
+                    <span class="ec-cartbar__meta"><span id="ui2CartCount">0 productos</span> · <span id="ui2CartBs">Bs 0.00</span></span>
+                    <span class="ec-cartbar__total" id="ui2CartUsd">$0.00</span>
+                </span>
+                <span class="ec-cartbar__cta">Cobrar<span data-icon="chevron" data-size="18"></span></span>
+            </button>
     </main>
 
-        <div id="cartModal"
+        <div data-ui="1" id="cartModal"
             class="fixed inset-0 modal-bg z-[75] hidden flex justify-center items-end sm:items-center transition-opacity duration-300">
         
             <div
@@ -2350,6 +2395,202 @@
                         <span>Confirmar Venta</span> <i class="fa-solid fa-arrow-right"></i>
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Fase 40: carrito del diseño nuevo (hoja en móvil, panel en escritorio). Mismos id y manejadores que el actual -->
+        <div data-ui="2" id="cartModal" class="fixed inset-0 modal-bg z-[75] hidden flex justify-center items-end sm:items-center" role="dialog" aria-modal="true" aria-labelledby="posTitle">
+            <div class="ui2-cart">
+                <header class="ui2-cart__head">
+                    <button type="button" class="ui2-cart__back" onclick="toggleCartModal(false)" aria-label="Volver al inventario"><span data-icon="back" data-size="22"></span></button>
+                    <div class="ui2-cart__titlebox">
+                        <h2 id="posTitle" class="ui2-cart__title">Venta</h2>
+                        <span id="editModeBadge" class="hidden ec-chip ec-chip--warning">Editando fiado</span>
+                    </div>
+                    <button type="button" class="ui2-cart__clear" onclick="clearCart()">Vaciar</button>
+                </header>
+
+                <div id="posContainer" class="ui2-cart__body">
+                    <div class="ec-seg" role="group" aria-label="Cómo se paga la venta">
+                        <button type="button" id="ui2SegCash" aria-pressed="true" onclick="ui2SetCredit(false)">Pagó ahora</button>
+                        <button type="button" id="ui2SegCredit" aria-pressed="false" onclick="ui2SetCredit(true)">Fiado</button>
+                    </div>
+                    <input type="checkbox" id="isCreditSale" class="sr-only" tabindex="-1" aria-hidden="true" onchange="toggleCreditModeUI()">
+
+                    <section class="ui2-card ui2-cartlist">
+                        <div id="cartTableBody" role="list"></div>
+                        <div id="cartEmptyMsg" class="ui2-cart__empty">Carrito vacío</div>
+                    </section>
+
+                    <section class="ui2-card ui2-possearch">
+                        <div class="ui2-possearch__row">
+                            <div class="ui2-possearch__box">
+                                <input type="text" id="posSearchInput" placeholder="Buscar producto..." aria-label="Buscar producto para agregar" autocomplete="off"
+                                    oninput="filterPosOptions()" onfocus="filterPosOptions()" onblur="hidePosOptionsDelayed()">
+                                <input type="hidden" id="saleProductSelect">
+                                <div id="posDropdown" class="hidden absolute w-full bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50 mt-1"></div>
+                                <p id="stockHint" class="ui2-possearch__hint"></p>
+                            </div>
+                            <button type="button" class="ui2-inv__scan" onclick="startScanner('POS')" aria-label="Escanear para vender"><span data-icon="scan"></span></button>
+                            <input type="number" id="saleQty" value="1" min="1" aria-label="Cantidad">
+                            <button type="button" class="ec-icon-btn" onclick="addToCart()" aria-label="Agregar a la venta"><span data-icon="plus"></span></button>
+                        </div>
+                    </section>
+
+                    <section id="creditConfig" class="hidden ui2-card ui2-credit">
+                        <div class="ui2-credit__head">
+                            <span class="ec-overline">DATOS DEL FIADO</span>
+                            <button id="btnCancelCreditMode" type="button" onclick="exitEditMode()" class="hidden ec-btn ec-btn--secondary ui2-credit__cancel">Cancelar</button>
+                        </div>
+
+                        <div id="newCreditInputs" class="ui2-credit__client">
+                            <div class="ui2-row-between">
+                                <label for="customerName" class="ec-field__label">Cliente</label>
+                                <button type="button" class="ui2-link" onclick="openMigrationModal()">Saldo anterior</button>
+                            </div>
+                            <input type="text" id="customerName" autocomplete="off" class="ui2-input"
+                                placeholder="Buscar o crear cliente (nombre, teléfono)"
+                                oninput="onClientPickerInput()" onfocus="onClientPickerInput()" onblur="hideClientPickerDelayed()">
+                            <div id="clientPickerList" class="hidden absolute left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-xl max-h-52 overflow-y-auto z-50 mt-1"></div>
+                        </div>
+
+                        <div id="posBalanceRow" class="hidden ui2-balance">
+                            <label class="ec-check">
+                                <input type="checkbox" id="chkUseBalance">
+                                <span>Usar saldo a favor: <span id="posBalanceText"></span></span>
+                            </label>
+                        </div>
+
+                        <div class="ui2-field-group">
+                            <div class="ec-field__label">Abono inicial <small>(opcional)</small></div>
+                            <div class="ui2-two">
+                                <label class="ec-field__control"><span class="ec-field__prefix">$</span><input type="number" id="initialPayUSD" step="0.01" placeholder="0.00" aria-label="Abono en dólares" oninput="convertCurrency('USD')"></label>
+                                <label class="ec-field__control"><span class="ec-field__prefix">Bs</span><input type="number" id="initialPayBS" step="0.01" placeholder="0.00" aria-label="Abono en bolívares" oninput="convertCurrency('BS')"></label>
+                            </div>
+                        </div>
+
+                        <div class="ui2-field-group">
+                            <div class="ec-field__label" id="ui2DueLabel">¿Cuándo paga?</div>
+                            <div class="ec-choices ec-choices--wrap" role="radiogroup" aria-labelledby="ui2DueLabel" id="ui2DueChips">
+                                <button type="button" class="ec-choice" role="radio" data-due="" aria-checked="true" onclick="ui2SetDue('')">Sin fecha</button>
+                                <button type="button" class="ec-choice" role="radio" data-due="15" aria-checked="false" onclick="ui2SetDue('15')">En 15 días</button>
+                                <button type="button" class="ec-choice" role="radio" data-due="30" aria-checked="false" onclick="ui2SetDue('30')">En 30 días</button>
+                                <button type="button" class="ec-choice" role="radio" data-due="quincena" aria-checked="false" onclick="ui2SetDue('quincena')">Quincena</button>
+                                <button type="button" class="ec-choice" role="radio" data-due="fin_mes" aria-checked="false" onclick="ui2SetDue('fin_mes')">Fin de mes</button>
+                                <button type="button" class="ec-choice" role="radio" data-due="custom" aria-checked="false" onclick="ui2SetDue('custom')">Otra fecha</button>
+                            </div>
+                            <select id="paymentScheduleSelect" class="sr-only" tabindex="-1" aria-hidden="true" onchange="toggleCustomDate()">
+                                <option value="">Sin fecha específica</option>
+                                <option value="15">En 15 días</option>
+                                <option value="30">En 30 días</option>
+                                <option value="quincena">Próxima Quincena</option>
+                                <option value="fin_mes">Fin de Mes</option>
+                                <option value="custom">Fecha Personalizada...</option>
+                            </select>
+                            <input type="date" id="customPaymentDate" class="hidden" aria-label="Fecha de pago">
+                        </div>
+                    </section>
+
+                    <section id="posPayMethod" class="ui2-card ui2-paybox">
+                        <div class="ec-field__label">¿Cómo pagó?</div>
+                        <div id="posPayChips" class="ec-choices"></div>
+                        <input type="text" id="posPayRef" maxlength="20" autocomplete="off" placeholder="Referencia (opcional)" aria-label="Referencia del pago" class="hidden ui2-input">
+                    </section>
+                </div>
+
+                <footer class="ui2-cart__foot">
+                    <div class="ui2-cart__totals">
+                        <div class="ec-overline" id="cartTotalLabel">Total $</div>
+                        <div class="ui2-cart__sum">
+                            <div id="cartTotalUSD" class="ui2-cart__usd">0.00</div>
+                            <div class="ui2-cart__bs">Bs <span id="cartTotalBS">0.00</span></div>
+                        </div>
+                    </div>
+                    <button type="button" onclick="processCheckout()" id="btnCheckout" class="ec-btn ec-btn--primary ec-btn--block" disabled>
+                        <span>Confirmar Venta</span> <i class="fa-solid fa-arrow-right ml-2"></i>
+                    </button>
+                </footer>
+            </div>
+        </div>
+
+        <!-- Fase 40: hoja «Nuevo / Editar producto» del diseño nuevo (los id del formulario actual) -->
+        <div data-ui="2" id="inventoryContainer" class="fixed inset-0 modal-bg z-[70] hidden flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="ui2ProdTitle">
+            <div class="ui2-cart ui2-prodsheet">
+                <header class="ui2-cart__head">
+                    <button type="button" class="ui2-cart__back" onclick="cancelEdit()" aria-label="Cerrar sin guardar"><span data-icon="x" data-size="22"></span></button>
+                    <div class="ui2-cart__titlebox"><h2 id="ui2ProdTitle" class="ui2-cart__title">Nuevo producto</h2></div>
+                    <button type="button" id="ui2ClearProd" class="ui2-cart__clear ui2-cart__clear--muted" onclick="clearForm()">Limpiar</button>
+                </header>
+
+                <div class="ui2-cart__body">
+                    <input type="hidden" id="productId">
+
+                    <section class="ui2-card ui2-photo">
+                        <label class="ui2-photo__box">
+                            <input type="file" id="prodImg" accept="image/*" class="hidden" onchange="previewImage(event)">
+                            <img id="imgPreview" class="hidden" alt="Foto del producto">
+                            <span id="imgIcon" class="ui2-photo__ph"><span data-icon="camera" data-size="24"></span>Foto</span>
+                            <button type="button" id="btnRemoveImg" class="hidden ui2-photo__rm" onclick="removeImage(event); event.preventDefault();" aria-label="Quitar la foto"><span data-icon="x" data-size="14"></span></button>
+                        </label>
+                        <div class="ui2-photo__side">
+                            <button type="button" class="ui2-inv__scan ui2-photo__scan" onclick="startScanner('LINK')"><span data-icon="scan" data-size="18"></span>Escanear código</button>
+                            <p class="ec-field__hint">Con el código, toca la nube para buscar nombre y foto.</p>
+                        </div>
+                    </section>
+
+                    <section class="ui2-card ui2-stack">
+                        <div class="ec-field">
+                            <label class="ec-field__label" for="prodName">Nombre</label>
+                            <div class="ec-field__control"><input type="text" id="prodName" required placeholder="Ej: Galletas Charmy"></div>
+                        </div>
+                        <div class="ec-field">
+                            <label class="ec-field__label" for="prodBarcode">Código de barras <small>(opcional)</small></label>
+                            <div class="ec-field__control"><input type="text" id="prodBarcode" inputmode="numeric" placeholder="EAN / UPC"><button type="button" class="ec-icon-btn ui2-cloudbtn" onclick="fetchProductData($('prodBarcode').value)" aria-label="Buscar nombre y foto con este código"><span data-icon="cloud-down" data-size="18"></span></button></div>
+                        </div>
+                    </section>
+
+                    <section class="ui2-card ui2-stack">
+                        <div class="ec-field">
+                            <label class="ec-field__label" for="prodPrice">Precio de venta</label>
+                            <div class="ec-field__control ec-field__control--amount ui2-pricebox"><span class="ec-field__prefix">$</span><input type="number" id="prodPrice" required step="0.01" inputmode="decimal" placeholder="0.00"></div>
+                            <div class="ec-field__hint" id="ui2PriceBs">= Bs 0,00</div>
+                            <input type="hidden" id="prodCost">
+                        </div>
+                        <div class="ui2-qtyrow" id="prodQtyBox">
+                            <div><div class="ec-field__label">Existencia</div><div class="ec-field__hint">Unidades que tienes hoy</div></div>
+                            <div class="ui2-qty">
+                                <button type="button" onclick="ui2StepQty(-1)" aria-label="Restar uno">−</button>
+                                <input type="number" id="prodQty" required min="1" inputmode="numeric" aria-label="Existencia" placeholder="0">
+                                <button type="button" onclick="ui2StepQty(1)" aria-label="Sumar uno">+</button>
+                            </div>
+                        </div>
+                        <label class="ui2-switchrow">
+                            <span><span class="ui2-switchrow__t">Siempre disponible</span><span class="ec-field__hint">No llevar existencias (servicios, recargas)</span></span>
+                            <input type="checkbox" id="prodUnlimited" onchange="toggleUnlimitedField()">
+                        </label>
+                    </section>
+
+                    <section class="ui2-card ui2-stack">
+                        <div class="ec-field">
+                            <label class="ec-field__label" for="prodCategory">Categoría <small>(opcional)</small></label>
+                            <div class="ec-field__control"><input type="text" id="prodCategory" list="categoryOptions" maxlength="40" placeholder="Ej: Dulces"><datalist id="categoryOptions"></datalist></div>
+                        </div>
+                        <div id="prodHideBox" class="hidden">
+                            <label class="ui2-switchrow">
+                                <span><span class="ui2-switchrow__t">No mostrar en la vitrina</span><span class="ec-field__hint">Tus clientes no lo verán en tu catálogo</span></span>
+                                <input type="checkbox" id="prodHideCatalog">
+                            </label>
+                        </div>
+                    </section>
+                </div>
+
+                <footer class="ui2-cart__foot">
+                    <button type="button" onclick="attemptSubmit()" id="submitBtn" class="ec-btn ec-btn--primary ec-btn--block"><i class="fa-solid fa-save"></i> <span>Guardar</span></button>
+                    <div class="ui2-prodfoot">
+                        <button type="button" id="cancelEditBtn" class="hidden ec-btn ec-btn--secondary">Cancelar</button>
+                        <button type="button" id="ui2DeleteProd" class="hidden ec-btn ec-btn--danger" onclick="ui2DeleteProduct()">Borrar producto</button>
+                    </div>
+                </footer>
             </div>
         </div>
 
