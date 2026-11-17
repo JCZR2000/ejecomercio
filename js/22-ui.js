@@ -5,6 +5,14 @@
         // --- A. LÓGICA VISUAL (ACORDEÓN) ---
         // Esta función es la que faltaba o estaba fallando
         function toggleProductManager(forceOpen = null) {
+            if (UI2) { // Fase 40: hoja «Nuevo / Editar producto»; abrir o cerrar es quitar o poner hidden
+                const sheet = $('inventoryContainer');
+                if (!sheet) return;
+                const open = forceOpen !== null ? forceOpen : sheet.classList.contains('hidden');
+                sheet.classList.toggle('hidden', !open);
+                if (open && typeof ui2OnProductSheet === 'function') ui2OnProductSheet();
+                return;
+            }
             const panel = $('productFormPanel');
             const chevron = $('mgrChevron');
             const container = $('inventoryContainer');
@@ -37,6 +45,9 @@
                     if (b.dataset.navTab === activeTab) b.setAttribute('aria-current', 'page');
                     else b.removeAttribute('aria-current');
                 });
+                document.body.dataset.tab = activeTab; // Fase 40: el panel de venta de escritorio solo sale en Inventario
+                const title = $('ui2PageTitle');
+                if (title) title.textContent = { home: 'Inventario', credits: 'Fiados', history: 'Historial' }[activeTab] || '';
                 return;
             }
             // Reiniciar todos a estado inactivo
@@ -63,6 +74,7 @@
             
             customConfirm('Vaciar carrito', '¿Estás seguro de vaciar todo el carrito?', 'danger', () => {
                 state.cart = [];
+                state.pendingOrderId = state.pendingOrderPhone = state.pendingOrderMsg = state.pendingOrderName = null; // vaciar un pedido en línea lo deja en la bandeja, como cerrar el carrito
 
                 // Limpiezas adicionales
                 $('stockHint').textContent = '';

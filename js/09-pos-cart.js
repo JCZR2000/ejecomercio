@@ -18,9 +18,11 @@
             row.classList.toggle('hidden', credit ? !((parseFloat($('initialPayUSD').value) || 0) > 0) : isGuidedReceipt());
             const m = currentPosPay().method;
             row.querySelectorAll('button').forEach(b => {
-                b.className = 'shrink-0 px-3 py-2 rounded-full text-xs font-bold border transition active:scale-95 ' + (b.dataset.pay === m ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300 text-gray-600');
+                if (UI2) b.setAttribute('aria-pressed', String(b.dataset.pay === m)); // el estilo lo da ui2.css
+                else b.className = 'shrink-0 px-3 py-2 rounded-full text-xs font-bold border transition active:scale-95 ' + (b.dataset.pay === m ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-300 text-gray-600');
             });
             $('posPayRef').classList.toggle('hidden', !REF_METHODS.includes(m));
+            if (UI2 && typeof syncUi2Cart === 'function') syncUi2Cart(); // refleja #isCreditSale y el vencimiento en los controles nuevos
         }
         function setPosPayMethod(key) { posPayMethod = payMethodKey(key) || 'EFECTIVO'; updatePosPayRow(); }
         ['initialPayUSD', 'initialPayBS'].forEach(id => $(id).addEventListener('input', updatePosPayRow));
@@ -226,6 +228,7 @@
                 $('abonoLabel').textContent = hasStubs ? "Abono (Deuda Vieja)" : "Abono Inicial";
             }
 
+            const uiRows = []; // solo con el diseño nuevo
             state.cart.forEach((item, idx) => {
                 // CALCULO SEGURO: Precio * Cantidad
                 const rowTotal = item.price * item.qty; 
@@ -239,7 +242,18 @@
                 const minusDisabled = item.qty <= 1 || isStub ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400' : 'hover:bg-red-100 text-red-600 bg-gray-50';
                 const plusDisabled = isStub ? 'opacity-30 cursor-not-allowed bg-gray-100 text-gray-400' : 'hover:bg-green-100 text-green-600 bg-green-50 border-green-200';
                 
-                const nameHtml = isStub 
+                if (UI2) { // Fase 40: filas del carrito nuevo (mismos onclick)
+                    const nm = escapeHtml(item.name);
+                    uiRows.push(`<div class="ui2-crow" role="listitem">
+                        <div class="ec-stepper"><button type="button" onclick="updateCartQty(${idx}, -1)" aria-label="Quitar uno de ${nm}" ${item.qty <= 1 || isStub ? 'disabled' : ''}>−</button><span>${item.qty}</span><button type="button" onclick="updateCartQty(${idx}, 1)" aria-label="Agregar uno de ${nm}" ${isStub ? 'disabled' : ''}>+</button></div>
+                        <div class="ui2-crow__body"><div class="ui2-crow__name">${nm}${isStub ? ' <span class="ec-chip ec-chip--pro">Deuda vieja</span>' : ''}</div><div class="ui2-crow__sub">${formatMoney(item.price)} c/u</div></div>
+                        <div class="ui2-crow__sum">${formatMoney(rowTotal)}</div>
+                        <button type="button" class="ui2-crow__rm" onclick="removeFromCart(${idx})" aria-label="Quitar ${nm}">×</button>
+                    </div>`);
+                    return;
+                }
+
+                const nameHtml = isStub
                     ? `<span class="text-indigo-600"><i class="fa-solid fa-clock-rotate-left mr-1"></i>${escapeHtml(item.name)}</span> <span class="text-[9px] bg-indigo-100 text-indigo-700 px-1 rounded ml-1">VIEJO</span>`
                     : escapeHtml(item.name);
 
@@ -273,6 +287,11 @@
                 </tr>`;
             });
             
+            if (UI2) {
+                tbody.innerHTML = uiRows.join('');
+                if (typeof ui2AfterRenderCart === 'function') ui2AfterRenderCart(totalItems, totalUSD, activeRate, sym);
+            }
+
             // UI de Estado Vacío
             const emptyMsg = $('cartEmptyMsg');
             if(emptyMsg) {

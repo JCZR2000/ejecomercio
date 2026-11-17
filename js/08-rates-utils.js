@@ -93,7 +93,7 @@
             // ------------------------------------------------
 
             const sym = getSymbol();
-            $('colHeaderCurrency').textContent = sym;
+            if ($('colHeaderCurrency')) $('colHeaderCurrency').textContent = sym;
             $('cartTotalLabel').textContent = `Total ${sym}`;
             document.querySelectorAll('.dynamic-symbol-span').forEach(span => span.textContent = sym);
         }

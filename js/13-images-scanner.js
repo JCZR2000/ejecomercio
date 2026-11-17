@@ -213,6 +213,7 @@
                         $('prodBarcode').value = decodedText;
                         $('searchInput').value = decodedText; // También lo ponemos en búsqueda
                         renderAll();
+                        if (UI2) toggleProductManager(true); // diseño nuevo: el formulario es una hoja cerrada
                         $('prodName').focus();
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                     }, 'Ir a Gestión', 'camera');
