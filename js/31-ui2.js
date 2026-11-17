@@ -32,7 +32,9 @@
             camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
             'cloud-down': '<path d="M17.5 19H8a5 5 0 1 1 1.4-9.8A6 6 0 0 1 21 11.5 4 4 0 0 1 17.5 19z"/><path d="m9 14 3 3 3-3M12 11v6"/>',
             edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
-            trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>'
+            trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/>',
+            // Fase 42
+            receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/>'
         };
 
         function icon(name, size) {
@@ -78,10 +80,16 @@
         const ui2Qty = p => Number(p && p.qty) || 0;
         const ui2Cat = p => String((p && p.category) || '').trim();
 
+        const ui2NoCost = p => !(Number(p && p.cost) > 0);
+
         function ui2FilterProducts(list) {
             const f = ui2InvFilter;
             if (f === 'low') return list.filter(p => !isUnlimited(p) && ui2Qty(p) > 0 && ui2Qty(p) < UI2_LOW_STOCK);
             if (f === 'out') return list.filter(p => !isUnlimited(p) && ui2Qty(p) <= 0);
+            if (f === 'nocost') { // Fase 42: solo cuáles faltan, sin mostrar costos
+                if (!state.products.some(ui2NoCost)) { ui2InvFilter = 'all'; return list; } // ya no falta ninguno
+                return list.filter(ui2NoCost);
+            }
             if (f.startsWith('cat:')) {
                 if (!state.products.some(p => 'cat:' + ui2Cat(p) === f)) { ui2InvFilter = 'all'; return list; } // la categoría ya no existe
                 return list.filter(p => 'cat:' + ui2Cat(p) === f);
@@ -97,7 +105,8 @@
             if (!box) return;
             const focused = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.f : null;
             const cats = [...new Set(state.products.map(ui2Cat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-            const defs = [['all', 'Todos · ' + state.products.length], ['low', 'Poco stock'], ['out', 'Agotados'], ...cats.map(c => ['cat:' + c, c])];
+            const noCost = state.products.filter(ui2NoCost).length;
+            const defs = [['all', 'Todos · ' + state.products.length], ['low', 'Poco stock'], ['out', 'Agotados'], ...(noCost > 0 ? [['nocost', 'Sin costo · ' + noCost]] : []), ...cats.map(c => ['cat:' + c, c])];
             box.innerHTML = defs.map(([k, label]) => `<button type="button" class="ec-filter" data-f="${escapeHtml(k)}" aria-pressed="${k === ui2InvFilter}">${escapeHtml(label)}</button>`).join('');
             box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => ui2SetFilter(b.dataset.f)));
             if (focused) { const b = [...box.querySelectorAll('button')].find(x => x.dataset.f === focused); if (b) b.focus(); }
@@ -135,6 +144,14 @@
             const n = $('ui2ProdCount');
             if (n) n.textContent = state.products.length;
             renderUi2Filters();
+            // Fase 42: tarjetas del escritorio (solo lectura; «cobrado» y «por cobrar» las escriben calculateTotals y renderCreditsList)
+            const set = (id, t) => { const e = $(id); if (e) e.textContent = t; };
+            const noCost = state.products.filter(ui2NoCost).length;
+            set('ui2StatProds', state.products.length);
+            set('ui2StatOut', state.products.filter(p => !isUnlimited(p) && ui2Qty(p) <= 0).length);
+            set('ui2StatNoCostN', noCost);
+            const nb = $('ui2StatNoCost');
+            if (nb) { nb.disabled = noCost === 0; nb.setAttribute('aria-label', 'Sin costo: ' + noCost + (noCost ? ', ver cuáles' : '')); }
         }
 
         // --- Hoja «Nuevo / Editar producto» ---
@@ -351,6 +368,11 @@
                             ${act('Fecha', 'updatePaymentDate')}${act('Recargo', 'openSurchargeModal')}${act('Editar', 'requestEditCredit')}${clientUseBalanceBtnHtml(c)}${act('Eliminar', 'requestDeleteCredit', ' ui2-danger')}
                         </div>
                     </section>
+
+                    <section class="ui2-card">
+                        <div class="ec-overline">MOVIMIENTOS</div>
+                        ${ui2CreditMovesHtml(c)}
+                    </section>
                 </div>`;
 
             el.dataset.id = id;
@@ -401,6 +423,147 @@
         // Al pasar de móvil a escritorio (o al revés) se vuelve a decidir qué se muestra
         window.matchMedia('(min-width: 1024px)').addEventListener('change', () => { if (UI2 && document.body.dataset.tab === 'credits') renderCreditsList(); });
 
+        // ==========================================
+        // Fase 42: historial, clientes y movimientos del fiado
+        // ==========================================
+        // Cuántos movimientos se ven: vive aquí, NO en state (no se guarda ni se sube)
+        let ui2HistLimit = 25;
+        const UI2_HIST_STEP = 25;
+        const ui2Hm = d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        // Pura: «Hoy · martes 17/11», «Ayer · lunes 16/11» o «jueves 12/11»
+        function ui2DayLabel(d, now = new Date()) {
+            const wd = d.toLocaleDateString('es', { weekday: 'long' }) + ' ' + ui2Dd(d);
+            const y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+            if (d.toDateString() === now.toDateString()) return 'Hoy · ' + wd;
+            if (d.toDateString() === y.toDateString()) return 'Ayer · ' + wd;
+            return wd;
+        }
+        // Pura: movimientos ya ordenados → grupos por día [{ label, items }]
+        function ui2HistGroups(list, now = new Date()) {
+            const groups = [];
+            list.forEach(s => {
+                const d = new Date(s.date), key = d.toDateString();
+                let g = groups[groups.length - 1];
+                if (!g || g.key !== key) { g = { key, label: ui2DayLabel(d, now), items: [] }; groups.push(g); }
+                g.items.push(s);
+            });
+            return groups;
+        }
+
+        function ui2HistRow(s) {
+            const id = escapeHtml(String(s.id)), amt = Number(s.total) || 0, isPay = s.type === 'payment';
+            let title, sub;
+            if (isPay) {
+                const m = payMethodLabel(s.method);
+                title = escapeHtml(s.description || 'Abono');
+                sub = 'Pago de fiado' + (m ? ' · ' + escapeHtml(m) : '');
+            } else {
+                const cons = {};
+                (s.items || []).forEach(i => { cons[i.name] = (cons[i.name] || 0) + (Number(i.qty) || 0); });
+                title = Object.entries(cons).map(([n, q]) => escapeHtml(n) + (q > 1 ? ' ×' + q : '')).join(', ') || 'Venta';
+                const count = (s.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
+                sub = s.items ? 'Venta · ' + count + (count === 1 ? ' producto' : ' productos') : '';
+            }
+            return `<div role="listitem" class="ui2-hrow">
+                <span class="ui2-hrow__time">${escapeHtml(ui2Hm(new Date(s.date)))}</span>
+                <span class="ec-row__body"><span class="ec-row__title" style="display:block">${title}</span>${sub ? `<span class="ec-row__sub" style="display:block">${sub}</span>` : ''}</span>
+                <span class="ec-amount${isPay ? ' ec-amount--paid' : ''}"><span class="ec-amount__usd">${isPay ? '+' : ''}${formatMoney(amt)}</span></span>
+                <button type="button" class="ec-iconbtn ec-iconbtn--plain" onclick="openReceiptFromHistory('${id}')" aria-label="Ver recibo">${icon('receipt', 20)}</button>
+            </div>`;
+        }
+
+        // La llama renderHistoryTable con state.sales ya ordenada (la más nueva primero)
+        function renderHistoryUi2(all) {
+            const body = $('historyBody');
+            if (!body) return;
+            const shown = all.slice(0, ui2HistLimit);
+            body.innerHTML = shown.length ? ui2HistGroups(shown).map(g => {
+                const n = g.items.length;
+                return `<div class="ui2-hday" role="presentation"><span>${escapeHtml(g.label)}</span><span>${n} ${n === 1 ? 'movimiento' : 'movimientos'}</span></div>` + g.items.map(ui2HistRow).join('');
+            }).join('') : '<div class="p-8 text-center text-gray-400 italic bg-white">Aún no hay ventas ni abonos</div>';
+            const more = $('ui2HistMore');
+            if (more) more.classList.toggle('hidden', all.length <= ui2HistLimit);
+        }
+        function ui2HistMore() { ui2HistLimit += UI2_HIST_STEP; renderHistoryTable(); }
+
+        // Fila de la lista de clientes (mismo patrón que las deudas)
+        function ui2ClientRow(c, s, rate) {
+            const id = escapeHtml(safeClientId(c.id)), name = escapeHtml(c.name);
+            const ini = escapeHtml((String(c.name).trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('') || '?').toUpperCase());
+            const owes = s.debt > 0.01, bal = s.balance > 0.01;
+            const aria = escapeHtml('Abrir ficha de ' + c.name + (owes ? ', debe ' + formatMoney(s.debt) : '') + (bal ? ', saldo a favor ' + formatMoney(s.balance) : ''));
+            return `<div role="listitem" class="ui2-fitem"><button type="button" class="ec-row ui2-frow" onclick="openClientCard('${id}')" aria-label="${aria}">
+                <span class="ec-row__lead">${ini}</span>
+                <span class="ec-row__body"><span class="ec-row__title" style="display:block">${name}</span><span class="ec-row__sub" style="display:block">${escapeHtml(c.phone || 'Sin teléfono')}</span></span>
+                <span class="ui2-clamt">${owes ? `<span class="ec-amount ec-amount--debt"><span class="ec-amount__usd">${formatMoney(s.debt)}</span><span class="ec-amount__bs">Bs ${(s.debt * rate).toFixed(2)}</span></span>` : ''}${bal ? `<span class="ec-chip ec-chip--success">Saldo ${formatMoney(s.balance)}</span>` : ''}</span>
+            </button></div>`;
+        }
+
+        // Ficha del cliente: mismo contenido y mismos onclick que la de siempre. s = clientSummary(id); id ya pasó por safeClientId.
+        function renderClientCardUi2(s, id, rate) {
+            const c = s.client, wa = clientWaNumber(c.phone);
+            const day = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(); };
+            const row = (left, mid, right) => `<div class="ui2-mv"><span class="ui2-mv__l">${left}</span>${mid ? `<b class="ui2-mv__m">${mid}</b>` : ''}<span class="ui2-mv__r">${right}</span></div>`;
+            const empty = t => `<div class="ui2-mv ui2-mv--empty">${t}</div>`;
+            const openRows = s.open.map(cr => row(escapeHtml(day(cr.date)), `<span class="ui2-neg">${formatMoney(creditPending(cr))}</span>`,
+                (s.balance > 0.01 ? `<button type="button" class="ec-btn ec-btn--ghost ui2-mini" onclick="requestUseBalance('${id}', '${safeClientId(cr.id)}')">Usar saldo</button>` : '') +
+                `<button type="button" class="ec-btn ec-btn--ghost ui2-mini" onclick="viewClientCredits('${id}')">Ver</button>`)).join('') || empty('Sin fiados abiertos.');
+            const closedRows = s.closed.slice(0, 5).map(cr => row(escapeHtml(day(cr.date)), formatMoney(cr.totalDebt), '<span class="ec-chip ec-chip--success">Pagado</span>')).join('') || empty('Ninguno guardado.');
+            const MOVE_LABELS = { OVERPAY: 'Pagó de más', USE: 'Usado en un fiado', ADJUST: 'Ajuste', MERGE: 'Unión de clientes' };
+            const movesRows = (c.moves || []).slice(0, 10).map(m => row(
+                escapeHtml(day(m.date)) + ' · ' + escapeHtml(MOVE_LABELS[m.kind] || m.kind) + (m.note ? ` <span class="ui2-muted">(${escapeHtml(m.note)})</span>` : ''), '',
+                `<b class="${m.amount < 0 ? 'ui2-neg' : 'ui2-pos'}">${m.amount < 0 ? '−' : '+'}${formatMoney(Math.abs(m.amount))}</b>`)).join('') || empty('Sin movimientos.');
+            const fig = (label, usd, cls) => `<div class="ui2-card ui2-fig"><div class="ec-overline">${label}</div><div class="ec-amount ec-amount--${cls} ec-amount--start"><span class="ec-amount__usd">${formatMoney(usd)}</span><span class="ec-amount__bs">Bs ${(usd * rate).toFixed(2)}</span></div></div>`;
+            return `
+                <div class="ui2-cardhead">
+                    <div class="ui2-cardhead__who">
+                        <h3 class="ui2-cart__title" style="white-space:normal">${escapeHtml(c.name)}</h3>
+                        <div class="ui2-detail__sub">${escapeHtml(c.phone || 'Sin teléfono')}${c.doc ? ' · ' + escapeHtml(c.doc) : ''}</div>
+                        ${c.notes ? `<div class="ui2-detail__sub" style="font-style:italic">${escapeHtml(c.notes)}</div>` : ''}
+                    </div>
+                    <button type="button" class="ec-btn ec-btn--secondary ui2-mini" onclick="openClientForm('${id}')">Editar</button>
+                </div>
+                <div class="ui2-two">${fig('DEBE', s.debt, 'debt')}${fig('SALDO A FAVOR', s.balance, 'paid')}</div>
+                <div class="ec-overline ui2-sec">FIADOS ABIERTOS</div><div class="ec-list">${openRows}</div>
+                <div class="ec-overline ui2-sec">PAGADOS (ÚLTIMOS GUARDADOS)</div><div class="ec-list">${closedRows}</div>
+                <div class="ec-overline ui2-sec">MOVIMIENTOS DEL SALDO</div><div class="ec-list">${movesRows}</div>
+                <div class="ui2-two ui2-cardacts">
+                    <button type="button" class="ec-btn ec-btn--secondary ui2-span2" onclick="requestAdjustBalance('${id}')">Ajustar saldo</button>
+                    ${wa ? `<button type="button" class="ec-btn ec-btn--soft" onclick="openClientWhatsapp('${id}')">WhatsApp</button>` : ''}
+                    <button type="button" class="ec-btn ec-btn--primary" onclick="newCreditForClient('${id}')">Nuevo fiado</button>
+                    <button type="button" class="ec-btn ec-btn--secondary" onclick="startMergeClient('${id}')">Unir con…</button>
+                    <button type="button" class="ec-btn ec-btn--danger ui2-span2" onclick="requestDeleteClient('${id}')">Eliminar</button>
+                </div>`;
+        }
+
+        // Movimientos de un fiado, de más nuevo a más viejo. Solo lectura. Siempre cuadra con c.paid: lo que no se puede fechar va en «Abonos anteriores».
+        // Cada línea: { label, sub (fecha y hora, '' si no se guardó), amount (− abona, + suma) }
+        function ui2CreditMoves(c) {
+            const dated = [];
+            state.sales.forEach(s => {
+                if (s.type !== 'payment' || s.creditId != c.id) return;
+                const m = payMethodLabel(s.method), toDebt = roundMoney((Number(s.total) || 0) - (Number(s.toBalance) || 0));
+                dated.push({ date: s.date, label: 'Abono' + (m ? ' · ' + m : ''), amount: -toDebt });
+            });
+            const cl = getClient(c.clientId);
+            ((cl && cl.moves) || []).forEach(m => {
+                if (m.kind === 'USE' && m.creditId == c.id) dated.push({ date: m.date, label: 'Saldo a favor usado', amount: -Math.abs(Number(m.amount) || 0) });
+            });
+            dated.sort((a, b) => new Date(b.date) - new Date(a.date));
+            const out = dated.map(m => ({ label: m.label, sub: ui2Dd(new Date(m.date)) + ' ' + ui2Hm(new Date(m.date)), amount: m.amount }));
+            const diff = roundMoney((Number(c.paid) || 0) + out.reduce((a, m) => a + m.amount, 0));
+            if (diff > 0.01) out.push({ label: 'Abonos anteriores', sub: '', amount: -diff });
+            else if (diff < -0.01) out.push({ label: 'Ajuste de abonos', sub: '', amount: -diff });
+            if (c.surcharge) out.push({ label: 'Recargo', sub: '', amount: c.surcharge }); // no se guarda cuándo se puso
+            const n = (c.items || []).reduce((a, i) => a + (Number(i.qty) || 0), 0);
+            out.push({ label: 'Venta · ' + n + (n === 1 ? ' producto' : ' productos'), sub: ui2Dd(new Date(c.date)), amount: roundMoney(c.totalDebt - (c.surcharge || 0)) });
+            return out;
+        }
+        function ui2CreditMovesHtml(c) {
+            return ui2CreditMoves(c).map(m => `<div class="ui2-mv"><span class="ui2-mv__l"><b>${escapeHtml(m.label)}</b>${m.sub ? `<span class="ui2-detail__sub" style="display:block">${escapeHtml(m.sub)}</span>` : ''}</span><b class="${m.amount < 0 ? 'ui2-neg' : 'ui2-pos'}">${m.amount < 0 ? '−' : '+'}${formatMoney(Math.abs(m.amount))}</b></div>`).join('');
+        }
+
         // Autoprueba (consola): selfTestUi2()
         function selfTestUi2() {
             const payload = buildCloudPayload();
@@ -440,7 +603,32 @@
             console.assert(breakdownOk, 'El desglose del cobro no suma la deuda');
             console.assert(statusOk, 'ui2CreditStatus da un estado equivocado');
             console.assert(credStateOk, 'ui2CreditId no debe estar en state ni en buildCloudPayload()');
-            const ok = noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk;
-            console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk });
+            // Fase 42: movimientos del fiado, agrupado del historial, filtro «Sin costo» y límite fuera de state
+            let movesOk = false, groupsOk = false, noCostOk = false;
+            const prev42 = { sales: state.sales, clients: state.clients, products: state.products, filter: ui2InvFilter };
+            try {
+                const now = new Date(), yest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 12);
+                state.clients = [{ id: 'zzcl', name: 'Cliente ficticio', moves: [{ kind: 'USE', creditId: 'zzc2', amount: -1, date: now.toISOString() }] }];
+                state.sales = [
+                    { id: 1, type: 'payment', date: now.toISOString(), total: 2, creditId: 'zzc2' },
+                    { id: 2, type: 'payment', date: now.toISOString(), total: 2 } // abono inicial: sin creditId
+                ];
+                const c = { id: 'zzc2', clientId: 'zzcl', customer: 'Cliente ficticio', date: now.toISOString(), items: [{ name: 'Prueba', price: 8, qty: 1 }], totalDebt: 8, paid: 5 };
+                const mv = ui2CreditMoves(c), prior = mv.find(m => m.label === 'Abonos anteriores');
+                movesOk = !!prior && prior.amount === -2 && roundMoney(-mv.filter(m => m.amount < 0).reduce((a, m) => a + m.amount, 0)) === c.paid;
+                state.sales = [{ date: now.toISOString() }, { date: now.toISOString() }, { date: yest.toISOString() }];
+                const g = ui2HistGroups(state.sales, now);
+                groupsOk = g.length === 2 && g[0].items.length === 2 && g[1].items.length === 1 && g[0].label.startsWith('Hoy') && g[1].label.startsWith('Ayer');
+                state.products = [{ id: 'a', cost: 3 }, { id: 'b', cost: 0 }, { id: 'c' }];
+                ui2InvFilter = 'nocost';
+                noCostOk = ui2FilterProducts(state.products).length === 2;
+            } finally { state.sales = prev42.sales; state.clients = prev42.clients; state.products = prev42.products; ui2InvFilter = prev42.filter; }
+            const limitOk = !('ui2HistLimit' in state) && !JSON.stringify(buildCloudPayload()).includes('ui2HistLimit');
+            console.assert(movesOk, 'ui2CreditMoves no cuadra con paid');
+            console.assert(groupsOk, 'ui2HistGroups agrupa mal por día');
+            console.assert(noCostOk, 'ui2FilterProducts nocost cuenta mal');
+            console.assert(limitOk, 'ui2HistLimit no debe estar en state ni en buildCloudPayload()');
+            const ok = noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
+            console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk, movesOk, groupsOk, noCostOk, limitOk });
             return ok;
         }
