@@ -12,6 +12,7 @@
             chart: '<path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/>',
             coins: '<circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6"/><path d="M10 7.8H8.6a.6.6 0 0 0 0 1.2h.8a.6.6 0 0 1 0 1.2H8M9 6.8v1M9 10.2v1"/>',
             crown: '<path d="m3 8 4 4 5-7 5 7 4-4-2 11H5z"/>',
+            dollar: '<path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
             sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
             download: '<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
             logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/>',
@@ -86,7 +87,7 @@
             scan: 'barcode qrcode', calc: 'calculator', cart: 'cart-shopping basket-shopping cart-plus', box: 'box box-open boxes-stacked',
             store: 'store', inbox: 'inbox', tag: 'tags', share: 'share-nodes', copy: 'copy', link: 'link', phone: 'phone mobile-screen',
             warning: 'triangle-exclamation circle-exclamation', info: 'circle-info info-circle', ban: 'ban',
-            chart: 'chart-line chart-pie arrow-trend-up', coins: 'coins money-bill money-bill-wave sack-dollar dollar-sign piggy-bank',
+            chart: 'chart-line chart-pie arrow-trend-up', coins: 'coins money-bill money-bill-wave sack-dollar piggy-bank', dollar: 'dollar-sign',
             crown: 'crown trophy', logout: 'right-from-bracket', login: 'right-to-bracket', 'eye-off': 'eye-slash', bolt: 'bolt'
         }).forEach(([k, names]) => names.split(' ').forEach(n => { UI2_FA_MAP[n] = k; }));
 
@@ -161,6 +162,54 @@
             }
         }
         if (UI2) ui2RenderSideUser();
+
+        // Fase 47: Ajustes en dos paneles en horizontal (categorías a la izquierda). El CSS decide si se ve el nav; en vertical se ven todas las secciones.
+        // La sección elegida vive aquí (no en state ni en localStorage).
+        const UI2_CFG = [['plan', 'Mi plan', 'crown'], ['rate', 'Tasa de cambio', 'coins'], ['storage', 'Almacenamiento', 'cloud'], ['security', 'Seguridad', 'lock'], ['fiados', 'Fiados', 'users'], ['billing', 'Facturación', 'receipt'], ['catalog', 'Vitrina', 'store'], ['danger', 'Zona de limpieza', 'trash']];
+        let ui2CfgKey = '';
+        // expand: en vertical abre esa sección (candado Pro); sin expand, en vertical se pliegan todas (al abrir Ajustes)
+        function ui2CfgShow(key, expand) {
+            const nav = document.querySelector('#configModal .ui2-cfgnav');
+            if (!nav) return;
+            ui2CfgKey = key;
+            const body = nav.parentElement, sec = body.querySelector(`[data-cfg="${key}"]`);
+            body.querySelectorAll('[data-cfg]').forEach(s => s.classList.toggle('is-on', s === sec));
+            nav.querySelectorAll('button').forEach(b => b.dataset.key === key ? b.setAttribute('aria-current', 'true') : b.removeAttribute('aria-current'));
+            if (nav.offsetParent === null) { body.querySelectorAll('section[data-cfg]').forEach(s => ui2CfgFold(s, !(expand && s === sec))); return; } // vertical: plegables
+            if (!sec) return;
+            if (key === 'danger') sec.open = true;
+            body.scrollTop = 0; sec.scrollTop = 0;
+        }
+        function ui2CfgInit() {
+            const nav = document.querySelector('#configModal .ui2-cfgnav');
+            if (!nav) return;
+            nav.innerHTML = UI2_CFG.map(([k, t, ic]) => `<button type="button" data-key="${k}" onclick="ui2CfgShow('${k}')"><span class="ui2-cfgnav__ic">${icon(ic, 20)}</span><span class="ui2-cfgnav__tx"><b>${t}</b><small></small></span></button>`).join('');
+            nav.querySelectorAll('button').forEach(b => {
+                const sub = document.querySelector(`#configModal [data-cfg="${b.dataset.key}"] .uppercase`); // subtítulo de la sección (o del summary)
+                b.querySelector('small').textContent = sub ? sub.textContent.trim() : '';
+            });
+            // Fase 47b: en vertical cada sección se pliega a su cabecera; tocarla la abre y pliega las demás (en horizontal el CSS no la pliega)
+            document.querySelectorAll('#configModal section[data-cfg] > :first-child').forEach(h => {
+                h.classList.add('ui2-cfghead');
+                h.setAttribute('role', 'button'); h.tabIndex = 0;
+                h.insertAdjacentHTML('beforeend', `<span class="ui2-cfghead__chev">${icon('chevron-down', 18)}</span>`);
+                const go = e => {
+                    if (nav.offsetParent !== null || e.target.closest('button, input, select, a')) return; // horizontal: manda el índice; el interruptor de la vitrina hace lo suyo
+                    const sec = h.parentElement, open = sec.classList.contains('is-fold');
+                    document.querySelectorAll('#configModal section[data-cfg]').forEach(s => ui2CfgFold(s, !(open && s === sec)));
+                    if (open) sec.scrollIntoView({ block: 'nearest' });
+                };
+                h.addEventListener('click', go);
+                h.addEventListener('keydown', e => { if (e.target === h && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); go(e); } });
+            });
+            ui2CfgShow(ui2CfgKey || 'plan');
+        }
+        function ui2CfgFold(sec, fold) {
+            sec.classList.toggle('is-fold', fold);
+            const h = sec.querySelector('.ui2-cfghead');
+            if (h) h.setAttribute('aria-expanded', String(!fold));
+        }
+        if (UI2) ui2CfgInit();
 
         // Un solo botón alterna entre los dos diseños. Se guarda y se recarga: no se redibuja en caliente.
         async function toggleDesign() {

@@ -219,6 +219,7 @@
                     renderCatalogConfigUI(); // Vitrina en línea
                     onConfigOpenLicense(); // Mi plan (Fase 30)
                     renderSyncState(); // «Sincronizar ahora» (Fase 33)
+                    if (UI2) ui2CfgShow(ui2CfgKey || 'plan'); // Fase 47: última sección vista
                 }
                 updateConfigUI();
             }

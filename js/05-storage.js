@@ -200,6 +200,7 @@
             } finally {
                 isUploadingToCloud = false;
                 if (typeof renderSyncState === 'function') renderSyncState();
+                if (typeof ui2RenderSideUser === 'function') ui2RenderSideUser(); // Fase 47: la barra lateral no se queda en «Subiendo…»
             }
         }
 
