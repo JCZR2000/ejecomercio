@@ -9,10 +9,11 @@
         // CERRAR MENÚ AL HACER CLIC FUERA
         window.addEventListener('click', (e) => {
             const menu = document.getElementById('userMenuDropdown');
-            const btn = document.querySelector('button[onclick="toggleUserMenu()"]');
-            
+            // Fase 39: en el diseño nuevo hay dos botones que abren el menú (avatar y menú lateral); el velo cuenta como «fuera»
+            const onToggle = e.target.closest && e.target.closest('[onclick="toggleUserMenu()"]');
+
             // Si el clic NO fue en el botón Y NO fue dentro del menú...
-            if (btn && menu && !btn.contains(e.target) && !menu.contains(e.target)) {
+            if (menu && !onToggle && !menu.contains(e.target)) {
                 // ...entonces ciérralo.
                 menu.classList.add('hidden');
             }

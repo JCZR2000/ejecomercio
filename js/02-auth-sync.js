@@ -164,7 +164,9 @@
                 return customAlert('Cambios sin subir', 'Hay cambios sin subir a la nube. Conéctate y espera a que se suban antes de borrar este dispositivo.', 'error');
             }
             if (unsubscribe) unsubscribe();
+            const ui = localStorage.getItem('inv_ui'); // Fase 39: el diseño elegido es del dispositivo, no de los datos
             localStorage.clear(); // incluye inv_enc_key
+            if (ui) safeSetItem('inv_ui', ui);
             const img = ('caches' in window) ? caches.delete(IMG_CACHE).catch(() => {}) : Promise.resolve();
             Promise.all([img, deleteImageDb()]).then(() => auth.signOut()).finally(() => location.reload());
         }

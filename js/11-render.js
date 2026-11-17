@@ -165,6 +165,10 @@
             } else {
                 badge.classList.add('hidden');
             }
+            document.querySelectorAll('[data-credit-count]').forEach(el => { // Fase 39: contador del menú lateral
+                el.textContent = allPending.length;
+                el.classList.toggle('hidden', allPending.length === 0);
+            });
 
             // 5. FILTRAR la lista para mostrar (Según búsqueda)
             const filteredList = allPending.filter(c => creditMatchesSearch(c, searchText));

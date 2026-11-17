@@ -32,6 +32,13 @@
 
         // Actualización de la Navbar (Estilo Píldoras)
         function updateMaterialNav(activeTab) {
+            if (UI2) { // Fase 39: barra inferior y menú lateral marcan la pestaña con aria-current
+                document.querySelectorAll('[data-nav-tab]').forEach(b => {
+                    if (b.dataset.navTab === activeTab) b.setAttribute('aria-current', 'page');
+                    else b.removeAttribute('aria-current');
+                });
+                return;
+            }
             // Reiniciar todos a estado inactivo
             ['home', 'credits', 'history'].forEach(tab => {
                 const pill = $(`nav-pill-${tab}`);
