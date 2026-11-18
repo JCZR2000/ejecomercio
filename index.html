@@ -8,10 +8,10 @@
     <link rel="apple-touch-icon" href="icon-192.png">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <title>EjeComercio v78.4</title>
+    <title>EjeComercio v79.0</title>
 
     <!-- Fase 39: diseño «Mostrador» opcional, por dispositivo. Antes de pintar, para que no parpadee. -->
-    <script>var UI2 = false; try { UI2 = localStorage.getItem('inv_ui') === '2'; } catch (e) {} if (UI2) document.documentElement.classList.add('ui2');</script>
+    <script>var UI_MODE = null; try { UI_MODE = localStorage.getItem('inv_ui'); } catch (e) {} var UI2 = UI_MODE === '2' || UI_MODE === 'lite'; var UI2_LITE = UI_MODE === 'lite'; if (UI2) document.documentElement.classList.add('ui2'); if (UI2_LITE) document.documentElement.classList.add('ui2-lite');</script>
 
     <!-- ?v=2: evita la copia opaca que guardó el Service Worker hasta la v62.0. Al cambiar de versión una librería, recalcular integrity. -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js?v=2" integrity="sha384-4gq9w/AGf72FXdNQ3Kn3EqWP7633NbCMjpYHt8YCZyXf23o2opcuAr4cif41tLrC" crossorigin="anonymous"></script>
@@ -156,7 +156,7 @@
 
     <!-- Fase 39: armazón del diseño nuevo (mismos id y onclick que el actual) -->
     <aside data-ui="2" class="ec-sidenav ui2-sidenav" aria-label="Menú principal">
-        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v78.4</span></div>
+        <div class="ec-sidenav__brand"><svg class="ui2-mark" style="width:34px;height:34px" aria-hidden="true" focusable="false"><use href="#ecMark"/></svg><span>Eje<b>Comercio</b></span><span class="ui2-ver">v79.0</span></div>
         <nav aria-label="Secciones" class="ec-sidenav__list">
             <button type="button" class="ec-sidenav__item" data-nav-tab="home" aria-current="page" onclick="switchTab('home')"><span data-icon="box"></span><span>Inventario</span></button>
             <button type="button" class="ec-sidenav__item" data-nav-tab="credits" onclick="switchTab('credits')"><span data-icon="users"></span><span>Fiados</span><span class="ec-sidenav__count hidden" data-credit-count>0</span></button>
@@ -172,7 +172,13 @@
 
     <header data-ui="2" class="ec-appbar ui2-appbar">
         <svg class="ui2-mark" role="img" aria-label="EjeComercio"><use href="#ecMark"/></svg>
-        <span class="ui2-ver ui2-ver--bar">v78.4</span>
+        <span class="ui2-brandname">Eje<b>Comercio</b></span>
+        <span class="ui2-ver ui2-ver--bar">v79.0</span>
+        <nav data-ui="2" id="mainNav" class="ec-nav ui2-bottomnav" aria-label="Secciones">
+            <button type="button" onclick="switchTab('home')" id="nav-btn-home" data-nav-tab="home" aria-current="page"><span id="nav-pill-home" data-icon="box" data-size="22" style="display:inline-flex"></span><span>Inventario</span></button>
+            <button type="button" onclick="switchTab('credits')" id="nav-btn-credits" data-nav-tab="credits"><span id="nav-pill-credits" data-icon="users" data-size="22" style="display:inline-flex"></span><span>Fiados</span><span id="creditBadge" class="ec-badge hidden">0</span></button>
+            <button type="button" onclick="switchTab('history')" id="nav-btn-history" data-nav-tab="history"><span id="nav-pill-history" data-icon="clock" data-size="22" style="display:inline-flex"></span><span>Historial</span></button>
+        </nav>
         <span id="ui2PageTitle" class="ui2-pagetitle">Inventario</span>
         <div class="ec-appbar__status ui2-status">
             <button type="button" id="catalogBadge" onclick="showCatalogDetail()" class="hidden" aria-label="Estado de la vitrina"></button>
@@ -247,7 +253,7 @@
                     <span class="hidden md:inline text-slate-100">
                         Eje<span class="text-yellow-400">Comercio</span>
                     </span>
-                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v78.4</span>
+                    <span class="text-xs bg-yellow-600 text-black px-1.5 rounded">v79.0</span>
                 </h1>
                 <span id="customRateBadge" class="hidden text-[10px] bg-yellow-200 text-yellow-900 border border-yellow-400 px-2 py-0.5 rounded font-bold uppercase animate-pulse">
                     <i class="fa-solid fa-triangle-exclamation mr-1"></i>Personalizada
@@ -682,6 +688,19 @@
 
             <div class="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
                 <nav data-ui="2" class="ui2-cfgnav" aria-label="Secciones de Ajustes"></nav>
+
+                <!-- Fase 49: pantalla Sencilla o Completa (sin data-ui: también en el diseño anterior) -->
+                <section data-cfg="view" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="bg-indigo-500 text-white w-10 h-10 rounded-2xl flex items-center justify-center shadow-md shrink-0"><i class="fa-solid fa-mobile-screen"></i></div>
+                        <div class="min-w-0"><h4 class="font-bold text-slate-800 leading-tight">Pantalla</h4><p class="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Sencilla o completa</p></div>
+                    </div>
+                    <div id="uiModePicker" role="radiogroup" aria-label="Pantalla" class="space-y-2">
+                        <button type="button" role="radio" data-mode="lite" aria-checked="false" onclick="setUiMode('lite')" class="ui-mode-opt w-full text-left rounded-xl border border-slate-200 px-3 py-2.5"><b class="block text-sm text-slate-800">Sencilla</b><span class="block text-xs text-slate-500">Inventario, fiados e historial. Lo demás, en el menú de tu cuenta.</span></button>
+                        <button type="button" role="radio" data-mode="2" aria-checked="false" onclick="setUiMode('2')" class="ui-mode-opt w-full text-left rounded-xl border border-slate-200 px-3 py-2.5"><b class="block text-sm text-slate-800">Completa</b><span class="block text-xs text-slate-500">Todo a la vista: menú lateral, cifras del mes y costos.</span></button>
+                        <button type="button" role="radio" data-mode="1" aria-checked="false" onclick="setUiMode('1')" class="ui-mode-opt w-full text-left rounded-xl border border-slate-200 px-3 py-2.5"><b class="block text-sm text-slate-800">Diseño anterior</b><span class="block text-xs text-slate-500">La pantalla de antes.</span></button>
+                    </div>
+                </section>
 
                 <!-- MI PLAN (Fase 30) -->
                 <section id="myPlanSection" data-cfg="plan" class="bg-white rounded-2xl border border-slate-100 shadow-sm p-4">
@@ -1822,12 +1841,6 @@
         </div>
     </div>
 
-    <nav data-ui="2" id="mainNav" class="ec-nav ui2-bottomnav" aria-label="Secciones">
-        <button type="button" onclick="switchTab('home')" id="nav-btn-home" data-nav-tab="home" aria-current="page"><span id="nav-pill-home" data-icon="box" data-size="22" style="display:inline-flex"></span><span>Inventario</span></button>
-        <button type="button" onclick="switchTab('credits')" id="nav-btn-credits" data-nav-tab="credits"><span id="nav-pill-credits" data-icon="users" data-size="22" style="display:inline-flex"></span><span>Fiados</span><span id="creditBadge" class="ec-badge hidden">0</span></button>
-        <button type="button" onclick="switchTab('history')" id="nav-btn-history" data-nav-tab="history"><span id="nav-pill-history" data-icon="clock" data-size="22" style="display:inline-flex"></span><span>Historial</span></button>
-    </nav>
-
     <nav data-ui="1" class="fixed bottom-0 left-0 w-full bg-slate-50 border-t border-slate-200 h-20 pb-2 z-40 rounded-t-[2rem] shadow-[0_-5px_15px_rgba(0,0,0,0.05)] flex justify-around items-center px-2 transition-transform duration-300"
         id="mainNav">
     
@@ -2051,9 +2064,14 @@
                             <option value="price">Precio</option>
                         </select>
                     </label>
+                    <div class="ui2-sortmenu">
+                        <button type="button" id="ui2SortBtn" aria-haspopup="menu" aria-expanded="false" aria-label="Ordenar productos" onclick="ui2SortToggle(event)"><span data-icon="sort" data-size="20"></span><span class="ui2-sortmenu__t">Ordenar</span></button>
+                        <div id="ui2SortList" class="hidden" role="menu" aria-label="Ordenar productos"></div>
+                    </div>
                 </div>
                 <div id="ui2CatsRow" class="ui2-inv__cats hidden"><span class="ui2-inv__catlbl">Categorías</span><div id="ui2InvCats" class="ui2-chips" role="group" aria-label="Filtrar productos por categoría"></div></div>
                 <div class="ec-list ui2-inv__list">
+                    <div class="ui2-prow__head" aria-hidden="true"><span></span><span class="l">Producto</span><span>Precio $</span><span>Precio Bs</span><span>Cantidad</span><span></span><span></span></div>
                     <div id="inventoryTableBody" role="list"></div>
                     <div id="emptyInvMsg" class="hidden p-8 text-center text-gray-400 italic bg-white">Inventario vacío o sin resultados</div>
                 </div>

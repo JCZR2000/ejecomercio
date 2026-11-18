@@ -737,8 +737,8 @@ html.ui2 #posPayChips button, .ui2-choice-ic { display: flex; flex-direction: co
   html.ui2 .ui2-prodsheet .ui2-cart__body { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; align-items: start; gap: 12px; }
   html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(1) { grid-column: 1; }
   html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(2) { grid-column: 1; }
-  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(3) { grid-column: 2; grid-row: 1 / span 2; }
-  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(4) { grid-column: 2; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(3) { grid-column: 2; grid-row: 1 / span 2; align-self: stretch; }
+  html.ui2 .ui2-prodsheet .ui2-cart__body > section:nth-of-type(4) { grid-column: 1 / -1; grid-row: 3; }
 }
 
 /* Fase 47: el índice de Ajustes solo existe en horizontal (ver más abajo); en vertical se ven todas las secciones */
@@ -930,3 +930,109 @@ html.ui2 .modal-bg > .ui2-cart.ui2-editcredit { height: auto; max-height: 90dvh;
   .ui2-inv__filters { flex-wrap: nowrap; }
   .ui2-inv__filters > .ui2-chips { flex: 1 1 0; }
 }
+
+/* ===== Fase 49: modo Sencillo ===== */
+/* C1. Inventario: sin chip «Sin costo», sin cifras del mes ni PDF; calculadora solo icono; «Nuevo producto» completo */
+html.ui2.ui2-lite :is([data-f="nocost"], #ui2PutCosts, .ui2-inv__pdf, .ui2-stats--4.ui2-desk-grid, .ui2-costrow) { display: none !important; }
+html.ui2.ui2-lite .ui2-inv__head { flex-wrap: nowrap; }
+html.ui2.ui2-lite .ui2-inv__head .ui2-inv__titlebox { flex: 1 1 0; min-width: 0; overflow: hidden; }
+html.ui2.ui2-lite .ui2-inv__head > .ui2-inv__calc { width: var(--tap-min); padding: 0; }
+html.ui2.ui2-lite .ui2-inv__calc .ui2-xl-only { display: none; }
+html.ui2.ui2-lite .ui2-inv__new .ui2-xl-only { display: inline; }
+/* C4. Escritorio: una sola barra oscura (marca, versión, pestañas, tasa y cuenta), como en el teléfono; sin barra lateral */
+.ui2-brandname { display: none; }
+@media (min-width: 1024px) {
+  html.ui2.ui2-lite .ui2-sidenav { display: none; }
+  html.ui2.ui2-lite body { padding-left: 0; }
+  html.ui2.ui2-lite .ui2-appbar { background: var(--ink); color: #ffffff; border-bottom: 0; }
+  html.ui2.ui2-lite .ui2-appbar > .ui2-mark { display: block; }
+  html.ui2.ui2-lite .ui2-ver--bar { display: inline-block; }
+  html.ui2.ui2-lite .ui2-brandname { display: inline; font: 600 19px/24px var(--font-display); color: #ffffff; }
+  html.ui2.ui2-lite .ui2-brandname b { color: var(--brand-yellow); }
+  html.ui2.ui2-lite .ui2-pagetitle { display: none; }
+  html.ui2.ui2-lite .ui2-bottomnav { display: flex; position: static; flex: 1; align-self: stretch; gap: 4px; margin-left: 16px; padding: 0; background: transparent; border: 0; }
+  html.ui2.ui2-lite .ui2-bottomnav button { flex: 0 0 auto; flex-direction: row; align-items: center; gap: 8px; padding: 0 14px; border-radius: 10px; color: var(--on-ink-muted); font-size: 14px; }
+  html.ui2.ui2-lite .ui2-bottomnav button:hover { color: #ffffff; }
+  html.ui2.ui2-lite .ui2-bottomnav button[aria-current="page"] { color: #ffffff; background: var(--on-ink-subtle); }
+  html.ui2.ui2-lite .ui2-bottomnav .ec-badge { position: static; }
+  html.ui2.ui2-lite .ui2-rate__label, html.ui2.ui2-lite #refreshRateBtn { color: var(--on-ink-muted); }
+  html.ui2.ui2-lite #displayRate { color: #ffffff; }
+  html.ui2.ui2-lite #rateBox { border-color: var(--on-ink-line); }
+  html.ui2.ui2-lite #statusDot { border-color: var(--ink); }
+  html.ui2.ui2-lite .ui2-avatar { display: flex; }
+  html.ui2.ui2-lite .ui2-sync { position: absolute; }
+  html.ui2.ui2-lite #userMenuDropdown { left: auto; right: 16px; top: 72px; bottom: auto; max-height: calc(100vh - 88px); }
+  /* C5. El carrito solo está si hace falta */
+  html.ui2.ui2-lite body[data-tab="home"][data-cart="0"]:not(:has(#posContainer.edit-mode)) #cartModal { display: none; }
+  html.ui2.ui2-lite body[data-tab="home"][data-cart="0"]:not(:has(#posContainer.edit-mode)) main { padding-right: 16px; }
+}
+html.ui2.ui2-lite .ui2-inv__title { font-size: 20px; line-height: 26px; }
+
+/* ===== Fase 49b: ajustes del modo Sencillo (inventario, carrito y cobro de fiados) ===== */
+/* Precio: dólares en negrita y bolívares más suaves, separados por una línea */
+html.ui2.ui2-lite .ui2-prow__price span { padding-left: 8px; border-left: 1px solid var(--border); color: #8a94a6; }
+/* Tabla con divisiones y títulos arriba: tableta vertical y escritorio ancho (de 1024 a 1279 px el panel del carrito deja poco sitio) */
+.ui2-prow__head { display: none; }
+html.ui2.ui2-lite .ui2-prow__del { display: none !important; }
+@media (min-width: 768px) and (max-width: 1023px), (min-width: 1280px) {
+  html.ui2.ui2-lite .ui2-inv__list { --addw: 56px; --cols: 56px minmax(0, 1fr) 96px 124px 96px var(--addw) 52px; }
+  html.ui2.ui2-lite .ui2-prow, html.ui2.ui2-lite .ui2-prow__head { display: grid; grid-template-columns: var(--cols); align-items: center; gap: 0; padding: 12px 16px; }
+  html.ui2.ui2-lite .ui2-prow__head { padding-top: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); font: 600 12px/16px var(--font-sans); letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); text-align: center; }
+  html.ui2.ui2-lite .ui2-prow__head .l { text-align: left; }
+  html.ui2.ui2-lite .ui2-prow__body, html.ui2.ui2-lite .ui2-prow__price { display: contents; }
+  html.ui2.ui2-lite .ui2-prow__tile { margin-right: 12px; }
+  html.ui2.ui2-lite .ui2-prow__price b, html.ui2.ui2-lite .ui2-prow__price span, html.ui2.ui2-lite .ui2-prow__stock, html.ui2.ui2-lite .ui2-prow .ec-chip { align-self: stretch; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 8px; border-left: 1px solid var(--border); border-radius: 0; background: transparent; font-size: 15px; }
+  html.ui2.ui2-lite .ui2-prow__price span { font-weight: 400; }
+  html.ui2.ui2-lite .ui2-prow__stock, html.ui2.ui2-lite .ui2-prow .ec-chip { border-right: 1px solid var(--border); font-size: 13px; }
+  html.ui2.ui2-lite .ui2-prow__add { justify-self: center; margin-left: 8px; }
+  html.ui2.ui2-lite .ui2-prow .ec-iconbtn { justify-self: end; }
+}
+@media (min-width: 1280px) { html.ui2.ui2-lite .ui2-inv__list { --addw: 132px; } }
+/* Teléfono: «Ordenar» pasa a ser un icono */
+@media (max-width: 719px) {
+  html.ui2.ui2-lite .ui2-inv__filters { flex-wrap: nowrap; }
+  html.ui2.ui2-lite .ui2-inv__filters > .ui2-chips { flex: 1 1 0; }
+}
+/* Carrito de escritorio: entra deslizando y el espacio de la lista se ajusta suave */
+@keyframes ui2LiteCartIn { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (min-width: 1024px) {
+  html.ui2.ui2-lite main { transition: padding-right .25s ease; }
+  html.ui2.ui2-lite body[data-tab="home"] #cartModal { animation: ui2LiteCartIn .25s ease-out; }
+}
+@media (prefers-reduced-motion: reduce) { html.ui2.ui2-lite body[data-tab="home"] #cartModal { animation: none; } html.ui2.ui2-lite main { transition: none; } }
+/* Cobro de un fiado: monto en dólares y bolívares grandes, pago enseguida y herramientas a mano */
+html.ui2.ui2-lite .ui2-detail .ec-amount--xl { flex-direction: row; flex-wrap: wrap; align-items: baseline; column-gap: 14px; }
+html.ui2.ui2-lite .ui2-detail .ec-amount--xl .ec-amount__bs { font: 600 26px/32px var(--font-display); color: var(--text-muted); }
+html.ui2.ui2-lite .ui2-detail .ui2-lines > .ui2-line { display: none; }
+html.ui2.ui2-lite .ui2-detail .ui2-lines { padding-top: 0; border-top: 0; }
+html.ui2.ui2-lite .ui2-detail .ui2-acts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+html.ui2.ui2-lite .ui2-detail .ui2-acts .ui2-act { flex-direction: column; justify-content: center; align-items: center; gap: 4px; min-height: 64px; padding: 8px 2px; text-align: center; font-size: 12px; }
+html.ui2.ui2-lite .ui2-detail .ui2-act__t small { display: none; }
+html.ui2.ui2-lite .ui2-detail .ui2-act__t b { font-size: 12px; }
+.ui2-prow__nm { min-width: 0; }
+
+/* Teléfono, modo Sencillo: «Quedan 4» pasa a «4 u.» en su insignia y los dos precios no se parten */
+.ui2-lowu { display: none; }
+.ui2-prow__price, .ui2-prow__price span { white-space: nowrap; }
+@media (max-width: 719px) {
+  html.ui2.ui2-lite .ui2-lowlbl { display: none; }
+  html.ui2.ui2-lite .ui2-lowu { display: inline; }
+  html.ui2.ui2-lite .ui2-prow .ec-chip { padding: 2px 8px; flex-shrink: 0; }
+  html.ui2.ui2-lite .ui2-prow { gap: 10px; }
+}
+
+/* Menú de orden del modo Sencillo (reemplaza el selector): icono en el teléfono, icono y texto desde 720 px */
+.ui2-sortmenu { display: none; }
+html.ui2.ui2-lite .ui2-inv__filters .ui2-sort { display: none; }
+html.ui2.ui2-lite .ui2-sortmenu { display: block; position: relative; flex-shrink: 0; }
+.ui2-sortmenu > button { display: inline-flex; align-items: center; gap: 6px; height: 44px; min-width: 44px; padding: 0 10px; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); color: #475569; font: 600 13px var(--font-sans); cursor: pointer; }
+.ui2-sortmenu > button[aria-expanded="true"] { border-color: var(--primary); }
+.ui2-sortmenu__t { display: none; }
+@media (min-width: 720px) { .ui2-sortmenu__t { display: inline; } .ui2-sortmenu > button { height: 38px; } }
+#ui2SortList:not(.hidden) { display: flex; flex-direction: column; position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; min-width: 230px; padding: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 8px 24px rgba(15, 23, 42, .14); }
+#ui2SortList button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text); font: 500 14px var(--font-sans); text-align: left; cursor: pointer; }
+#ui2SortList button:hover { background: var(--bg); }
+#ui2SortList button[aria-checked="true"] { background: var(--primary-soft); color: var(--primary-ink); font-weight: 600; }
+.ui2-sortmenu__ic { display: inline-flex; color: var(--primary); }
+/* Cobro de un fiado: herramientas en tres columnas, repartidas parejas */
+html.ui2.ui2-lite .ui2-detail .ui2-acts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
