@@ -114,6 +114,7 @@
             toggleUnlimitedField();
             $('prodPrice').value = p.price;
             $('prodCost').value = p.cost ?? '';
+            $('prodCostNote')?.remove();
             $('prodCategory').value = p.category || '';
             $('prodHideBox').classList.toggle('hidden', !normalizeCatalogConfig().allowHide);
             $('prodHideCatalog').checked = p.hideInCatalog === true;
@@ -168,6 +169,7 @@
             toggleUnlimitedField();
             $('prodPrice').value = '';
             $('prodCost').value = '';
+            $('prodCostNote')?.remove(); // Fase 48: la nota de la calculadora no pasa al siguiente producto
             if (typeof ui2HideCost === 'function') ui2HideCost(); // Fase 44: la fila «Costo» vuelve a quedar oculta
             $('prodCategory').value = '';
             $('prodHideCatalog').checked = false;

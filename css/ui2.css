@@ -901,3 +901,32 @@ html.ui2 .modal-bg > .ui2-cart.ui2-editcredit { height: auto; max-height: 90dvh;
 @media (min-width: 640px) and (orientation: portrait) {
   html.ui2 #cartModal > .ui2-cart { max-width: 640px; height: 86dvh; max-height: 86dvh; }
 }
+
+/* ===== Fase 48: tableta en vertical ===== */
+/* D. «Por cobrar»: los botones no estiran la fila del rótulo (todos los tamaños) */
+.ui2-debtcard { position: relative; }
+.ui2-debtcard__tools { position: absolute; top: 14px; right: 14px; }
+/* E. Billetera de «Cobrado este mes» */
+.ui2-debtcard__month [data-icon] { align-self: center; display: inline-flex; color: var(--success); }
+/* H. Carrito: sin hueco con productos y «Total $» en la línea de los $ («Editar fiado» mantiene su center) */
+.ui2-card.ui2-cartlist:has(.ui2-crow) { min-height: 0; }
+.ui2-cart__totals { align-items: flex-start; }
+.ui2-cart__totals #cartTotalLabel { line-height: 28px; }
+.ui2-cart__bs { margin-top: 4px; }
+@media (min-width: 640px) and (orientation: portrait) {
+  /* A. Estado de la vitrina junto a la Tasa */
+  html.ui2 .ui2-status { justify-content: flex-end; }
+  /* B. «Calcular precio» con texto */
+  .ui2-inv__head > .ui2-inv__calc { width: auto; padding: 0 14px; }
+  .ui2-inv__calc .ui2-xl-only { display: inline; }
+  /* F. Historial y Tasa de fiados con texto */
+  html.ui2 .ui2-debtcard__tools span.ui2-desk-only { display: inline !important; }
+  .ui2-debtcard__tools .ec-iconbtn { width: auto; padding: 0 12px; gap: 6px; font: 600 14px var(--font-sans); }
+  /* G. «Recordar a los atrasados» a todo el ancho */
+  .ui2-debtcard__btn { align-self: stretch; justify-content: center; }
+}
+/* C. «Ordenar» en la fila de los filtros (a 640 px, con «Poner costos», los chips no caben) */
+@media (min-width: 720px) and (orientation: portrait) {
+  .ui2-inv__filters { flex-wrap: nowrap; }
+  .ui2-inv__filters > .ui2-chips { flex: 1 1 0; }
+}
