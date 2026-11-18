@@ -151,10 +151,13 @@
                     if (!note) {
                         note = document.createElement('p');
                         note.id = 'prodCostNote';
-                        note.className = 'text-[10px] text-green-700 font-bold mt-1';
-                        $('prodPrice').parentElement.appendChild(note);
+                        // Fase 48: en Mostrador va en la sección Costo (fuera de la caja oculta por PIN, sin cifra); en el clásico, bajo el precio
+                        const costBox = UI2 && $('ui2CostEditBox');
+                        note.className = costBox ? 'ec-field__hint' : 'text-[10px] text-green-700 font-bold mt-1';
+                        if (costBox) { note.style.color = 'var(--success)'; costBox.after(note); }
+                        else $('prodPrice').parentElement.appendChild(note);
                     }
-                    note.textContent = `Costo guardado: ${formatMoney(unitCost)}`;
+                    note.textContent = UI2 && $('ui2CostEditBox') ? 'Costo guardado desde la calculadora' : `Costo guardado: ${formatMoney(unitCost)}`;
                 }
 
                 // Feedback visual en el input de precio
