@@ -55,6 +55,9 @@
             share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4M8.7 13.3l6.6 4.4"/>',
             copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
             link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+            sort: '<path d="M7 4v16M3 16l4 4 4-4M17 20V4M13 8l4-4 4 4"/>',
+            'arrow-up': '<path d="M12 19V5M5 12l7-7 7 7"/>',
+            'arrow-down': '<path d="M12 5v14M19 12l-7 7-7-7"/>',
             phone: '<rect x="5.5" y="2" width="13" height="20" rx="2.5"/><path d="M10.5 18h3"/>',
             warning: '<path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
             info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
@@ -165,7 +168,7 @@
 
         // Fase 47: Ajustes en dos paneles en horizontal (categorías a la izquierda). El CSS decide si se ve el nav; en vertical se ven todas las secciones.
         // La sección elegida vive aquí (no en state ni en localStorage).
-        const UI2_CFG = [['plan', 'Mi plan', 'crown'], ['rate', 'Tasa de cambio', 'coins'], ['storage', 'Almacenamiento', 'cloud'], ['security', 'Seguridad', 'lock'], ['fiados', 'Fiados', 'users'], ['billing', 'Facturación', 'receipt'], ['catalog', 'Vitrina', 'store'], ['danger', 'Zona de limpieza', 'trash']];
+        const UI2_CFG = [['view', 'Pantalla', 'phone'], ['plan', 'Mi plan', 'crown'], ['rate', 'Tasa de cambio', 'coins'], ['storage', 'Almacenamiento', 'cloud'], ['security', 'Seguridad', 'lock'], ['fiados', 'Fiados', 'users'], ['billing', 'Facturación', 'receipt'], ['catalog', 'Vitrina', 'store'], ['danger', 'Zona de limpieza', 'trash']];
         let ui2CfgKey = '';
         // expand: en vertical abre esa sección (candado Pro); sin expand, en vertical se pliegan todas (al abrir Ajustes)
         function ui2CfgShow(key, expand) {
@@ -211,20 +214,29 @@
         }
         if (UI2) ui2CfgInit();
 
-        // Un solo botón alterna entre los dos diseños. Se guarda y se recarga: no se redibuja en caliente.
-        async function toggleDesign() {
-            if (state.cart.length > 0) {
+        // Fase 49: 'lite' (Sencillo), '2' (Completo) o '1' (diseño anterior). Entre Sencillo y Completo solo cambia la clase (sin recargar); hacia o desde el anterior se guarda y se recarga.
+        function ui2MarkMode() {
+            const cur = UI2 ? (document.documentElement.classList.contains('ui2-lite') ? 'lite' : '2') : '1';
+            document.querySelectorAll('#uiModePicker [data-mode]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === cur)));
+        }
+        async function setUiMode(mode) {
+            const cur = UI2 ? (document.documentElement.classList.contains('ui2-lite') ? 'lite' : '2') : '1';
+            if (mode === cur) return;
+            const reload = !UI2 || mode === '1';
+            if (reload && state.cart.length > 0) {
                 const ok = await customConfirm('Venta sin cobrar', 'Tienes una venta sin cobrar. Al cambiar de diseño se vacía el carrito.', 'warning', null, 'Cambiar de diseño');
                 if (!ok) return;
             }
-            await waitForUpload();
-            if (UI2) {
-                try { localStorage.removeItem('inv_ui'); } catch (e) {}
-            } else if (!safeSetItem('inv_ui', '2')) {
-                return customAlert('Diseño', 'No se pudo guardar la preferencia en este dispositivo.', 'error');
-            }
-            location.reload();
+            if (reload) await waitForUpload();
+            if (!safeSetItem('inv_ui', mode)) return customAlert('Diseño', 'No se pudo guardar la preferencia en este dispositivo.', 'error');
+            if (reload) return location.reload();
+            document.documentElement.classList.toggle('ui2-lite', mode === 'lite');
+            if (mode === 'lite' && ui2InvFilter === 'nocost') ui2InvFilter = 'all';
+            renderAll();
+            ui2MarkMode();
         }
+        function toggleDesign() { return setUiMode(UI2 ? '1' : 'lite'); }
+        ui2MarkMode();
 
         // En esta fase el botón solo lo ve el administrador. Dentro del diseño nuevo se ve siempre, para poder volver.
         document.addEventListener('DOMContentLoaded', () => auth.onAuthStateChanged(() => {
@@ -266,6 +278,26 @@
         function ui2SetFilter(key) { ui2InvFilter = key; renderAll(); }
         // Fase 44: tarjeta «Sin costo» y enlace «Poner costos». Mismo PIN que Ganancias (el costo sigue oculto sin él); no exige Pro.
         function ui2OpenMissingCosts() { checkAuth('profit', () => openCosts(true)); }
+        // Menú de orden del modo Sencillo: cada opción fija columna y sentido (texto fijo, sin datos del usuario)
+        const UI2_SORTS = [['name', true, 'Nombre A–Z'], ['name', false, 'Nombre Z–A'], ['qty', true, 'Menos existencia'], ['qty', false, 'Más existencia'], ['price', true, 'Precio menor'], ['price', false, 'Precio mayor']];
+        function ui2SortMark() {
+            const l = $('ui2SortList');
+            if (l) l.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-checked', String(UI2_SORTS[i][0] === state.sortCol && UI2_SORTS[i][1] === state.sortAsc)));
+        }
+        function ui2SortToggle(e, force) {
+            const l = $('ui2SortList'), b = $('ui2SortBtn');
+            if (!l) return;
+            if (e) e.stopPropagation();
+            const open = force === undefined ? l.classList.contains('hidden') : force;
+            l.classList.toggle('hidden', !open);
+            b.setAttribute('aria-expanded', String(open));
+        }
+        function ui2SortSet(i) { state.sortCol = UI2_SORTS[i][0]; state.sortAsc = UI2_SORTS[i][1]; ui2SortToggle(null, false); renderAll(); }
+        if (UI2 && $('ui2SortList')) {
+            $('ui2SortList').innerHTML = UI2_SORTS.map(([c, asc, t], i) => `<button type="button" role="menuitemradio" aria-checked="false" onclick="ui2SortSet(${i})"><span class="ui2-sortmenu__ic">${icon(asc ? 'arrow-up' : 'arrow-down', 18)}</span>${t}</button>`).join('');
+            document.addEventListener('click', e => { if (!e.target.closest('.ui2-sortmenu')) ui2SortToggle(null, false); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') ui2SortToggle(null, false); });
+        }
         function ui2SortChange(col) { if (state.sortCol !== col) sortInventory(col); }
 
         function renderUi2Filters() {
@@ -290,6 +322,7 @@
             if (focused) { const b = [...document.querySelectorAll('#ui2InvFilters button, #ui2InvCats button')].find(x => x.dataset.f === focused); if (b) b.focus(); }
             const sort = $('ui2Sort');
             if (sort) sort.value = state.sortCol;
+            ui2SortMark();
         }
 
         function ui2Tile(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return UI2_TILES[h % UI2_TILES.length]; }
@@ -307,14 +340,14 @@
             body.innerHTML = list.map(p => {
                 const id = escapeHtml(String(p.id)), name = escapeHtml(p.name), q = ui2Qty(p);
                 const unl = isUnlimited(p), out = !unl && q <= 0, low = !unl && !out && q < UI2_LOW_STOCK;
-                const stock = unl ? '∞' : out ? 'Agotado' : low ? 'Quedan ' + q : q + ' u.';
+                const stock = unl ? '∞' : out ? 'Agotado' : low ? `<span class="ui2-lowlbl">Quedan </span>${q}<span class="ui2-lowu"> u.</span>` : q + ' u.';
                 const stockCls = out ? 'ec-chip ec-chip--neutral' : low ? 'ec-chip ec-chip--warning' : 'ui2-prow__stock';
                 const cat = ui2Cat(p);
                 return `<div class="ui2-prow" role="listitem"${out ? ' style="opacity:.6"' : ''}>
                     ${ui2ProdTile(p, `<span class="ui2-prow__badge hidden" data-cart-badge="${id}">0</span>`)}
                     <div class="ui2-prow__body">
-                        <button type="button" class="ui2-prow__name" onclick="editProduct('${id}')" aria-label="Editar ${name}">${name}</button>
-                        ${cat ? `<div class="ui2-prow__cat">${escapeHtml(cat)}</div>` : ''}
+                        <div class="ui2-prow__nm"><button type="button" class="ui2-prow__name" onclick="editProduct('${id}')" aria-label="Editar ${name}">${name}</button>
+                        ${cat ? `<div class="ui2-prow__cat">${escapeHtml(cat)}</div>` : ''}</div>
                         <div class="ui2-prow__price"><b>${formatMoney(p.price)}</b><span>Bs ${(p.price * rate).toFixed(2)}</span></div>
                     </div>
                     <span class="${stockCls}">${stock}</span>
@@ -414,6 +447,7 @@
         function ui2AfterRenderCart(totalItems, totalUSD, rate, sym) {
             const bar = $('fabCart');
             if (bar) bar.dataset.count = totalItems;
+            document.body.dataset.cart = totalItems > 0 ? '1' : '0'; // Fase 49: el modo Sencillo solo muestra el panel con productos
             const set = (id, t) => { const e = $(id); if (e) e.textContent = t; };
             set('ui2CartCount', totalItems + (totalItems === 1 ? ' producto' : ' productos'));
             set('ui2CartBs', 'Bs ' + (totalUSD * rate).toFixed(2));
@@ -866,17 +900,31 @@
             console.assert(swapNo, 'ui2SwapIcon cambió marcas, desconocidos o el recibo');
             console.assert(mapOk, 'UI2_FA_MAP apunta a un icono que no existe');
             // Fase 44: fila «Costo» oculta al limpiar, el campo escribe en #prodCost, y cada método de pago tiene su icono
-            const prevCost = $('prodCost').value;
-            ui2HideCost();
-            const costHidden = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '';
-            $('ui2CostEditBox').classList.remove('hidden'); $('ui2ProdCostEdit').value = '2.5'; ui2CostInput();
-            const costCopies = $('prodCost').value === '2.5';
-            ui2HideCost(); $('prodCost').value = prevCost;
-            const costBack = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '' && $('prodCost').value === prevCost;
+            let costHidden = true, costCopies = true, costBack = true; // en el diseño anterior no existe la fila «Costo» del Mostrador
+            if (UI2) {
+                const prevCost = $('prodCost').value;
+                ui2HideCost();
+                costHidden = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '';
+                $('ui2CostEditBox').classList.remove('hidden'); $('ui2ProdCostEdit').value = '2.5'; ui2CostInput();
+                costCopies = $('prodCost').value === '2.5';
+                ui2HideCost(); $('prodCost').value = prevCost;
+                costBack = $('ui2CostEditBox').classList.contains('hidden') && $('ui2ProdCostEdit').value === '' && $('prodCost').value === prevCost;
+            }
             const payIconsOk = PAY_METHODS.every(m => UI2_PAY_ICONS[m.key] in UI2_ICONS) && new Set(PAY_METHODS.map(m => UI2_PAY_ICONS[m.key])).size === PAY_METHODS.length;
             console.assert(costHidden && costCopies && costBack, 'La fila Costo no se oculta o no copia a #prodCost', { costHidden, costCopies, costBack });
             console.assert(payIconsOk, 'Cada método de pago necesita un icono distinto en UI2_PAY_ICONS');
-            const ok = costHidden && costCopies && costBack && payIconsOk && swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
+            // Fase 49: la clase ui2-lite existe solo con inv_ui = 'lite'; en Sencillo no se ven la barra lateral (escritorio) ni la chip «Sin costo»
+            let stored = null; try { stored = localStorage.getItem('inv_ui'); } catch (e) {}
+            const liteClassOk = document.documentElement.classList.contains('ui2-lite') === (stored === 'lite');
+            let liteHideOk = true;
+            if (UI2 && document.documentElement.classList.contains('ui2-lite')) {
+                const chip = document.createElement('button'); chip.dataset.f = 'nocost'; document.body.appendChild(chip);
+                liteHideOk = getComputedStyle(chip).display === 'none' && (innerWidth < 1024 || getComputedStyle(document.querySelector('.ui2-sidenav')).display === 'none');
+                chip.remove();
+            }
+            console.assert(liteClassOk, 'ui2-lite debe existir solo con inv_ui = lite');
+            console.assert(liteHideOk, 'En Sencillo la chip nocost y la barra lateral deben estar ocultas');
+            const ok = liteClassOk && liteHideOk && costHidden && costCopies && costBack && payIconsOk && swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
             console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk, movesOk, groupsOk, noCostOk, limitOk });
             return ok;
         }
