@@ -190,6 +190,10 @@
             nav.querySelectorAll('button').forEach(b => {
                 const sub = document.querySelector(`#configModal [data-cfg="${b.dataset.key}"] .uppercase`); // subtítulo de la sección (o del summary)
                 b.querySelector('small').textContent = sub ? sub.textContent.trim() : '';
+                // Fase 50: el icono del índice lleva el color del cuadro de icono de su sección
+                const box = document.querySelector(`#configModal [data-cfg="${b.dataset.key}"] .w-10.h-10`);
+                const bg = box && [...box.classList].find(c => /^bg-[a-z]+-\d+$/.test(c));
+                if (bg) b.querySelector('.ui2-cfgnav__ic').classList.add(bg, 'text-white');
             });
             // Fase 47b: en vertical cada sección se pliega a su cabecera; tocarla la abre y pliega las demás (en horizontal el CSS no la pliega)
             document.querySelectorAll('#configModal section[data-cfg] > :first-child').forEach(h => {
@@ -212,30 +216,24 @@
             const h = sec.querySelector('.ui2-cfghead');
             if (h) h.setAttribute('aria-expanded', String(!fold));
         }
-        if (UI2) ui2CfgInit();
+        ui2CfgInit();
 
-        // Fase 49: 'lite' (Sencillo), '2' (Completo) o '1' (diseño anterior). Entre Sencillo y Completo solo cambia la clase (sin recargar); hacia o desde el anterior se guarda y se recarga.
+        // Fase 50: dos diseños, Clásico ('1', predeterminado) y Moderno ('2'). Todo cambio cruza de diseño: se guarda y se recarga.
         function ui2MarkMode() {
-            const cur = UI2 ? (document.documentElement.classList.contains('ui2-lite') ? 'lite' : '2') : '1';
+            const cur = UI2 ? '2' : '1';
             document.querySelectorAll('#uiModePicker [data-mode]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === cur)));
         }
         async function setUiMode(mode) {
-            const cur = UI2 ? (document.documentElement.classList.contains('ui2-lite') ? 'lite' : '2') : '1';
-            if (mode === cur) return;
-            const reload = !UI2 || mode === '1';
-            if (reload && state.cart.length > 0) {
+            if (mode === (UI2 ? '2' : '1')) return;
+            if (state.cart.length > 0) {
                 const ok = await customConfirm('Venta sin cobrar', 'Tienes una venta sin cobrar. Al cambiar de diseño se vacía el carrito.', 'warning', null, 'Cambiar de diseño');
                 if (!ok) return;
             }
-            if (reload) await waitForUpload();
+            await waitForUpload();
             if (!safeSetItem('inv_ui', mode)) return customAlert('Diseño', 'No se pudo guardar la preferencia en este dispositivo.', 'error');
-            if (reload) return location.reload();
-            document.documentElement.classList.toggle('ui2-lite', mode === 'lite');
-            if (mode === 'lite' && ui2InvFilter === 'nocost') ui2InvFilter = 'all';
-            renderAll();
-            ui2MarkMode();
+            location.reload();
         }
-        function toggleDesign() { return setUiMode(UI2 ? '1' : 'lite'); }
+        function toggleDesign() { return setUiMode(UI2 ? '1' : '2'); }
         ui2MarkMode();
 
         // En esta fase el botón solo lo ve el administrador. Dentro del diseño nuevo se ve siempre, para poder volver.
@@ -278,26 +276,6 @@
         function ui2SetFilter(key) { ui2InvFilter = key; renderAll(); }
         // Fase 44: tarjeta «Sin costo» y enlace «Poner costos». Mismo PIN que Ganancias (el costo sigue oculto sin él); no exige Pro.
         function ui2OpenMissingCosts() { checkAuth('profit', () => openCosts(true)); }
-        // Menú de orden del modo Sencillo: cada opción fija columna y sentido (texto fijo, sin datos del usuario)
-        const UI2_SORTS = [['name', true, 'Nombre A–Z'], ['name', false, 'Nombre Z–A'], ['qty', true, 'Menos existencia'], ['qty', false, 'Más existencia'], ['price', true, 'Precio menor'], ['price', false, 'Precio mayor']];
-        function ui2SortMark() {
-            const l = $('ui2SortList');
-            if (l) l.querySelectorAll('button').forEach((b, i) => b.setAttribute('aria-checked', String(UI2_SORTS[i][0] === state.sortCol && UI2_SORTS[i][1] === state.sortAsc)));
-        }
-        function ui2SortToggle(e, force) {
-            const l = $('ui2SortList'), b = $('ui2SortBtn');
-            if (!l) return;
-            if (e) e.stopPropagation();
-            const open = force === undefined ? l.classList.contains('hidden') : force;
-            l.classList.toggle('hidden', !open);
-            b.setAttribute('aria-expanded', String(open));
-        }
-        function ui2SortSet(i) { state.sortCol = UI2_SORTS[i][0]; state.sortAsc = UI2_SORTS[i][1]; ui2SortToggle(null, false); renderAll(); }
-        if (UI2 && $('ui2SortList')) {
-            $('ui2SortList').innerHTML = UI2_SORTS.map(([c, asc, t], i) => `<button type="button" role="menuitemradio" aria-checked="false" onclick="ui2SortSet(${i})"><span class="ui2-sortmenu__ic">${icon(asc ? 'arrow-up' : 'arrow-down', 18)}</span>${t}</button>`).join('');
-            document.addEventListener('click', e => { if (!e.target.closest('.ui2-sortmenu')) ui2SortToggle(null, false); });
-            document.addEventListener('keydown', e => { if (e.key === 'Escape') ui2SortToggle(null, false); });
-        }
         function ui2SortChange(col) { if (state.sortCol !== col) sortInventory(col); }
 
         function renderUi2Filters() {
@@ -322,7 +300,6 @@
             if (focused) { const b = [...document.querySelectorAll('#ui2InvFilters button, #ui2InvCats button')].find(x => x.dataset.f === focused); if (b) b.focus(); }
             const sort = $('ui2Sort');
             if (sort) sort.value = state.sortCol;
-            ui2SortMark();
         }
 
         function ui2Tile(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return UI2_TILES[h % UI2_TILES.length]; }
@@ -340,7 +317,7 @@
             body.innerHTML = list.map(p => {
                 const id = escapeHtml(String(p.id)), name = escapeHtml(p.name), q = ui2Qty(p);
                 const unl = isUnlimited(p), out = !unl && q <= 0, low = !unl && !out && q < UI2_LOW_STOCK;
-                const stock = unl ? '∞' : out ? 'Agotado' : low ? `<span class="ui2-lowlbl">Quedan </span>${q}<span class="ui2-lowu"> u.</span>` : q + ' u.';
+                const stock = unl ? '∞' : out ? 'Agotado' : low ? `Quedan ${q}` : q + ' u.';
                 const stockCls = out ? 'ec-chip ec-chip--neutral' : low ? 'ec-chip ec-chip--warning' : 'ui2-prow__stock';
                 const cat = ui2Cat(p);
                 return `<div class="ui2-prow" role="listitem"${out ? ' style="opacity:.6"' : ''}>
@@ -447,7 +424,7 @@
         function ui2AfterRenderCart(totalItems, totalUSD, rate, sym) {
             const bar = $('fabCart');
             if (bar) bar.dataset.count = totalItems;
-            document.body.dataset.cart = totalItems > 0 ? '1' : '0'; // Fase 49: el modo Sencillo solo muestra el panel con productos
+            document.body.dataset.cart = totalItems > 0 ? '1' : '0'; // Fase 50: la barra del carrito lo usa para dejar sitio en el Clásico
             const set = (id, t) => { const e = $(id); if (e) e.textContent = t; };
             set('ui2CartCount', totalItems + (totalItems === 1 ? ' producto' : ' productos'));
             set('ui2CartBs', 'Bs ' + (totalUSD * rate).toFixed(2));
@@ -913,17 +890,19 @@
             const payIconsOk = PAY_METHODS.every(m => UI2_PAY_ICONS[m.key] in UI2_ICONS) && new Set(PAY_METHODS.map(m => UI2_PAY_ICONS[m.key])).size === PAY_METHODS.length;
             console.assert(costHidden && costCopies && costBack, 'La fila Costo no se oculta o no copia a #prodCost', { costHidden, costCopies, costBack });
             console.assert(payIconsOk, 'Cada método de pago necesita un icono distinto en UI2_PAY_ICONS');
-            // Fase 49: la clase ui2-lite existe solo con inv_ui = 'lite'; en Sencillo no se ven la barra lateral (escritorio) ni la chip «Sin costo»
+            // Fase 50: dos diseños; 'lite' y vacío dan el Clásico. Una sola entrada, una sola barra del carrito, y un botón de Ajustes por sección
             let stored = null; try { stored = localStorage.getItem('inv_ui'); } catch (e) {}
-            const liteClassOk = document.documentElement.classList.contains('ui2-lite') === (stored === 'lite');
-            let liteHideOk = true;
-            if (UI2 && document.documentElement.classList.contains('ui2-lite')) {
-                const chip = document.createElement('button'); chip.dataset.f = 'nocost'; document.body.appendChild(chip);
-                liteHideOk = getComputedStyle(chip).display === 'none' && (innerWidth < 1024 || getComputedStyle(document.querySelector('.ui2-sidenav')).display === 'none');
-                chip.remove();
-            }
-            console.assert(liteClassOk, 'ui2-lite debe existir solo con inv_ui = lite');
-            console.assert(liteHideOk, 'En Sencillo la chip nocost y la barra lateral deben estar ocultas');
+            const liteClassOk = UI2 === (stored === '2');
+            const loginOk = document.querySelectorAll('#loginOverlay').length === 1 && $('loginOverlay').classList.contains('ui2-login');
+            const cartBars = document.querySelectorAll('#fabCart');
+            const cartBarOk = cartBars.length === 1 && cartBars[0].classList.contains('ui2-cartbar') && Number(cartBars[0].dataset.count) === state.cart.reduce((n, i) => n + i.qty, 0);
+            const cfgNav = document.querySelector('#configModal .ui2-cfgnav');
+            const cfgNavOk = !!cfgNav && cfgNav.querySelectorAll('button').length === UI2_CFG.length;
+            console.assert(liteClassOk, 'UI2 debe ser true solo con inv_ui = 2');
+            console.assert(loginOk, 'Debe haber un solo #loginOverlay con la clase ui2-login');
+            console.assert(cartBarOk, 'Debe haber un solo #fabCart (ui2-cartbar) con data-count igual a los productos del carrito');
+            console.assert(cfgNavOk, 'El índice de Ajustes debe tener un botón por sección');
+            const liteHideOk = loginOk && cartBarOk && cfgNavOk;
             const ok = liteClassOk && liteHideOk && costHidden && costCopies && costBack && payIconsOk && swapA && swapB && swapNo && mapOk && noUiInCloud && dupIds.length === 0 && leftover === 0 && iconOk && filterOk && stateOk && breakdownOk && statusOk && credStateOk && movesOk && groupsOk && noCostOk && limitOk;
             console.log(ok ? '✅ selfTestUi2: todo bien' : '❌ selfTestUi2: revisar', { ui2: UI2, noUiInCloud, dupIds, leftover, iconOk, filterOk, stateOk, breakdownOk, statusOk, credStateOk, movesOk, groupsOk, noCostOk, limitOk });
             return ok;

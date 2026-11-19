@@ -202,7 +202,7 @@
             const note = $('myPlanFeature');
             note.textContent = feature ? feature.charAt(0).toUpperCase() + feature.slice(1) + ' es parte de Pro' : '';
             note.classList.toggle('hidden', !feature);
-            if (UI2) ui2CfgShow('plan', true); // Fase 47: la sección «Mi plan» (en vertical, abierta)
+            ui2CfgShow('plan', true); // Fase 47: la sección «Mi plan» (en vertical, abierta)
             $('myPlanSection').scrollIntoView({ block: 'start' });
         }
 
