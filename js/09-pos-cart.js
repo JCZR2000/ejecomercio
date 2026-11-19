@@ -288,10 +288,9 @@
                 </tr>`;
             });
             
-            if (UI2) {
-                tbody.innerHTML = uiRows.join('');
-                if (typeof ui2AfterRenderCart === 'function') ui2AfterRenderCart(totalItems, totalUSD, activeRate, sym);
-            }
+            if (UI2) tbody.innerHTML = uiRows.join('');
+            // Fase 50: la barra del carrito (#fabCart) existe en los dos diseños
+            if (typeof ui2AfterRenderCart === 'function') ui2AfterRenderCart(totalItems, totalUSD, activeRate, sym);
 
             // UI de Estado Vacío
             const emptyMsg = $('cartEmptyMsg');
